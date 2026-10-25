@@ -244,8 +244,9 @@ export async function exportBlessingAsImage(blessing, options = {}) {
 
     // Measure Proof Lines (if present)
     let proofLines = [];
+    const proofFontFamily = blessing.proofType === 'quran' ? '"Amiri Quran", "Amiri", serif' : '"Amiri", serif';
     if (proofText) {
-      ctx.font = `bold italic ${proofFontSize}px "Amiri", serif`;
+      ctx.font = `bold italic ${proofFontSize}px ${proofFontFamily}`;
       proofLines = splitTextIntoLines(ctx, proofText, textMaxWidth - (isSquare ? 100 : 120));
     }
 
@@ -296,7 +297,7 @@ export async function exportBlessingAsImage(blessing, options = {}) {
 
       // Render Proof lines inside the box
       let proofCurrentY = boxY + boxPaddingTop + (proofLineHeight * 0.7);
-      ctx.font = `bold italic ${proofFontSize}px "Amiri", serif`;
+      ctx.font = `bold italic ${proofFontSize}px ${proofFontFamily}`;
       ctx.fillStyle = theme.proofText;
 
       for (let i = 0; i < proofLines.length; i++) {

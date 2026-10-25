@@ -6,6 +6,7 @@ import GratitudeInteractions from './components/GratitudeInteractions';
 import FavoritesDrawer from './components/FavoritesDrawer';
 import GratitudeJournalDrawer from './components/GratitudeJournalDrawer';
 import NotificationModal from './components/NotificationModal';
+import FocusReflectionModal from './components/FocusReflectionModal';
 import AddBlessingModal from './components/AddBlessingModal';
 import SearchExploreModal from './components/SearchExploreModal';
 import ShareModal from './components/ShareModal';
@@ -248,6 +249,7 @@ export default function App() {
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isFocusModeOpen, setIsFocusModeOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -274,7 +276,7 @@ export default function App() {
     const handleKeyDown = (e) => {
       // Don't trigger if user is typing in an input or textarea
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
-      if (isFavoritesOpen || isJournalOpen || isNotificationsOpen || isAddModalOpen || isSearchOpen || isShareOpen) return;
+      if (isFavoritesOpen || isJournalOpen || isNotificationsOpen || isAddModalOpen || isSearchOpen || isShareOpen || isFocusModeOpen) return;
 
       if (e.code === 'Space') {
         e.preventDefault();
@@ -290,7 +292,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleRandom, handleNext, handlePrev, isFavoritesOpen, isJournalOpen, isNotificationsOpen, isAddModalOpen, isSearchOpen, isShareOpen]);
+  }, [handleRandom, handleNext, handlePrev, isFavoritesOpen, isJournalOpen, isNotificationsOpen, isAddModalOpen, isSearchOpen, isShareOpen, isFocusModeOpen]);
 
   // Milestone title based on dailyCount
   const getMilestoneLabel = () => {
@@ -352,6 +354,7 @@ export default function App() {
           onToggleFavorite={toggleFavorite}
           onShare={handleOpenShare}
           onDownloadImage={handleDownloadImage}
+          onOpenFocusMode={() => setIsFocusModeOpen(true)}
           animatingKey={animatingKey}
         />
 
@@ -396,6 +399,15 @@ export default function App() {
       <NotificationModal
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
+      />
+
+      <FocusReflectionModal
+        isOpen={isFocusModeOpen}
+        onClose={() => setIsFocusModeOpen(false)}
+        blessing={currentBlessing}
+        onNext={handleNext}
+        onPrev={handlePrev}
+        onRandom={handleRandom}
       />
 
       <AddBlessingModal

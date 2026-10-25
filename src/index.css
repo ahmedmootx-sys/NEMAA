@@ -9,6 +9,7 @@
 :root {
   --font-arabic-heading: 'Reem Kufi', 'Amiri', serif;
   --font-arabic-body: 'Amiri', serif;
+  --font-arabic-quran: 'Amiri Quran', 'Amiri', serif;
   --font-arabic-ui: 'Cairo', 'Tajawal', -apple-system, BlinkMacSystemFont, sans-serif;
 
   /* Color Palette - Day (Warm Cream & Olive) */
@@ -1570,4 +1571,356 @@ html, body {
     font-size: 20px;
   }
 }
+
+/* ================= Quranic Uthmanic Script Typography ================= */
+.proof-quote.quran-verse,
+.quran-script {
+  font-family: var(--font-arabic-quran) !important;
+  font-size: clamp(1.2rem, 4.6vw, 1.48rem) !important;
+  line-height: 2.2 !important;
+  font-weight: 400 !important;
+  color: var(--color-primary);
+  text-align: center;
+  word-spacing: 0.06em;
+  padding: 4px 0;
+}
+[data-theme="night"] .proof-quote.quran-verse,
+[data-theme="night"] .quran-script {
+  color: #E2DAC8;
+}
+
+/* ================= Gratitude Dua Box (دعاء شكر النعمة) ================= */
+.gratitude-dua-box {
+  background: var(--surface-card-subtle);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-top: 14px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 10px rgba(212, 175, 55, 0.06);
+  transition: all var(--transition-fast);
+}
+.gratitude-dua-box:hover {
+  border-color: var(--color-gold);
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.12);
+}
+
+.dua-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--border-subtle);
+}
+
+.dua-box-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-gold);
+}
+
+.dua-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  border-radius: var(--radius-full);
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.dua-copy-btn:hover {
+  border-color: var(--color-gold);
+  color: var(--color-primary);
+  background: var(--surface-card);
+}
+
+.dua-text {
+  font-family: var(--font-arabic-body);
+  font-size: clamp(1.05rem, 4.2vw, 1.25rem);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.85;
+  text-align: center;
+  margin-bottom: 4px;
+  word-spacing: 0.04em;
+}
+[data-theme="night"] .dua-text {
+  color: #E9DFCE;
+}
+
+.dua-source {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  font-weight: 500;
+}
+
+/* ================= Focus Reflection Mode (الوضع التدبري الهادئ) ================= */
+.focus-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--bg-main);
+  background-image: 
+    radial-gradient(circle at 50% 15%, rgba(212, 175, 55, 0.08) 0%, transparent 65%),
+    linear-gradient(180deg, var(--bg-gradient-top) 0%, var(--bg-gradient-bottom) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px 16px;
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+}
+[data-theme="night"] .focus-modal-overlay {
+  background: #0B1612;
+  background-image: 
+    radial-gradient(circle at 50% 15%, rgba(212, 175, 55, 0.1) 0%, transparent 65%),
+    linear-gradient(180deg, #0B1612 0%, #060E0B 100%);
+}
+
+.focus-ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  opacity: 0.35;
+}
+.focus-orb-1 {
+  width: 350px;
+  height: 350px;
+  top: -80px;
+  right: -80px;
+  background: rgba(212, 175, 55, 0.2);
+}
+.focus-orb-2 {
+  width: 320px;
+  height: 320px;
+  bottom: -60px;
+  left: -60px;
+  background: rgba(44, 74, 62, 0.25);
+}
+
+.focus-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto 16px;
+  position: relative;
+  z-index: 10;
+}
+
+.focus-brand-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-gold);
+}
+
+.focus-close-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding: 7px 14px;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+.focus-close-btn:hover {
+  border-color: var(--color-gold);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.focus-center-content {
+  width: 100%;
+  max-width: 740px;
+  margin: auto auto;
+  text-align: center;
+  padding: 20px 8px;
+  position: relative;
+  z-index: 10;
+}
+
+.focus-category-pill {
+  display: inline-block;
+  padding: 5px 14px;
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  border: 1px solid var(--badge-border);
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.focus-blessing-title {
+  font-family: var(--font-arabic-heading);
+  font-size: clamp(1.6rem, 6.2vw, 2.6rem);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.5;
+  margin-bottom: 14px;
+  word-spacing: 0.04em;
+}
+[data-theme="night"] .focus-blessing-title {
+  color: #FFFFFF;
+}
+
+.focus-title-divider {
+  color: var(--color-gold);
+  font-size: 13px;
+  opacity: 0.75;
+  margin-bottom: 22px;
+}
+
+.focus-reflection-text {
+  font-family: var(--font-arabic-body);
+  font-size: clamp(1.2rem, 4.6vw, 1.6rem);
+  line-height: 2.1;
+  color: var(--text-main);
+  margin-bottom: 30px;
+  word-spacing: 0.05em;
+  padding: 0 4px;
+}
+
+.focus-proof-box {
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow-md);
+}
+
+.focus-proof-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-gold);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.focus-proof-quote {
+  font-family: var(--font-arabic-body);
+  font-size: clamp(1.15rem, 4.4vw, 1.4rem);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.95;
+  margin-bottom: 6px;
+}
+[data-theme="night"] .focus-proof-quote {
+  color: #F0E8D9;
+}
+
+.focus-proof-source {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.focus-dua-box {
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px dashed var(--border-gold);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-top: 16px;
+}
+
+.focus-dua-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--color-gold);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.focus-dua-text {
+  font-family: var(--font-arabic-body);
+  font-size: clamp(1.1rem, 4.2vw, 1.35rem);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.85;
+  margin-bottom: 4px;
+}
+[data-theme="night"] .focus-dua-text {
+  color: #FFFFFF;
+}
+
+.focus-dua-source {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.focus-bottom-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 600px;
+  margin: 16px auto 0;
+  position: relative;
+  z-index: 10;
+}
+
+.focus-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding: 10px 18px;
+  color: var(--text-main);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+.focus-nav-btn:hover {
+  border-color: var(--color-gold);
+  color: var(--color-primary);
+}
+
+.focus-random-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-fast);
+}
+.focus-random-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(44, 74, 62, 0.25);
+}
+
 

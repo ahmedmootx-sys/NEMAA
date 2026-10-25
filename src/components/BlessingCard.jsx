@@ -8,9 +8,12 @@ import {
   Sparkles,
   Quote,
   Volume2,
-  VolumeX
+  VolumeX,
+  Maximize2,
+  HeartHandshake
 } from 'lucide-react';
 import { subscribeToVoiceChanges, speakArabic, stopSpeaking } from '../utils/speechHelper';
+import { getBlessingGratitudeDua } from '../utils/duaHelper';
 
 export default function BlessingCard({ 
   blessing, 
@@ -18,9 +21,11 @@ export default function BlessingCard({
   onToggleFavorite, 
   onShare, 
   onDownloadImage,
+  onOpenFocusMode,
   animatingKey
 }) {
   const [copied, setCopied] = useState(false);
+  const [duaCopied, setDuaCopied] = useState(false);
   const [hasArabicVoice, setHasArabicVoice] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -64,11 +69,22 @@ export default function BlessingCard({
     );
   }
 
+  const gratitudeDua = getBlessingGratitudeDua(blessing);
+
   const handleCopy = () => {
-    const textToCopy = `«${blessing.title}»\n\n${blessing.reflection}\n\n${blessing.proof ? blessing.proof + (blessing.proofSource ? ` (${blessing.proofSource})` : '') + '\n\n' : ''}من منصة نِعْمَة ✨ تَذَكَّرْ لِتَشْكُرْ`;
+    const textToCopy = `«${blessing.title}»\n\n${blessing.reflection}\n\n${blessing.proof ? blessing.proof + (blessing.proofSource ? ` (${blessing.proofSource})` : '') + '\n\n' : ''}${gratitudeDua ? `دعاء شكر النعمة:\n${gratitudeDua.dua}\n\n` : ''}من منصة نِعْمَة ✨ تَذَكَّرْ لِتَشْكُرْ`;
     navigator.clipboard.writeText(textToCopy).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
+    });
+  };
+
+  const handleCopyDua = (e) => {
+    e.stopPropagation();
+    if (!gratitudeDua) return;
+    navigator.clipboard.writeText(`${gratitudeDua.dua}\n— ${gratitudeDua.source}`).then(() => {
+      setDuaCopied(true);
+      setTimeout(() => setDuaCopied(false), 2000);
     });
   };
 
@@ -104,6 +120,16 @@ export default function BlessingCard({
 
           {/* Quick Header Actions */}
           <div className="card-header-actions">
+            {/* Focus / Zen Mode Button */}
+            <button
+              className="card-action-btn"
+              onClick={onOpenFocusMode}
+              title="الوضع التدبري الهادئ (ملء الشاشة)"
+              aria-label="الوضع التدبري"
+            >
+              <Maximize2 size={16} />
+            </button>
+
             {/* Audio Listen Button (Shown ONLY when authentic Arabic voice is detected) */}
             {hasArabicVoice && (
               <button
@@ -181,12 +207,42 @@ export default function BlessingCard({
               <Quote size={14} />
               <span>{blessing.proofType === 'hadith' ? 'حديث شريف' : 'شاهد من كتاب الله'}</span>
             </div>
-            <div className="proof-quote">
+            <div className={`proof-quote ${blessing.proofType === 'quran' ? 'quran-verse' : 'hadith-quote'}`}>
               {blessing.proof}
             </div>
             {blessing.proofSource && (
               <div className="proof-source">
                 {blessing.proofSource}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Gratitude Dua Section (دعاء شكر النعمة) */}
+        {gratitudeDua && (
+          <div className="gratitude-dua-box">
+            <div className="dua-box-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <HeartHandshake size={15} color="var(--color-gold)" />
+                <span className="dua-box-title">{gratitudeDua.title}</span>
+              </div>
+              <button 
+                type="button" 
+                className="dua-copy-btn" 
+                onClick={handleCopyDua}
+                title="نسخ الدعاء"
+                aria-label="نسخ الدعاء"
+              >
+                {duaCopied ? <Check size={13} color="#38A169" /> : <Copy size={13} />}
+                <span>{duaCopied ? 'تم النسخ' : 'نسخ'}</span>
+              </button>
+            </div>
+            <p className="dua-text">
+              {gratitudeDua.dua}
+            </p>
+            {gratitudeDua.source && (
+              <div className="dua-source">
+                — {gratitudeDua.source}
               </div>
             )}
           </div>
