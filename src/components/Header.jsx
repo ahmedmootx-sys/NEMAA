@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Heart, 
   PlusCircle, 
@@ -6,7 +6,8 @@ import {
   Moon, 
   Sun, 
   Sparkles,
-  Flame
+  Flame,
+  Download
 } from 'lucide-react';
 
 export default function Header({ 
@@ -19,6 +20,26 @@ export default function Header({
   dailyCount,
   streak
 }) {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
   return (
     <header className="app-header">
       <div className="container header-inner">
@@ -93,6 +114,19 @@ export default function Header({
           >
             {theme === 'night' ? <Sun size={18} color="#E5C358" /> : <Moon size={18} />}
           </button>
+
+          {/* PWA Install Button */}
+          {deferredPrompt && (
+            <button 
+              className="btn-icon btn-install-pwa" 
+              title="تثبيت تطبيق نِعْمَة على هاتفك"
+              onClick={handleInstallClick}
+              aria-label="تثبيت التطبيق"
+              style={{ color: 'var(--color-primary)', background: 'rgba(44, 74, 62, 0.1)', borderColor: 'var(--color-gold)' }}
+            >
+              <Download size={18} />
+            </button>
+          )}
         </div>
       </div>
     </header>
