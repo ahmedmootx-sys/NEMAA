@@ -4,8 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/prepare-build.js && vite",
+    "prebuild": "node scripts/prepare-build.js",
     "build": "vite build",
+    "postbuild": "node scripts/sync-build.js",
     "lint": "oxlint",
     "preview": "vite preview",
     "predeploy": "npm run build",
