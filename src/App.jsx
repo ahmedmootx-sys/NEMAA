@@ -7,7 +7,6 @@ import FavoritesDrawer from './components/FavoritesDrawer';
 import AddBlessingModal from './components/AddBlessingModal';
 import SearchExploreModal from './components/SearchExploreModal';
 import ShareModal from './components/ShareModal';
-import AmbientSoundWidget from './components/AmbientSoundWidget';
 import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
 import { Award, Sparkles, CheckCircle2 } from 'lucide-react';
@@ -61,8 +60,17 @@ export default function App() {
     });
   }, [allBlessings]);
 
-  // 4. Current Blessing Navigation
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // 4. Current Blessing Navigation (Random blessing on every app open)
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_custom_blessings');
+      const customCount = saved ? JSON.parse(saved).length : 0;
+      const total = INITIAL_BLESSINGS.length + customCount;
+      return total > 0 ? Math.floor(Math.random() * total) : 0;
+    } catch {
+      return Math.floor(Math.random() * INITIAL_BLESSINGS.length);
+    }
+  });
   const [animatingKey, setAnimatingKey] = useState(1);
 
   // Keep currentIndex in bounds when category changes
@@ -322,9 +330,6 @@ export default function App() {
           </p>
         </div>
       </main>
-
-      {/* Ambient Sound Floating Widget */}
-      <AmbientSoundWidget />
 
       {/* Modals & Drawers */}
       <FavoritesDrawer
