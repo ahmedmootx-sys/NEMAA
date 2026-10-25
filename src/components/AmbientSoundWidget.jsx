@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, Music, Sliders } from 'lucide-react';
+import { Volume2, VolumeX, Sliders } from 'lucide-react';
 import { audioEngine } from '../utils/audioEngine';
 
 export default function AmbientSoundWidget() {
@@ -34,23 +34,11 @@ export default function AmbientSoundWidget() {
   };
 
   return (
-    <div className="audio-widget" aria-label="أصوات السكينة والطبيعة">
+    <div className={`audio-widget ${isPlaying ? 'audio-active' : ''}`} aria-label="أصوات السكينة والطبيعة">
       {/* Play/Pause Button */}
       <button
         onClick={togglePlayback}
-        style={{
-          background: isPlaying ? 'var(--color-gold)' : 'transparent',
-          color: isPlaying ? '#1A2B25' : 'var(--text-main)',
-          border: 'none',
-          borderRadius: '9999px',
-          width: '32px',
-          height: '32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease'
-        }}
+        className="audio-play-btn"
         title={isPlaying ? "إيقاف الصوت الهادئ" : "تشغيل صوت السكينة"}
         aria-label={isPlaying ? "إيقاف الصوت" : "تشغيل الصوت"}
       >
@@ -64,28 +52,20 @@ export default function AmbientSoundWidget() {
         onChange={handleTrackChange}
         title="اختر صوت السكينة الخلفي"
       >
-        <option value="rain">🌧️ مطر هادئ</option>
-        <option value="breeze">🍃 نسيم عليل</option>
-        <option value="birds">🐦 فجر وطيور</option>
-        <option value="drone">🕊️ سكون وتأمل</option>
+        <option value="rain">🌧️ مطر</option>
+        <option value="breeze">🍃 نسيم</option>
+        <option value="birds">🐦 طيور</option>
+        <option value="drone">🕊️ سكون</option>
       </select>
 
       {/* Volume slider expand toggle */}
       <button
         onClick={() => setShowControls(!showControls)}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--text-faint)',
-          cursor: 'pointer',
-          padding: '2px',
-          display: 'flex',
-          alignItems: 'center'
-        }}
+        className="audio-sliders-btn"
         title="مستوى الصوت"
         aria-label="مستوى الصوت"
       >
-        <Sliders size={14} />
+        <Sliders size={13} />
       </button>
 
       {showControls && (
@@ -96,11 +76,7 @@ export default function AmbientSoundWidget() {
           step="0.05"
           value={volume}
           onChange={handleVolumeChange}
-          style={{
-            width: '65px',
-            accentColor: 'var(--color-gold)',
-            cursor: 'pointer'
-          }}
+          className="audio-range-slider"
           title={`مستوى الصوت: ${Math.round(volume * 100)}%`}
         />
       )}

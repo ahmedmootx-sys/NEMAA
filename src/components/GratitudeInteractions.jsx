@@ -48,13 +48,13 @@ export default function GratitudeInteractions({
     const y = (rect.top + rect.height / 2) / window.innerHeight;
 
     confetti({
-      particleCount: 38,
-      spread: 60,
+      particleCount: 32,
+      spread: 55,
       origin: { x, y },
       colors: ['#D4AF37', '#2C4A3E', '#F5D77F', '#528974', '#FFF9E6'],
-      ticks: 200,
-      gravity: 0.8,
-      scalar: 0.9,
+      ticks: 180,
+      gravity: 0.85,
+      scalar: 0.85,
       shapes: ['circle', 'square']
     });
   };
@@ -78,15 +78,15 @@ export default function GratitudeInteractions({
         title="اضغط للحمد والامتنان"
         aria-label="الحمد لله"
       >
-        <Sparkles size={24} color="#1A2B25" />
+        <Sparkles size={20} color="#1A2B25" />
         <span>الْحَمْدُ لِلَّهِ</span>
-        <Sparkles size={24} color="#1A2B25" />
+        <Sparkles size={20} color="#1A2B25" />
       </button>
 
       {/* Floating Comforting Gratitude Phrase */}
       {comfortPhrase && (
         <div className="comfort-phrase-toast" role="status">
-          <HeartHandshake size={20} color="var(--color-gold)" />
+          <HeartHandshake size={18} color="var(--color-gold)" style={{ flexShrink: 0 }} />
           <span>{comfortPhrase}</span>
         </div>
       )}
@@ -97,10 +97,10 @@ export default function GratitudeInteractions({
         <button
           className="btn-nav-arrow"
           onClick={onNextBlessing}
-          title="النعمة التالية (سهم يمين)"
+          title="النعمة التالية"
           aria-label="النعمة التالية"
         >
-          <ChevronRight size={22} />
+          <ChevronRight size={20} />
         </button>
 
         {/* Core "نعمة جديدة" Button */}
@@ -110,7 +110,7 @@ export default function GratitudeInteractions({
           onClick={onRandomBlessing}
           title="عرض نعمة عشوائية (مسافة)"
         >
-          <RefreshCw size={19} />
+          <RefreshCw size={17} />
           <span>نِعْمَةٌ جَدِيدَةٌ</span>
         </button>
 
@@ -118,10 +118,10 @@ export default function GratitudeInteractions({
         <button
           className="btn-nav-arrow"
           onClick={onPrevBlessing}
-          title="النعمة السابقة (سهم يسار)"
+          title="النعمة السابقة"
           aria-label="النعمة السابقة"
         >
-          <ChevronLeft size={22} />
+          <ChevronLeft size={20} />
         </button>
       </div>
 
@@ -132,7 +132,7 @@ export default function GratitudeInteractions({
           onClick={() => onDownloadImage(currentBlessing)}
           title="تحميل كبطاقة مصممة"
         >
-          <Download size={15} />
+          <Download size={14} />
           <span>تحميل البطاقة</span>
         </button>
 
@@ -141,7 +141,7 @@ export default function GratitudeInteractions({
           onClick={handleCopy}
           title="نسخ نص التدبر"
         >
-          {copied ? <Check size={15} color="#38A169" /> : <Copy size={15} />}
+          {copied ? <Check size={14} color="#38A169" /> : <Copy size={14} />}
           <span>{copied ? 'تم النسخ!' : 'نسخ النص'}</span>
         </button>
 
@@ -150,7 +150,7 @@ export default function GratitudeInteractions({
           onClick={() => onShare(currentBlessing)}
           title="مشاركة على وسائل التواصل"
         >
-          <Share2 size={15} />
+          <Share2 size={14} />
           <span>مشاركة النعمة</span>
         </button>
       </div>

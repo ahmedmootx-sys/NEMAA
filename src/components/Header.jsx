@@ -29,34 +29,25 @@ export default function Header({
             alt="شعار نِعْمَة" 
             className="brand-logo-img"
             onError={(e) => {
-              // Fallback if image fails
               e.target.style.display = 'none';
             }}
           />
           <div className="brand-text">
-            <span className="brand-title">نِعْمَة</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="brand-title">نِعْمَة</span>
+              {streak > 0 && (
+                <div 
+                  className="daily-streak-badge mobile-compact-streak" 
+                  title={`حامد مستمر: ${streak} أيام`}
+                >
+                  <Flame size={13} color="#D4AF37" />
+                  <span>{streak}d</span>
+                </div>
+              )}
+            </div>
             <span className="brand-slogan">« تَذَكَّرْ لِتَشْكُرْ »</span>
           </div>
         </div>
-
-        {/* Daily Streak Indicator */}
-        {streak > 0 && (
-          <div className="daily-streak-badge" title={`حامد مستمر: ${streak} أيام متتالية`} style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px',
-            background: 'rgba(212, 175, 55, 0.12)',
-            border: '1px solid var(--border-gold)',
-            borderRadius: '9999px',
-            padding: '4px 10px',
-            fontSize: '12px',
-            fontWeight: 700,
-            color: 'var(--color-gold)'
-          }}>
-            <Flame size={15} color="#D4AF37" />
-            <span>{streak} {streak === 1 ? 'يوم' : 'أيام'} حمد</span>
-          </div>
-        )}
 
         {/* Action Controls */}
         <div className="header-actions">
@@ -67,7 +58,7 @@ export default function Header({
             onClick={onOpenSearch}
             aria-label="بحث"
           >
-            <Search size={19} />
+            <Search size={18} />
           </button>
 
           {/* Add Custom Blessing Button */}
@@ -77,7 +68,7 @@ export default function Header({
             onClick={onOpenAddModal}
             aria-label="إضافة نعمة"
           >
-            <PlusCircle size={19} />
+            <PlusCircle size={18} />
           </button>
 
           {/* Favorites Button with Badge */}
@@ -87,7 +78,7 @@ export default function Header({
             onClick={onOpenFavorites}
             aria-label="المفضلة"
           >
-            <Heart size={19} fill={favoritesCount > 0 ? "var(--color-gold)" : "none"} color={favoritesCount > 0 ? "var(--color-gold)" : "currentColor"} />
+            <Heart size={18} fill={favoritesCount > 0 ? "var(--color-gold)" : "none"} color={favoritesCount > 0 ? "var(--color-gold)" : "currentColor"} />
             {favoritesCount > 0 && (
               <span className="btn-badge">{favoritesCount}</span>
             )}
@@ -100,7 +91,7 @@ export default function Header({
             onClick={onToggleTheme}
             aria-label="تبديل المظهر"
           >
-            {theme === 'night' ? <Sun size={19} color="#E5C358" /> : <Moon size={19} />}
+            {theme === 'night' ? <Sun size={18} color="#E5C358" /> : <Moon size={18} />}
           </button>
         </div>
       </div>

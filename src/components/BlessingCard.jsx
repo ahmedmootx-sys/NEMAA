@@ -5,7 +5,6 @@ import {
   Download, 
   Copy, 
   Check, 
-  BookOpen, 
   Sparkles,
   Quote
 } from 'lucide-react';
@@ -22,7 +21,7 @@ export default function BlessingCard({
 
   if (!blessing) {
     return (
-      <div className="blessing-card" style={{ textAlign: 'center', padding: '60px 20px' }}>
+      <div className="blessing-card" style={{ textAlign: 'center', padding: '40px 16px' }}>
         <p style={{ color: 'var(--text-muted)' }}>لا توجد نِعَم متوفرة في هذا التصنيف حالياً.</p>
       </div>
     );
@@ -42,9 +41,6 @@ export default function BlessingCard({
         key={animatingKey}
         id="blessing-card-exportable"
         className="blessing-card"
-        style={{
-          animation: 'slideFadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)'
-        }}
       >
         {/* Subtle Watermark Emblem */}
         <img 
@@ -56,15 +52,15 @@ export default function BlessingCard({
 
         {/* Card Header Metadata */}
         <div className="card-header-meta">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="card-meta-left">
             <span className="card-category-pill">
-              <Sparkles size={13} color="var(--color-gold)" />
-              {blessing.categoryName}
+              <Sparkles size={12} color="var(--color-gold)" />
+              <span>{blessing.categoryName}</span>
             </span>
 
             {blessing.isCustom && (
               <span className="card-custom-badge">
-                نعمة خاصة بك ✍️
+                خاصة بك ✍️
               </span>
             )}
           </div>
@@ -78,7 +74,7 @@ export default function BlessingCard({
               title={copied ? "تم النسخ!" : "نسخ النص والتأمل"}
               aria-label="نسخ"
             >
-              {copied ? <Check size={18} color="#38A169" /> : <Copy size={18} />}
+              {copied ? <Check size={16} color="#38A169" /> : <Copy size={16} />}
             </button>
 
             {/* Download as Image */}
@@ -88,7 +84,7 @@ export default function BlessingCard({
               title="تحميل كبطاقة مصممة للمشاركة"
               aria-label="تحميل صورة"
             >
-              <Download size={18} />
+              <Download size={16} />
             </button>
 
             {/* Share Dialog */}
@@ -98,7 +94,7 @@ export default function BlessingCard({
               title="مشاركة النعمة"
               aria-label="مشاركة"
             >
-              <Share2 size={18} />
+              <Share2 size={16} />
             </button>
 
             {/* Favorite Bookmark */}
@@ -109,7 +105,7 @@ export default function BlessingCard({
               aria-label="المفضلة"
             >
               <Heart 
-                size={20} 
+                size={18} 
                 fill={isFavorite ? "#E53E3E" : "none"} 
                 color={isFavorite ? "#E53E3E" : "currentColor"} 
               />
@@ -132,7 +128,7 @@ export default function BlessingCard({
         {blessing.proof && (
           <div className="spiritual-proof-box">
             <div className="proof-header">
-              <Quote size={15} />
+              <Quote size={14} />
               <span>{blessing.proofType === 'hadith' ? 'حديث شريف' : 'شاهد من كتاب الله'}</span>
             </div>
             <div className="proof-quote">
