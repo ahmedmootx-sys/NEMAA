@@ -44,7 +44,7 @@ export default function BlessingCard({
       >
         {/* Subtle Watermark Emblem */}
         <img 
-          src="/brand/emblem-calligraphy.jpg" 
+          src={`${import.meta.env.BASE_URL}brand/emblem-calligraphy.jpg`} 
           alt="" 
           className="card-watermark" 
           aria-hidden="true" 

@@ -25,7 +25,7 @@ export default function Header({
         {/* Brand Logo & Title */}
         <div className="brand-wrapper" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           <img 
-            src="/brand/logo-calligraphy.jpg" 
+            src={`${import.meta.env.BASE_URL}brand/logo-calligraphy.jpg`} 
             alt="شعار نِعْمَة" 
             className="brand-logo-img"
             onError={(e) => {
