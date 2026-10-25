@@ -74,7 +74,7 @@ const SPECIFIC_DUAS = {
 const MASTER_DUA = {
   title: 'صيغة الحمد الشاملة',
   dua: '«اللَّهُمَّ لَكَ الْحَمْدُ حَتَّى تَرْضَى، وَلَكَ الْحَمْدُ إِذَا رَضِيتَ، وَلَكَ الْحَمْدُ بَعْدَ الرِّضَا، وَلَكَ الْحَمْدُ عَلَى كُلِّ حَالٍ»',
-  source: 'مأثور'
+  source: 'دعاء مأثور عن السلف الصالح في الحمد'
 };
 
 export function getBlessingGratitudeDua(blessing) {
