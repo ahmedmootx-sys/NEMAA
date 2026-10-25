@@ -2,7 +2,7 @@
  * Card Export Utility
  * Generates high-definition, beautifully styled shareable cards
  * Supports 4 aesthetic themes and 2 aspect ratios (Story 9:16 and Square 1:1)
- * Fallback to DOM-based html2canvas if canvas fails
+ * Uses high-res Canvas with dynamic line wrapping, font loading guards, and zero-overlap layout.
  */
 import html2canvas from 'html2canvas';
 
@@ -89,7 +89,42 @@ export const THEME_CONFIGS = {
   }
 };
 
+/**
+ * Splits text into wrapped lines with exact measurement
+ */
+function splitTextIntoLines(ctx, text, maxWidth) {
+  if (!text) return [];
+  const words = text.trim().split(/\s+/);
+  const lines = [];
+  let currentLine = '';
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const width = ctx.measureText(testLine).width;
+    if (width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  return lines;
+}
+
 export async function exportBlessingAsImage(blessing, options = {}) {
+  // Wait for Google Fonts to be fully ready before measuring or drawing
+  if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+    try {
+      await document.fonts.ready;
+    } catch {
+      // proceed if fonts error
+    }
+  }
+
   // Support both options object or legacy boolean isNightMode
   let themeKey = 'olive';
   let ratio = 'story';
@@ -146,29 +181,30 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     drawDiamond(borderMargin + 10, height - borderMargin - 10, 8);
     drawDiamond(width - borderMargin - 10, height - borderMargin - 10, 8);
 
-    // Typography Setup
+    // Base typography setup
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
     ctx.direction = 'rtl';
 
-    // Header: App Title & Slogan
-    const titleY = isSquare ? 110 : 210;
-    const sloganY = isSquare ? 152 : 265;
+    // 1. Header: App Title & Slogan
+    const headerTitleY = isSquare ? 105 : 190;
+    const headerSloganY = isSquare ? 144 : 242;
 
-    ctx.font = `bold ${isSquare ? '46px' : '58px'} "Reem Kufi", "Amiri", "Cairo", sans-serif`;
+    ctx.font = `bold ${isSquare ? '42px' : '56px'} "Reem Kufi", "Amiri", "Cairo", sans-serif`;
     ctx.fillStyle = theme.appTitle;
-    ctx.fillText('نِعْمَة', width / 2, titleY);
+    ctx.fillText('نِعْمَة', width / 2, headerTitleY);
 
-    ctx.font = `${isSquare ? '22px' : '26px'} "Cairo", "Tajawal", sans-serif`;
+    ctx.font = `${isSquare ? '20px' : '25px'} "Cairo", "Tajawal", sans-serif`;
     ctx.fillStyle = theme.slogan;
-    ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', width / 2, sloganY);
+    ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', width / 2, headerSloganY);
 
-    // Category Badge
-    ctx.font = `600 ${isSquare ? '20px' : '24px'} "Cairo", "Tajawal", sans-serif`;
+    // 2. Category Badge
+    ctx.font = `600 ${isSquare ? '19px' : '23px'} "Cairo", "Tajawal", sans-serif`;
     const badgeText = blessing.categoryName || 'نعم الله';
-    const badgeWidth = ctx.measureText(badgeText).width + (isSquare ? 50 : 64);
+    const badgeWidth = ctx.measureText(badgeText).width + (isSquare ? 48 : 60);
     const badgeX = (width - badgeWidth) / 2;
-    const badgeY = isSquare ? 195 : 330;
-    const badgeH = isSquare ? 36 : 44;
+    const badgeY = isSquare ? 175 : 295;
+    const badgeH = isSquare ? 34 : 42;
 
     ctx.fillStyle = theme.badgeBg;
     ctx.beginPath();
@@ -176,61 +212,117 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     ctx.fill();
 
     ctx.fillStyle = theme.badgeText;
-    ctx.fillText(badgeText, width / 2, badgeY + (isSquare ? 25 : 30));
+    ctx.fillText(badgeText, width / 2, badgeY + (isSquare ? 24 : 30));
 
-    // Title of the Blessing
-    const blessingTitleY = isSquare ? 300 : 540;
-    const titleFontSize = isSquare ? 42 : 54;
+    // Dynamic Sizing calculation to guarantee non-overlapping layout
+    const textMaxWidth = isSquare ? 880 : 860;
+
+    // Check content lengths
+    const titleText = blessing.title || '';
+    const refText = blessing.reflection || '';
+    const proofText = blessing.proof || '';
+    const isLongContent = isSquare && (refText.length > 150 || (proofText.length > 70 && refText.length > 100));
+
+    // Font configurations
+    const titleFontSize = isSquare ? (isLongContent ? 34 : 38) : 52;
+    const titleLineHeight = isSquare ? (isLongContent ? 54 : 60) : 80;
+
+    const refFontSize = isSquare ? (isLongContent ? 23 : 26) : 33;
+    const refLineHeight = isSquare ? (isLongContent ? 42 : 46) : 62;
+
+    const proofFontSize = isSquare ? (isLongContent ? 20 : 23) : 29;
+    const proofLineHeight = isSquare ? (isLongContent ? 36 : 40) : 52;
+    const proofSourceFontSize = isSquare ? 17 : 22;
+
+    // Measure Title Lines
+    ctx.font = `bold ${titleFontSize}px "Amiri", "Reem Kufi", serif`;
+    const titleLines = splitTextIntoLines(ctx, titleText, textMaxWidth);
+
+    // Measure Reflection Lines
+    ctx.font = `400 ${refFontSize}px "Amiri", "Cairo", serif`;
+    const refLines = splitTextIntoLines(ctx, refText, textMaxWidth);
+
+    // Measure Proof Lines (if present)
+    let proofLines = [];
+    if (proofText) {
+      ctx.font = `bold italic ${proofFontSize}px "Amiri", serif`;
+      proofLines = splitTextIntoLines(ctx, proofText, textMaxWidth - (isSquare ? 100 : 120));
+    }
+
+    // Starting Y coordinates
+    let currentY = isSquare ? (isLongContent ? 260 : 275) : 480;
+
+    // Render Title Lines
     ctx.font = `bold ${titleFontSize}px "Amiri", "Reem Kufi", serif`;
     ctx.fillStyle = theme.title;
-    const afterTitleY = wrapText(ctx, blessing.title, width / 2, blessingTitleY, width - 180, isSquare ? 56 : 74);
+    for (let i = 0; i < titleLines.length; i++) {
+      ctx.fillText(titleLines[i], width / 2, currentY);
+      currentY += titleLineHeight;
+    }
 
-    // Reflection Text (التدبّر)
-    const reflectionY = afterTitleY + (isSquare ? 35 : 55);
-    const refFontSize = isSquare ? 27 : 34;
+    // Gap between Title and Reflection
+    currentY += isSquare ? (isLongContent ? 24 : 32) : 50;
+
+    // Render Reflection Lines
     ctx.font = `400 ${refFontSize}px "Amiri", "Cairo", serif`;
     ctx.fillStyle = theme.reflection;
-    const reflectionEndY = wrapText(ctx, blessing.reflection, width / 2, reflectionY, width - (isSquare ? 180 : 220), isSquare ? 46 : 60);
+    for (let i = 0; i < refLines.length; i++) {
+      ctx.fillText(refLines[i], width / 2, currentY);
+      currentY += refLineHeight;
+    }
 
-    // Quranic Ayah or Hadith Frame
-    if (blessing.proof) {
-      const minBoxY = isSquare ? 670 : 1200;
-      const boxY = Math.max(reflectionEndY + (isSquare ? 35 : 70), minBoxY);
-      const boxWidth = width - (isSquare ? 160 : 200);
+    // Render Proof Box if present
+    if (proofLines.length > 0) {
+      currentY += isSquare ? (isLongContent ? 20 : 30) : 50;
+
+      const hasSource = Boolean(blessing.proofSource);
+      const boxPaddingTop = isSquare ? 24 : 34;
+      const boxPaddingBottom = isSquare ? 22 : 30;
+      const sourceSpace = hasSource ? (isSquare ? 32 : 44) : 0;
+      const boxHeight = boxPaddingTop + (proofLines.length * proofLineHeight) + sourceSpace + boxPaddingBottom;
+      const boxWidth = textMaxWidth + (isSquare ? 40 : 60);
       const boxX = (width - boxWidth) / 2;
-      const boxHeight = isSquare ? 210 : 280;
+      const boxY = currentY;
 
+      // Box Background & Border
       ctx.fillStyle = theme.proofBoxBg;
       ctx.beginPath();
-      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 18);
+      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 16);
       ctx.fill();
 
       ctx.strokeStyle = theme.proofBorder;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.3;
       ctx.stroke();
 
-      // Proof text
-      const proofFontSize = isSquare ? 25 : 32;
-      ctx.font = `italic ${proofFontSize}px "Amiri", serif`;
+      // Render Proof lines inside the box
+      let proofCurrentY = boxY + boxPaddingTop + (proofLineHeight * 0.7);
+      ctx.font = `bold italic ${proofFontSize}px "Amiri", serif`;
       ctx.fillStyle = theme.proofText;
-      wrapText(ctx, blessing.proof, width / 2, boxY + (isSquare ? 60 : 80), boxWidth - 60, isSquare ? 42 : 54);
 
-      // Proof source
-      if (blessing.proofSource) {
-        ctx.font = `${isSquare ? '19px' : '23px'} "Cairo", sans-serif`;
+      for (let i = 0; i < proofLines.length; i++) {
+        ctx.fillText(proofLines[i], width / 2, proofCurrentY);
+        proofCurrentY += proofLineHeight;
+      }
+
+      // Render Proof Source
+      if (hasSource) {
+        proofCurrentY += isSquare ? 4 : 8;
+        ctx.font = `${proofSourceFontSize}px "Cairo", sans-serif`;
         ctx.fillStyle = theme.proofSource;
-        ctx.fillText(`— ${blessing.proofSource}`, width / 2, boxY + boxHeight - (isSquare ? 26 : 38));
+        ctx.fillText(`— ${blessing.proofSource}`, width / 2, proofCurrentY);
       }
     }
 
-    // Footer
-    ctx.font = `${isSquare ? '19px' : '22px'} "Cairo", sans-serif`;
+    // Footer at the bottom
+    const footerY = height - (isSquare ? 42 : 75);
+    ctx.font = `${isSquare ? '18px' : '22px'} "Cairo", sans-serif`;
     ctx.fillStyle = theme.footer;
-    ctx.fillText('منصة نِعْمَة — شارك لتؤجر وذكّر لتشكر', width / 2, height - (isSquare ? 50 : 80));
+    ctx.fillText('منصة نِعْمَة — شارك لتؤجر وذكّر لتشكر', width / 2, footerY);
 
-    // Download image
+    // Export image
     const dataUrl = canvas.toDataURL('image/png');
-    const filename = `نعمة-${blessing.title.replace(/\s+/g, '_')}-${themeKey}-${ratio}.png`;
+    const safeTitle = (blessing.title || 'نعمة').replace(/[\\/:*?"<>|\s]+/g, '_').substring(0, 30);
+    const filename = `نعمة-${safeTitle}-${themeKey}-${ratio}.png`;
     downloadURI(dataUrl, filename);
     return true;
   } catch (err) {
@@ -247,29 +339,6 @@ export async function exportBlessingAsImage(blessing, options = {}) {
       return true;
     }
   }
-}
-
-// Helper to wrap text cleanly in Canvas
-function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-  if (!text) return y;
-  const words = text.split(' ');
-  let line = '';
-  let curY = y;
-
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + ' ';
-    const metrics = ctx.measureText(testLine);
-    const testWidth = metrics.width;
-    if (testWidth > maxWidth && n > 0) {
-      ctx.fillText(line.trim(), x, curY);
-      line = words[n] + ' ';
-      curY += lineHeight;
-    } else {
-      line = testLine;
-    }
-  }
-  ctx.fillText(line.trim(), x, curY);
-  return curY;
 }
 
 function downloadURI(uri, name) {

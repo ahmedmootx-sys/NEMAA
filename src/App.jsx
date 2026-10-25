@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import CategoryFilter from './components/CategoryFilter';
 import BlessingCard from './components/BlessingCard';
@@ -62,26 +62,63 @@ export default function App() {
     });
   }, [allBlessings]);
 
-  // 4. Current Blessing Navigation (Random blessing on every app open)
+  // 4. Current Blessing Navigation (Distinct Random blessing on every app open)
   const [currentIndex, setCurrentIndex] = useState(() => {
     try {
       const saved = localStorage.getItem('nemaa_custom_blessings');
-      const customCount = saved ? JSON.parse(saved).length : 0;
-      const total = INITIAL_BLESSINGS.length + customCount;
-      return total > 0 ? Math.floor(Math.random() * total) : 0;
+      const customList = saved ? JSON.parse(saved) : [];
+      const pool = [...customList, ...INITIAL_BLESSINGS];
+      const lastSeenId = sessionStorage.getItem('nemaa_last_seen_blessing_id');
+
+      if (pool.length > 1 && lastSeenId) {
+        const differentIndices = [];
+        pool.forEach((b, i) => {
+          if (String(b.id) !== String(lastSeenId)) {
+            differentIndices.push(i);
+          }
+        });
+        if (differentIndices.length > 0) {
+          const chosenIdx = differentIndices[Math.floor(Math.random() * differentIndices.length)];
+          sessionStorage.setItem('nemaa_last_seen_blessing_id', String(pool[chosenIdx].id));
+          return chosenIdx;
+        }
+      }
+
+      const randomIdx = Math.floor(Math.random() * pool.length);
+      if (pool[randomIdx]) {
+        sessionStorage.setItem('nemaa_last_seen_blessing_id', String(pool[randomIdx].id));
+      }
+      return randomIdx;
     } catch {
       return Math.floor(Math.random() * INITIAL_BLESSINGS.length);
     }
   });
-  const [animatingKey, setAnimatingKey] = useState(1);
 
-  // Keep currentIndex in bounds when category changes
+  const [animatingKey, setAnimatingKey] = useState(1);
+  const isFirstMount = useRef(true);
+  const prevCategory = useRef(activeCategory);
+
+  // Keep currentIndex in bounds when category changes (without resetting on initial mount!)
   useEffect(() => {
-    setCurrentIndex(0);
-    setAnimatingKey(Date.now());
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    if (prevCategory.current !== activeCategory) {
+      prevCategory.current = activeCategory;
+      setCurrentIndex(0);
+      setAnimatingKey(Date.now());
+    }
   }, [activeCategory]);
 
   const currentBlessing = filteredBlessings[currentIndex] || filteredBlessings[0];
+
+  // Save current blessing ID in session so reload avoids repeating it
+  useEffect(() => {
+    if (currentBlessing?.id) {
+      sessionStorage.setItem('nemaa_last_seen_blessing_id', String(currentBlessing.id));
+    }
+  }, [currentBlessing?.id]);
 
   const handleNext = useCallback(() => {
     if (filteredBlessings.length <= 1) return;
