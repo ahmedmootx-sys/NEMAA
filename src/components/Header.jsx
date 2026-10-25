@@ -5,9 +5,10 @@ import {
   Search, 
   Moon, 
   Sun, 
-  Sparkles,
   Flame,
-  Download
+  Download,
+  BookOpen,
+  Bell
 } from 'lucide-react';
 
 export default function Header({ 
@@ -15,6 +16,8 @@ export default function Header({
   onOpenFavorites, 
   onOpenAddModal, 
   onOpenSearch, 
+  onOpenJournal,
+  onOpenNotifications,
   theme, 
   onToggleTheme,
   dailyCount,
@@ -40,6 +43,7 @@ export default function Header({
       setDeferredPrompt(null);
     }
   };
+
   return (
     <header className="app-header">
       <div className="container header-inner">
@@ -72,6 +76,26 @@ export default function Header({
 
         {/* Action Controls */}
         <div className="header-actions">
+          {/* Gratitude Journal Button */}
+          <button 
+            className="btn-icon" 
+            title="دَفْتَرُ الحَمْدِ وَالامْتِنَان"
+            onClick={onOpenJournal}
+            aria-label="دفتر الامتنان"
+          >
+            <BookOpen size={18} />
+          </button>
+
+          {/* Daily Notifications / Reminders Button */}
+          <button 
+            className="btn-icon" 
+            title="التذكير اليومي بالنعمة"
+            onClick={onOpenNotifications}
+            aria-label="التذكير اليومي"
+          >
+            <Bell size={18} />
+          </button>
+
           {/* Search Button */}
           <button 
             className="btn-icon" 

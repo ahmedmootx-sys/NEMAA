@@ -1055,3 +1055,512 @@ html, body {
 .pulse-glow {
   animation: pulseGlow 1.8s infinite;
 }
+
+/* ================= Drawer Components (Gratitude Journal, etc.) ================= */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 26, 22, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 100;
+  display: flex;
+  justify-content: flex-start; /* in RTL, flex-start is the right side */
+  animation: fadeIn 0.25s ease-out;
+}
+
+.drawer-content {
+  background: var(--surface-card);
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  position: relative;
+  animation: slideDrawer 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDrawer {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-card-subtle);
+}
+
+.drawer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drawer-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drawer-title {
+  font-family: var(--font-arabic-heading);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1.2;
+}
+
+.drawer-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ================= Gratitude Journal Styles ================= */
+.journal-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+}
+
+.journal-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.journal-tab-btn.active {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: var(--color-primary);
+}
+
+.journal-streak-pill {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(229, 62, 62, 0.1);
+  color: #E53E3E;
+  border: 1px solid rgba(229, 62, 62, 0.25);
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.journal-body {
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.journal-date-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  background: var(--surface-card-subtle);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.saved-badge {
+  margin-right: auto;
+  color: #38A169;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(56, 161, 105, 0.12);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.journal-prompt-text {
+  font-family: var(--font-arabic-heading);
+  font-size: 15px;
+  color: var(--color-primary);
+  text-align: center;
+  line-height: 1.6;
+  padding: 12px 14px;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px dashed var(--border-gold);
+  border-radius: var(--radius-md);
+}
+
+.journal-inputs-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.journal-input-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-card-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  transition: all var(--transition-fast);
+}
+
+.journal-input-item:focus-within {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px var(--color-gold-light);
+}
+
+.journal-num-badge {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-arabic-heading);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.journal-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-arabic-ui);
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.journal-save-btn {
+  margin-top: 10px;
+  padding: 13px;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.journal-history-list {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.journal-history-card {
+  background: var(--surface-card-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  transition: all var(--transition-fast);
+}
+
+.journal-history-card:hover {
+  border-color: var(--border-gold);
+}
+
+.journal-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.journal-card-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.journal-card-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.journal-card-items li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.bullet-dot {
+  color: var(--color-gold);
+  font-weight: bold;
+}
+
+.journal-empty-history {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--text-muted);
+}
+
+.journal-empty-history h4 {
+  font-family: var(--font-arabic-heading);
+  font-size: 18px;
+  color: var(--text-heading);
+  margin: 12px 0 6px;
+}
+
+.journal-empty-history p {
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* ================= Notification Modal Styles ================= */
+.notification-modal {
+  max-width: 460px;
+  border-radius: 20px;
+  background: var(--surface-card);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.notification-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--surface-card-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.toggle-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.toggle-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Toggle Switch */
+.switch-label {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.switch-label input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border-subtle);
+  transition: 0.3s;
+  border-radius: 26px;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.switch-label input:checked + .switch-slider {
+  background-color: var(--color-primary);
+}
+
+.switch-label input:checked + .switch-slider:before {
+  transform: translateX(22px);
+}
+
+.notification-time-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-card-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+}
+
+.time-label-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.time-picker-input {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-primary);
+  outline: none;
+}
+
+.time-picker-input:focus {
+  border-color: var(--color-gold);
+}
+
+.notification-alert-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.notification-alert-box.alert-warning {
+  background: rgba(229, 62, 62, 0.1);
+  border: 1px solid rgba(229, 62, 62, 0.25);
+  color: #C53030;
+}
+
+.notification-status-msg {
+  padding: 10px 14px;
+  background: rgba(56, 161, 105, 0.12);
+  color: #2F855A;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 14px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.btn-full {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+}
+
+/* Speech Narration Active Pulse */
+.card-action-btn.active-speaking {
+  color: var(--color-primary);
+  background: rgba(212, 175, 55, 0.22);
+  border-color: var(--color-gold);
+  animation: pulseGlow 1.6s infinite;
+}
+
+/* Mobile Header Spacing Adjustments */
+@media (max-width: 440px) {
+  .header-actions {
+    gap: 4px;
+  }
+  .btn-icon {
+    width: 33px;
+    height: 33px;
+    min-width: 33px;
+  }
+  .brand-title {
+    font-size: 20px;
+  }
+}
+

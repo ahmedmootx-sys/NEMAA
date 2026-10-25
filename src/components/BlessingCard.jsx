@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Heart, 
   Share2, 
@@ -6,8 +6,11 @@ import {
   Copy, 
   Check, 
   Sparkles,
-  Quote
+  Quote,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
+import { subscribeToVoiceChanges, speakArabic, stopSpeaking } from '../utils/speechHelper';
 
 export default function BlessingCard({ 
   blessing, 
@@ -18,6 +21,40 @@ export default function BlessingCard({
   animatingKey
 }) {
   const [copied, setCopied] = useState(false);
+  const [hasArabicVoice, setHasArabicVoice] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Check if user's device has an authentic Arabic voice
+  useEffect(() => {
+    const unsubscribe = subscribeToVoiceChanges((voice) => {
+      setHasArabicVoice(!!voice);
+    });
+    return () => {
+      unsubscribe();
+      stopSpeaking();
+    };
+  }, []);
+
+  // Stop speaking when blessing changes
+  useEffect(() => {
+    stopSpeaking();
+    setIsSpeaking(false);
+  }, [blessing?.id]);
+
+  const handleToggleSpeech = () => {
+    if (isSpeaking) {
+      stopSpeaking();
+      setIsSpeaking(false);
+    } else {
+      const textToSpeak = `${blessing.title}. ${blessing.reflection}. ${blessing.proof ? blessing.proof : ''}`;
+      speakArabic(
+        textToSpeak,
+        () => setIsSpeaking(true),
+        () => setIsSpeaking(false),
+        () => setIsSpeaking(false)
+      );
+    }
+  };
 
   if (!blessing) {
     return (
@@ -67,6 +104,19 @@ export default function BlessingCard({
 
           {/* Quick Header Actions */}
           <div className="card-header-actions">
+            {/* Audio Listen Button (Shown ONLY when authentic Arabic voice is detected) */}
+            {hasArabicVoice && (
+              <button
+                className={`card-action-btn ${isSpeaking ? 'active-speaking' : ''}`}
+                onClick={handleToggleSpeech}
+                title={isSpeaking ? "إيقاف القراءة الصوتية" : "استماع للتأمل والذكر بصوت مهدئ"}
+                aria-label="قراءة صوتية"
+                style={isSpeaking ? { color: 'var(--color-primary)', background: 'rgba(212, 175, 55, 0.2)', borderColor: 'var(--color-gold)' } : {}}
+              >
+                {isSpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              </button>
+            )}
+
             {/* Copy Button */}
             <button
               className="card-action-btn"

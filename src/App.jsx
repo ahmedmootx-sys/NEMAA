@@ -4,12 +4,14 @@ import CategoryFilter from './components/CategoryFilter';
 import BlessingCard from './components/BlessingCard';
 import GratitudeInteractions from './components/GratitudeInteractions';
 import FavoritesDrawer from './components/FavoritesDrawer';
+import GratitudeJournalDrawer from './components/GratitudeJournalDrawer';
+import NotificationModal from './components/NotificationModal';
 import AddBlessingModal from './components/AddBlessingModal';
 import SearchExploreModal from './components/SearchExploreModal';
 import ShareModal from './components/ShareModal';
 import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
-import { Award, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Award, Sparkles } from 'lucide-react';
 
 export default function App() {
   // 1. Theme State (Day / Night)
@@ -205,8 +207,10 @@ export default function App() {
     setAnimatingKey(Date.now());
   };
 
-  // 9. Modals State
+  // 9. Modals & Drawers State
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  const [isJournalOpen, setIsJournalOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -217,10 +221,14 @@ export default function App() {
     setIsShareOpen(true);
   };
 
-  const handleDownloadImage = async (blessing) => {
+  const handleDownloadImage = async (blessing, options = {}) => {
     const target = blessing || currentBlessing;
     if (target) {
-      await exportBlessingAsImage(target, theme === 'night');
+      const exportOptions = {
+        theme: options.theme || (theme === 'night' ? 'midnight' : 'olive'),
+        ratio: options.ratio || 'story'
+      };
+      await exportBlessingAsImage(target, exportOptions);
     }
   };
 
@@ -229,7 +237,7 @@ export default function App() {
     const handleKeyDown = (e) => {
       // Don't trigger if user is typing in an input or textarea
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
-      if (isFavoritesOpen || isAddModalOpen || isSearchOpen || isShareOpen) return;
+      if (isFavoritesOpen || isJournalOpen || isNotificationsOpen || isAddModalOpen || isSearchOpen || isShareOpen) return;
 
       if (e.code === 'Space') {
         e.preventDefault();
@@ -245,7 +253,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleRandom, handleNext, handlePrev, isFavoritesOpen, isAddModalOpen, isSearchOpen, isShareOpen]);
+  }, [handleRandom, handleNext, handlePrev, isFavoritesOpen, isJournalOpen, isNotificationsOpen, isAddModalOpen, isSearchOpen, isShareOpen]);
 
   // Milestone title based on dailyCount
   const getMilestoneLabel = () => {
@@ -261,6 +269,8 @@ export default function App() {
       <Header
         favoritesCount={favorites.length}
         onOpenFavorites={() => setIsFavoritesOpen(true)}
+        onOpenJournal={() => setIsJournalOpen(true)}
+        onOpenNotifications={() => setIsNotificationsOpen(true)}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onOpenSearch={() => setIsSearchOpen(true)}
         theme={theme}
@@ -339,6 +349,16 @@ export default function App() {
         onSelectBlessing={handleSelectBlessing}
         onRemoveFavorite={removeFavorite}
         onClearAllFavorites={clearAllFavorites}
+      />
+
+      <GratitudeJournalDrawer
+        isOpen={isJournalOpen}
+        onClose={() => setIsJournalOpen(false)}
+      />
+
+      <NotificationModal
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
       />
 
       <AddBlessingModal
