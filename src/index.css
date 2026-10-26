@@ -535,17 +535,55 @@ html, body {
 /* Watermark Emblem */
 .card-watermark {
   position: absolute;
-  bottom: -35px;
-  left: -35px;
-  width: 180px;
-  height: 180px;
-  opacity: 0.035;
+  bottom: -15px;
+  left: -15px;
+  width: 175px;
+  height: auto;
+  opacity: 0.055;
   pointer-events: none;
-  filter: grayscale(1);
-  transform: rotate(-12deg);
+  user-select: none;
+  transform: rotate(-8deg);
+  transition: opacity 0.3s ease;
 }
 [data-theme="night"] .card-watermark {
-  opacity: 0.05;
+  opacity: 0.065;
+}
+
+/* Share to Reward Button (شارك تُؤجر) */
+.btn-share-to-reward {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+  margin: 14px auto 0;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(44, 74, 62, 0.25) 100%);
+  border: 1.5px solid var(--color-gold);
+  border-radius: var(--radius-full);
+  color: var(--color-primary);
+  font-family: var(--font-arabic-ui);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.15);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+[data-theme="night"] .btn-share-to-reward {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(27, 59, 47, 0.4) 100%);
+  color: #F7E7A9;
+}
+.btn-share-to-reward:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.3);
+  border-color: #E5C358;
+}
+.btn-share-reward-subtitle {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-gold);
+  opacity: 0.9;
 }
 
 /* Card Header Metadata */

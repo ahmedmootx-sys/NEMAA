@@ -181,6 +181,29 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     drawDiamond(borderMargin + 10, height - borderMargin - 10, 8);
     drawDiamond(width - borderMargin - 10, height - borderMargin - 10, 8);
 
+    // Subtle Watermark Emblem in Background
+    try {
+      const emblemImg = new Image();
+      emblemImg.crossOrigin = 'anonymous';
+      emblemImg.src = `${import.meta.env.BASE_URL}brand/emblem-arabic.png`;
+      await new Promise((resolve) => {
+        emblemImg.onload = resolve;
+        emblemImg.onerror = resolve;
+      });
+      if (emblemImg.complete && emblemImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.globalAlpha = (themeKey === 'midnight' || themeKey === 'emerald') ? 0.075 : 0.055;
+        const emblemW = isSquare ? 480 : 640;
+        const emblemH = (emblemW / emblemImg.naturalWidth) * emblemImg.naturalHeight;
+        const emblemX = (width - emblemW) / 2;
+        const emblemY = (height - emblemH) / 2 + (isSquare ? 20 : 60);
+        ctx.drawImage(emblemImg, emblemX, emblemY, emblemW, emblemH);
+        ctx.restore();
+      }
+    } catch {
+      // non-fatal
+    }
+
     // Base typography setup
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';

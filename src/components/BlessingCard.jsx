@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { subscribeToVoiceChanges, speakArabic, stopSpeaking } from '../utils/speechHelper';
 import { getBlessingGratitudeDua } from '../utils/duaHelper';
+import { getBlessingInLang } from '../i18n/blessingsEn';
+import { TRANSLATIONS } from '../i18n/translations';
 
 export default function BlessingCard({ 
   blessing, 
@@ -22,7 +24,8 @@ export default function BlessingCard({
   onShare, 
   onDownloadImage,
   onOpenFocusMode,
-  animatingKey
+  animatingKey,
+  lang = 'ar'
 }) {
   const [copied, setCopied] = useState(false);
   const [duaCopied, setDuaCopied] = useState(false);
@@ -69,10 +72,14 @@ export default function BlessingCard({
     );
   }
 
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.ar;
+  const displayBlessing = getBlessingInLang(blessing, lang) || blessing;
   const gratitudeDua = getBlessingGratitudeDua(blessing);
 
   const handleCopy = () => {
-    const textToCopy = `«${blessing.title}»\n\n${blessing.reflection}\n\n${blessing.proof ? blessing.proof + (blessing.proofSource ? ` (${blessing.proofSource})` : '') + '\n\n' : ''}${gratitudeDua ? `دعاء شكر النعمة:\n${gratitudeDua.dua}\n\n` : ''}من منصة نِعْمَة ✨ تَذَكَّرْ لِتَشْكُرْ`;
+    const textToCopy = lang === 'en'
+      ? `«${displayBlessing.title}»\n\n${displayBlessing.reflection}\n\n${displayBlessing.proofArabic ? displayBlessing.proofArabic + '\n' : ''}${displayBlessing.proofMeaning ? `Meaning: "${displayBlessing.proofMeaning}"` + (displayBlessing.proofSource ? ` (${displayBlessing.proofSource})` : '') + '\n\n' : ''}From NEMAA Platform ✨ Remember to give thanks`
+      : `«${blessing.title}»\n\n${blessing.reflection}\n\n${blessing.proof ? blessing.proof + (blessing.proofSource ? ` (${blessing.proofSource})` : '') + '\n\n' : ''}${gratitudeDua ? `دعاء شكر النعمة:\n${gratitudeDua.dua}\n\n` : ''}من منصة نِعْمَة ✨ تَذَكَّرْ لِتَشْكُرْ`;
     navigator.clipboard.writeText(textToCopy).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
@@ -97,7 +104,7 @@ export default function BlessingCard({
       >
         {/* Subtle Watermark Emblem */}
         <img 
-          src={`${import.meta.env.BASE_URL}brand/emblem-calligraphy.jpg`} 
+          src={`${import.meta.env.BASE_URL}brand/emblem-arabic.png`} 
           alt="" 
           className="card-watermark" 
           aria-hidden="true" 
@@ -108,12 +115,12 @@ export default function BlessingCard({
           <div className="card-meta-left">
             <span className="card-category-pill">
               <Sparkles size={12} color="var(--color-gold)" />
-              <span>{blessing.categoryName}</span>
+              <span>{displayBlessing.categoryName}</span>
             </span>
 
             {blessing.isCustom && (
               <span className="card-custom-badge">
-                خاصة بك ✍️
+                {t.customBadge}
               </span>
             )}
           </div>
@@ -124,8 +131,8 @@ export default function BlessingCard({
             <button
               className="card-action-btn"
               onClick={onOpenFocusMode}
-              title="الوضع التدبري الهادئ (ملء الشاشة)"
-              aria-label="الوضع التدبري"
+              title={t.focusMode}
+              aria-label={t.focusMode}
             >
               <Maximize2 size={16} />
             </button>
@@ -135,8 +142,8 @@ export default function BlessingCard({
               <button
                 className={`card-action-btn ${isSpeaking ? 'active-speaking' : ''}`}
                 onClick={handleToggleSpeech}
-                title={isSpeaking ? "إيقاف القراءة الصوتية" : "استماع للتأمل والذكر بصوت مهدئ"}
-                aria-label="قراءة صوتية"
+                title={isSpeaking ? t.audioStop : t.audioListen}
+                aria-label={t.audioListen}
                 style={isSpeaking ? { color: 'var(--color-primary)', background: 'rgba(212, 175, 55, 0.2)', borderColor: 'var(--color-gold)' } : {}}
               >
                 {isSpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -147,8 +154,8 @@ export default function BlessingCard({
             <button
               className="card-action-btn"
               onClick={handleCopy}
-              title={copied ? "تم النسخ!" : "نسخ النص والتأمل"}
-              aria-label="نسخ"
+              title={copied ? t.copiedText : t.copyBtn}
+              aria-label={t.copyBtn}
             >
               {copied ? <Check size={16} color="#38A169" /> : <Copy size={16} />}
             </button>
@@ -157,8 +164,8 @@ export default function BlessingCard({
             <button
               className="card-action-btn"
               onClick={() => onDownloadImage(blessing)}
-              title="تحميل كبطاقة مصممة للمشاركة"
-              aria-label="تحميل صورة"
+              title={t.downloadBtn}
+              aria-label={t.downloadBtn}
             >
               <Download size={16} />
             </button>
@@ -167,8 +174,8 @@ export default function BlessingCard({
             <button
               className="card-action-btn"
               onClick={() => onShare(blessing)}
-              title="مشاركة النعمة"
-              aria-label="مشاركة"
+              title={t.shareBtn}
+              aria-label={t.shareBtn}
             >
               <Share2 size={16} />
             </button>
@@ -177,8 +184,8 @@ export default function BlessingCard({
             <button
               className={`card-action-btn ${isFavorite ? 'active-favorite' : ''}`}
               onClick={() => onToggleFavorite(blessing.id)}
-              title={isFavorite ? "إزالة من المفضلة" : "حفظ في المفضلة"}
-              aria-label="المفضلة"
+              title={isFavorite ? t.favoriteRemove : t.favoriteAdd}
+              aria-label={t.favoriteAdd}
             >
               <Heart 
                 size={18} 
@@ -190,14 +197,14 @@ export default function BlessingCard({
         </div>
 
         {/* Blessing Title */}
-        <h2 className="blessing-title">{blessing.title}</h2>
+        <h2 className="blessing-title">{displayBlessing.title}</h2>
         <div className="blessing-title-decor" aria-hidden="true">
           <span>◆</span>
         </div>
 
         {/* Reflection (التدبّر) */}
         <p className="blessing-reflection">
-          {blessing.reflection}
+          {displayBlessing.reflection}
         </p>
 
         {/* Quranic Verse / Prophetic Hadith Callout Box */}
@@ -205,14 +212,35 @@ export default function BlessingCard({
           <div className="spiritual-proof-box">
             <div className="proof-header">
               <Quote size={14} />
-              <span>{blessing.proofType === 'hadith' ? 'حديث شريف' : 'شاهد من كتاب الله'}</span>
+              <span>{blessing.proofType === 'hadith' ? t.proofHadith : t.proofQuran}</span>
             </div>
-            <div className={`proof-quote ${blessing.proofType === 'quran' ? 'quran-verse' : 'hadith-quote'}`}>
+            <div className={`proof-quote ${blessing.proofType === 'quran' ? 'quran-verse' : 'hadith-quote'}`} dir="rtl">
               {blessing.proof}
             </div>
+            {lang === 'en' && displayBlessing.proofMeaning && (
+              <div 
+                className="proof-meaning-box"
+                style={{
+                  marginTop: '10px',
+                  paddingTop: '8px',
+                  borderTop: '1px dashed rgba(212, 175, 55, 0.3)',
+                  fontStyle: 'italic',
+                  fontSize: '0.92rem',
+                  lineHeight: '1.6',
+                  color: 'var(--text-secondary)',
+                  textAlign: 'left'
+                }}
+                dir="ltr"
+              >
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, display: 'block', color: 'var(--color-gold)', fontStyle: 'normal', marginBottom: '3px' }}>
+                  {t.proofMeaningLabel || 'Translation of Meaning:'}
+                </span>
+                "{displayBlessing.proofMeaning}"
+              </div>
+            )}
             {blessing.proofSource && (
               <div className="proof-source">
-                {blessing.proofSource}
+                {displayBlessing.proofSource || blessing.proofSource}
               </div>
             )}
           </div>

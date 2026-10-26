@@ -10,6 +10,8 @@ import {
   Shuffle
 } from 'lucide-react';
 import { getBlessingGratitudeDua } from '../utils/duaHelper';
+import { getBlessingInLang } from '../i18n/blessingsEn';
+import { TRANSLATIONS } from '../i18n/translations';
 
 export default function FocusReflectionModal({ 
   isOpen, 
@@ -17,7 +19,8 @@ export default function FocusReflectionModal({
   blessing, 
   onNext, 
   onPrev, 
-  onRandom 
+  onRandom,
+  currentLang = 'ar'
 }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -39,6 +42,8 @@ export default function FocusReflectionModal({
 
   if (!isOpen || !blessing) return null;
 
+  const t = TRANSLATIONS[currentLang] || TRANSLATIONS.ar;
+  const displayBlessing = getBlessingInLang(blessing, currentLang) || blessing;
   const duaInfo = getBlessingGratitudeDua(blessing);
 
   return (
@@ -51,16 +56,16 @@ export default function FocusReflectionModal({
       <div className="focus-top-bar">
         <div className="focus-brand-tag">
           <Sparkles size={16} color="var(--color-gold)" />
-          <span>الوضع التدبري الهادئ</span>
+          <span>{currentLang === 'ar' ? 'الوضع التدبري الهادئ' : 'Spiritual Focus Mode'}</span>
         </div>
 
         <button 
           className="focus-close-btn" 
           onClick={onClose}
-          title="الخروج من الوضع التدبري (Esc)"
+          title={currentLang === 'ar' ? 'الخروج من الوضع التدبري (Esc)' : 'Exit Focus Mode (Esc)'}
           aria-label="إغلاق"
         >
-          <span>خروج</span>
+          <span>{currentLang === 'ar' ? 'خروج' : 'Exit'}</span>
           <Minimize2 size={16} />
         </button>
       </div>
@@ -68,12 +73,12 @@ export default function FocusReflectionModal({
       {/* Main Peaceful Content Area */}
       <div className="focus-center-content">
         <div className="focus-category-pill">
-          {blessing.categoryName}
+          {displayBlessing.categoryName}
         </div>
 
         {/* Title */}
         <h1 className="focus-blessing-title">
-          {blessing.title}
+          {displayBlessing.title}
         </h1>
 
         <div className="focus-title-divider" aria-hidden="true">
@@ -82,7 +87,7 @@ export default function FocusReflectionModal({
 
         {/* Reflection Text */}
         <p className="focus-reflection-text">
-          {blessing.reflection}
+          {displayBlessing.reflection}
         </p>
 
         {/* Quranic Ayah / Hadith Callout */}
@@ -90,14 +95,34 @@ export default function FocusReflectionModal({
           <div className="focus-proof-box">
             <div className="focus-proof-badge">
               <Quote size={13} />
-              <span>{blessing.proofType === 'hadith' ? 'حديث شريف' : 'شاهد من كتاب الله'}</span>
+              <span>{blessing.proofType === 'hadith' ? t.proofHadith : t.proofQuran}</span>
             </div>
-            <div className={`focus-proof-quote ${blessing.proofType === 'quran' ? 'quran-script' : ''}`}>
+            <div className={`focus-proof-quote ${blessing.proofType === 'quran' ? 'quran-script' : ''}`} dir="rtl">
               {blessing.proof}
             </div>
+            {currentLang === 'en' && displayBlessing.proofMeaning && (
+              <div 
+                style={{
+                  marginTop: '12px',
+                  paddingTop: '10px',
+                  borderTop: '1px dashed rgba(212, 175, 55, 0.3)',
+                  fontStyle: 'italic',
+                  fontSize: '1rem',
+                  lineHeight: '1.6',
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  textAlign: 'left'
+                }}
+                dir="ltr"
+              >
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, display: 'block', color: 'var(--color-gold)', fontStyle: 'normal', marginBottom: '4px' }}>
+                  Translation of Meaning:
+                </span>
+                "{displayBlessing.proofMeaning}"
+              </div>
+            )}
             {blessing.proofSource && (
               <div className="focus-proof-source">
-                — {blessing.proofSource}
+                {displayBlessing.proofSource || blessing.proofSource}
               </div>
             )}
           </div>

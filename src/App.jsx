@@ -10,8 +10,11 @@ import FocusReflectionModal from './components/FocusReflectionModal';
 import AddBlessingModal from './components/AddBlessingModal';
 import SearchExploreModal from './components/SearchExploreModal';
 import ShareModal from './components/ShareModal';
+import ShareAppModal from './components/ShareAppModal';
+import LanguageSelectModal from './components/LanguageSelectModal';
 import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
+import { TRANSLATIONS } from './i18n/translations';
 import { Award, Sparkles } from 'lucide-react';
 
 export default function App() {
@@ -28,6 +31,35 @@ export default function App() {
   const toggleTheme = () => {
     setTheme(prev => prev === 'night' ? 'day' : 'night');
   };
+
+  // Language & Localization State
+  const [currentLang, setCurrentLang] = useState(() => {
+    return localStorage.getItem('nemaa_lang') || 'ar';
+  });
+
+  const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(() => {
+    // If first time visit, prompt for language
+    return !localStorage.getItem('nemaa_lang');
+  });
+
+  const [isShareAppModalOpen, setIsShareAppModalOpen] = useState(false);
+
+  const handleSelectLanguage = (newLang) => {
+    setCurrentLang(newLang);
+    localStorage.setItem('nemaa_lang', newLang);
+  };
+
+  const handleToggleLanguage = () => {
+    const nextLang = currentLang === 'ar' ? 'en' : 'ar';
+    handleSelectLanguage(nextLang);
+  };
+
+  useEffect(() => {
+    document.documentElement.lang = currentLang;
+    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+  }, [currentLang]);
+
+  const t = TRANSLATIONS[currentLang] || TRANSLATIONS.ar;
 
   // 2. Custom Blessings State
   const [customBlessings, setCustomBlessings] = useState(() => {
@@ -296,9 +328,9 @@ export default function App() {
 
   // Milestone title based on dailyCount
   const getMilestoneLabel = () => {
-    if (dailyStats.count >= 20) return 'حامدٌ شاكرٌ وممتن 🌟';
-    if (dailyStats.count >= 10) return 'ذاكرٌ لنعم ربه 🌿';
-    if (dailyStats.count >= 5) return 'قلبٌ مستشعر للفضل 🤍';
+    if (dailyStats.count >= 20) return t.milestones.diamond;
+    if (dailyStats.count >= 10) return t.milestones.gold;
+    if (dailyStats.count >= 5) return t.milestones.silver;
     return null;
   };
 
@@ -316,23 +348,19 @@ export default function App() {
         onToggleTheme={toggleTheme}
         dailyCount={dailyStats.count}
         streak={dailyStats.streak}
+        currentLang={currentLang}
+        onToggleLanguage={handleToggleLanguage}
+        onOpenLanguageModal={() => setIsLanguageModalOpen(true)}
       />
 
       <main className="container" style={{ paddingTop: '20px', paddingBottom: '70px' }}>
-        {/* Category Filter Tabs */}
-        <CategoryFilter
-          categories={categoriesWithCounts}
-          activeCategory={activeCategory}
-          onSelectCategory={setActiveCategory}
-        />
-
         {/* Daily Gratitude Status Banner */}
         <div className="stats-banner">
           <div className="stats-item">
             <Sparkles size={16} color="var(--color-gold)" />
-            <span>تأملاتك وحمدك اليوم:</span>
+            <span>{t.dailyStatsLabel}</span>
             <span className="stats-number">{dailyStats.count}</span>
-            <span style={{ fontSize: '12px' }}>مرات</span>
+            <span style={{ fontSize: '12px' }}>{currentLang === 'ar' ? 'مرات' : 'times'}</span>
           </div>
 
           {getMilestoneLabel() ? (
@@ -342,7 +370,7 @@ export default function App() {
             </div>
           ) : (
             <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
-              «وَقَلِيلٌ مِّنْ عِبَادِيَ الشَّكُورُ»
+              {currentLang === 'ar' ? '«وَقَلِيلٌ مِّنْ عِبَادِيَ الشَّكُورُ»' : '“And few of My servants are grateful.”'}
             </span>
           )}
         </div>
@@ -356,6 +384,7 @@ export default function App() {
           onDownloadImage={handleDownloadImage}
           onOpenFocusMode={() => setIsFocusModeOpen(true)}
           animatingKey={animatingKey}
+          lang={currentLang}
         />
 
         {/* Gratitude & Navigation Actions */}
@@ -367,7 +396,9 @@ export default function App() {
           currentBlessing={currentBlessing}
           onDownloadImage={handleDownloadImage}
           onShare={handleOpenShare}
+          onOpenShareApp={() => setIsShareAppModalOpen(true)}
           dailyCount={dailyStats.count}
+          lang={currentLang}
         />
 
         {/* Spiritual Quote Footer Note */}
@@ -376,7 +407,9 @@ export default function App() {
             ﴿وَآتَاكُم مِّن كُلِّ مَا سَأَلْتُمُوهُ ۚ وَإِن تَعُدُّوا نِعْمَتَ اللَّهِ لَا تُحْصُوهَا﴾
           </p>
           <p style={{ color: 'var(--text-faint)' }}>
-            منصة نِعْمَة — تذكّر لتشكر • اضغط مسافة للتبديل السريع بين النعم
+            {currentLang === 'ar' 
+              ? 'منصة نِعْمَة — تذكّر لتشكر • اضغط مسافة للتبديل السريع بين النعم'
+              : 'NEMAA Platform — Remember to give thanks • Press Spacebar for a new blessing'}
           </p>
         </div>
       </main>
@@ -408,6 +441,7 @@ export default function App() {
         onNext={handleNext}
         onPrev={handlePrev}
         onRandom={handleRandom}
+        currentLang={currentLang}
       />
 
       <AddBlessingModal
@@ -428,6 +462,21 @@ export default function App() {
         onClose={() => setIsShareOpen(false)}
         blessing={blessingToShare}
         onDownloadImage={handleDownloadImage}
+      />
+
+      {/* Share App Modal (شارك تُؤجر) */}
+      <ShareAppModal
+        isOpen={isShareAppModalOpen}
+        onClose={() => setIsShareAppModalOpen(false)}
+        currentLang={currentLang}
+      />
+
+      {/* Welcome / Language Select Modal */}
+      <LanguageSelectModal
+        isOpen={isLanguageModalOpen}
+        onClose={() => setIsLanguageModalOpen(false)}
+        currentLang={currentLang}
+        onSelectLang={handleSelectLanguage}
       />
     </div>
   );

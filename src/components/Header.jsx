@@ -8,8 +8,10 @@ import {
   Flame,
   Download,
   BookOpen,
-  Bell
+  Bell,
+  Globe
 } from 'lucide-react';
+import { TRANSLATIONS } from '../i18n/translations';
 
 export default function Header({ 
   favoritesCount, 
@@ -21,7 +23,10 @@ export default function Header({
   theme, 
   onToggleTheme,
   dailyCount,
-  streak
+  streak,
+  currentLang = 'ar',
+  onToggleLanguage,
+  onOpenLanguageModal
 }) {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
@@ -44,13 +49,15 @@ export default function Header({
     }
   };
 
+  const t = TRANSLATIONS[currentLang] || TRANSLATIONS.ar;
+
   return (
     <header className="app-header">
       <div className="container header-inner">
         {/* Brand Logo & Title */}
         <div className="brand-wrapper" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           <img 
-            src={`${import.meta.env.BASE_URL}brand/logo-calligraphy.jpg`} 
+            src={`${import.meta.env.BASE_URL}brand/logo-wordmark.png`} 
             alt="شعار نِعْمَة" 
             className="brand-logo-img"
             onError={(e) => {
@@ -59,29 +66,41 @@ export default function Header({
           />
           <div className="brand-text">
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span className="brand-title">نِعْمَة</span>
+              <span className="brand-title">{t.brandTitle}</span>
               {streak > 0 && (
                 <div 
                   className="daily-streak-badge mobile-compact-streak" 
-                  title={`حامد مستمر: ${streak} أيام`}
+                  title={t.streakTooltip.replace('{streak}', streak)}
                 >
                   <Flame size={13} color="#D4AF37" />
-                  <span>{streak}d</span>
+                  <span>{t.streakBadge.replace('{streak}', streak)}</span>
                 </div>
               )}
             </div>
-            <span className="brand-slogan">« تَذَكَّرْ لِتَشْكُرْ »</span>
+            <span className="brand-slogan">{t.brandSlogan}</span>
           </div>
         </div>
 
         {/* Action Controls */}
         <div className="header-actions">
+          {/* Language Switcher Button */}
+          <button
+            className="btn-icon btn-lang-toggle"
+            title={t.switchLanguage}
+            onClick={onToggleLanguage}
+            aria-label="Language / اللغة"
+            style={{ fontWeight: 800, fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px', padding: '0 6px', minWidth: '38px', color: 'var(--color-primary)' }}
+          >
+            <Globe size={14} color="var(--color-gold)" />
+            <span>{currentLang === 'ar' ? 'EN' : 'ع'}</span>
+          </button>
+
           {/* Gratitude Journal Button */}
           <button 
             className="btn-icon" 
-            title="دَفْتَرُ الحَمْدِ وَالامْتِنَان"
+            title={t.journalBtn}
             onClick={onOpenJournal}
-            aria-label="دفتر الامتنان"
+            aria-label={t.journalBtn}
           >
             <BookOpen size={18} />
           </button>
@@ -89,9 +108,9 @@ export default function Header({
           {/* Daily Notifications / Reminders Button */}
           <button 
             className="btn-icon" 
-            title="التذكير اليومي بالنعمة"
+            title={t.notificationsBtn}
             onClick={onOpenNotifications}
-            aria-label="التذكير اليومي"
+            aria-label={t.notificationsBtn}
           >
             <Bell size={18} />
           </button>
@@ -99,9 +118,9 @@ export default function Header({
           {/* Search Button */}
           <button 
             className="btn-icon" 
-            title="تصفح وبحث في النعم"
+            title={t.searchBtn}
             onClick={onOpenSearch}
-            aria-label="بحث"
+            aria-label={t.searchBtn}
           >
             <Search size={18} />
           </button>
@@ -109,9 +128,9 @@ export default function Header({
           {/* Add Custom Blessing Button */}
           <button 
             className="btn-icon" 
-            title="إضافة نعمة خاصة بك"
+            title={t.addBlessingBtn}
             onClick={onOpenAddModal}
-            aria-label="إضافة نعمة"
+            aria-label={t.addBlessingBtn}
           >
             <PlusCircle size={18} />
           </button>
@@ -119,9 +138,9 @@ export default function Header({
           {/* Favorites Button with Badge */}
           <button 
             className="btn-icon" 
-            title="النعم المفضلة"
+            title={t.favoritesBtn}
             onClick={onOpenFavorites}
-            aria-label="المفضلة"
+            aria-label={t.favoritesBtn}
           >
             <Heart size={18} fill={favoritesCount > 0 ? "var(--color-gold)" : "none"} color={favoritesCount > 0 ? "var(--color-gold)" : "currentColor"} />
             {favoritesCount > 0 && (
@@ -132,7 +151,7 @@ export default function Header({
           {/* Theme Toggle (Day / Night) */}
           <button 
             className="btn-icon" 
-            title={theme === 'night' ? 'الوضع النهاري' : 'وضع سكينة الليل'}
+            title={theme === 'night' ? t.themeDay : t.themeNight}
             onClick={onToggleTheme}
             aria-label="تبديل المظهر"
           >
@@ -143,9 +162,9 @@ export default function Header({
           {deferredPrompt && (
             <button 
               className="btn-icon btn-install-pwa" 
-              title="تثبيت تطبيق نِعْمَة على هاتفك"
+              title={t.installPwa}
               onClick={handleInstallClick}
-              aria-label="تثبيت التطبيق"
+              aria-label={t.installPwa}
               style={{ color: 'var(--color-primary)', background: 'rgba(44, 74, 62, 0.1)', borderColor: 'var(--color-gold)' }}
             >
               <Download size={18} />

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { GRATITUDE_PHRASES } from '../data/blessings';
 import { audioEngine } from '../utils/audioEngine';
+import { TRANSLATIONS } from '../i18n/translations';
 
 export default function GratitudeInteractions({
   onNextBlessing,
@@ -22,7 +23,9 @@ export default function GratitudeInteractions({
   currentBlessing,
   onDownloadImage,
   onShare,
-  dailyCount
+  onOpenShareApp,
+  dailyCount,
+  lang = 'ar'
 }) {
   const [comfortPhrase, setComfortPhrase] = useState('');
   const [copied, setCopied] = useState(false);
@@ -68,6 +71,8 @@ export default function GratitudeInteractions({
     });
   };
 
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.ar;
+
   return (
     <div className="gratitude-action-section">
       {/* Prominent "الحمد لله" Button */}
@@ -76,10 +81,10 @@ export default function GratitudeInteractions({
         className={`btn-alhamdulillah ${isSparkling ? 'pulse-glow' : ''}`}
         onClick={handleAlhamdulillahClick}
         title="اضغط للحمد والامتنان"
-        aria-label="الحمد لله"
+        aria-label={t.alhamdulillahBtn}
       >
         <Sparkles size={20} color="#1A2B25" />
-        <span>الْحَمْدُ لِلَّهِ</span>
+        <span>{t.alhamdulillahBtn}</span>
         <Sparkles size={20} color="#1A2B25" />
       </button>
 
@@ -97,8 +102,8 @@ export default function GratitudeInteractions({
         <button
           className="btn-nav-arrow"
           onClick={onNextBlessing}
-          title="النعمة التالية"
-          aria-label="النعمة التالية"
+          title={t.nextBlessingBtn}
+          aria-label={t.nextBlessingBtn}
         >
           <ChevronRight size={20} />
         </button>
@@ -108,18 +113,18 @@ export default function GratitudeInteractions({
           id="btn-new-blessing"
           className="btn-new-blessing"
           onClick={onRandomBlessing}
-          title="عرض نعمة عشوائية (مسافة)"
+          title={`${t.newBlessingBtn} (Space)`}
         >
           <RefreshCw size={17} />
-          <span>نِعْمَةٌ جَدِيدَةٌ</span>
+          <span>{t.newBlessingBtn}</span>
         </button>
 
         {/* Previous Button (in RTL: left arrow goes back) */}
         <button
           className="btn-nav-arrow"
           onClick={onPrevBlessing}
-          title="النعمة السابقة"
-          aria-label="النعمة السابقة"
+          title={t.prevBlessingBtn}
+          aria-label={t.prevBlessingBtn}
         >
           <ChevronLeft size={20} />
         </button>
@@ -130,30 +135,43 @@ export default function GratitudeInteractions({
         <button 
           className="toolbar-btn"
           onClick={() => onDownloadImage(currentBlessing)}
-          title="تحميل كبطاقة مصممة"
+          title={t.downloadBtn}
         >
           <Download size={14} />
-          <span>تحميل البطاقة</span>
+          <span>{t.downloadBtn}</span>
         </button>
 
         <button 
           className="toolbar-btn"
           onClick={handleCopy}
-          title="نسخ نص التدبر"
+          title={t.copyBtn}
         >
           {copied ? <Check size={14} color="#38A169" /> : <Copy size={14} />}
-          <span>{copied ? 'تم النسخ!' : 'نسخ النص'}</span>
+          <span>{copied ? t.copiedText : t.copyBtn}</span>
         </button>
 
         <button 
           className="toolbar-btn"
           onClick={() => onShare(currentBlessing)}
-          title="مشاركة على وسائل التواصل"
+          title={t.shareBtn}
         >
           <Share2 size={14} />
-          <span>مشاركة النعمة</span>
+          <span>{t.shareBtn}</span>
         </button>
       </div>
+
+      {/* Dedicated Spiritual Share Button (شَارِكْ تُؤْجَرْ — صَدَقَةٌ جَارِيَةٌ) */}
+      <button
+        type="button"
+        id="btn-share-to-reward-main"
+        className="btn-share-to-reward"
+        onClick={onOpenShareApp}
+        title="شَارِكْ تُؤْجَرْ — تصميم بوستر للنشر في الحالة ورابط التحميل"
+      >
+        <HeartHandshake size={18} color="var(--color-gold)" />
+        <span>{t.shareToRewardBtn}</span>
+        <span className="btn-share-reward-subtitle">«الدَّالُّ عَلَى الْخَيْرِ كَفَاعِلِهِ»</span>
+      </button>
     </div>
   );
 }
