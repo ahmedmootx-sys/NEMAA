@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Heart, Trash2, ArrowLeft, Sparkles, BookOpen } from 'lucide-react';
+import { X, Heart, Trash2, ArrowLeft } from 'lucide-react';
 
 export default function FavoritesDrawer({
   isOpen,

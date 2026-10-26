@@ -39,7 +39,7 @@ export default function ShareAppModal({ isOpen, onClose, currentLang = 'ar' }) {
   };
 
   const handleCopyLink = () => {
-    const shareText = `«تطبيق نِعْمَة ✨ تَذَكَّرْ لِتَشْكُرْ»\nتطبيق إسلامي تدبّري يُعينك على استشعار نعم الله وتجديد الحمد والامتنان كل يوم.\n\nرابط المنصة والتطبيق:\n${appUrl}\n\n«الدَّالُّ عَلَى الْخَيْرِ كَفَاعِلِهِ»`;
+    const shareText = `«تطبيق نِعْمَة — تَذَكَّرْ لِتَشْكُرْ»\nتطبيق إسلامي تدبّري يُعينك على استشعار نعم الله وتجديد الحمد والامتنان كل يوم.\n\nرابط المنصة والتطبيق:\n${appUrl}\n\n«الدَّالُّ عَلَى الْخَيْرِ كَفَاعِلِهِ»`;
     navigator.clipboard.writeText(shareText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);

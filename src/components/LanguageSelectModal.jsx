@@ -1,5 +1,4 @@
-import React from 'react';
-import { Globe, Check, Sparkles } from 'lucide-react';
+import { Globe, Check } from 'lucide-react';
 import { TRANSLATIONS } from '../i18n/translations';
 
 export default function LanguageSelectModal({ isOpen, onClose, currentLang, onSelectLang }) {
@@ -65,8 +64,23 @@ export default function LanguageSelectModal({ isOpen, onClose, currentLang, onSe
               textAlign: 'right'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '20px' }}>🇸🇦</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'rgba(44, 74, 62, 0.1)',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: 'var(--font-arabic-heading)',
+                fontSize: '14px',
+                fontWeight: 700,
+                color: 'var(--color-primary)'
+              }}>
+                ع
+              </div>
               <div>
                 <div style={{ fontFamily: 'var(--font-arabic-heading)', fontSize: '16px', fontWeight: 700, color: 'var(--text-heading)' }}>
                   العربية
@@ -97,8 +111,22 @@ export default function LanguageSelectModal({ isOpen, onClose, currentLang, onSe
               textAlign: 'left'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '20px' }}>🌐</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'rgba(212, 175, 55, 0.15)',
+                border: '1px solid rgba(212, 175, 55, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 700,
+                color: 'var(--color-gold)'
+              }}>
+                EN
+              </div>
               <div>
                 <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-heading)' }}>
                   English

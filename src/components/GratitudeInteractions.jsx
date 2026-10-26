@@ -64,7 +64,7 @@ export default function GratitudeInteractions({
 
   const handleCopy = () => {
     if (!currentBlessing) return;
-    const textToCopy = `«${currentBlessing.title}»\n\n${currentBlessing.reflection}\n\n${currentBlessing.proof ? currentBlessing.proof + (currentBlessing.proofSource ? ` (${currentBlessing.proofSource})` : '') + '\n\n' : ''}من منصة نِعْمَة ✨ تَذَكَّرْ لِتَشْكُرْ`;
+    const textToCopy = `«${currentBlessing.title}»\n\n${currentBlessing.reflection}\n\n${currentBlessing.proof ? currentBlessing.proof + (currentBlessing.proofSource ? ` (${currentBlessing.proofSource})` : '') + '\n\n' : ''}من منصة نِعْمَة — تَذَكَّرْ لِتَشْكُرْ`;
     navigator.clipboard.writeText(textToCopy).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

@@ -213,7 +213,7 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     const headerTitleY = isSquare ? 105 : 190;
     const headerSloganY = isSquare ? 144 : 242;
 
-    ctx.font = `bold ${isSquare ? '42px' : '56px'} "Reem Kufi", "Amiri", "Cairo", sans-serif`;
+    ctx.font = `bold ${isSquare ? '44px' : '58px'} "Aref Ruqaa", "Amiri", serif`;
     ctx.fillStyle = theme.appTitle;
     ctx.fillText('نِعْمَة', width / 2, headerTitleY);
 
@@ -237,47 +237,88 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     ctx.fillStyle = theme.badgeText;
     ctx.fillText(badgeText, width / 2, badgeY + (isSquare ? 24 : 30));
 
-    // Dynamic Sizing calculation to guarantee non-overlapping layout
+    // Dynamic Non-Overlapping Layout Calculation
     const textMaxWidth = isSquare ? 880 : 860;
+    const startY = isSquare ? 230 : 420;
+    const footerY = height - (isSquare ? 42 : 75);
+    const maxUsableY = footerY - (isSquare ? 28 : 50);
+    const availableHeight = maxUsableY - startY;
 
-    // Check content lengths
     const titleText = blessing.title || '';
     const refText = blessing.reflection || '';
     const proofText = blessing.proof || '';
-    const isLongContent = isSquare && (refText.length > 150 || (proofText.length > 70 && refText.length > 100));
 
-    // Font configurations
-    const titleFontSize = isSquare ? (isLongContent ? 34 : 38) : 52;
-    const titleLineHeight = isSquare ? (isLongContent ? 54 : 60) : 80;
+    // Base font configurations
+    let baseTitleSize = isSquare ? 36 : 50;
+    let baseTitleLH = isSquare ? 56 : 76;
+    let baseRefSize = isSquare ? 25 : 32;
+    let baseRefLH = isSquare ? 44 : 58;
+    let baseProofSize = isSquare ? 21 : 28;
+    let baseProofLH = isSquare ? 38 : 50;
 
-    const refFontSize = isSquare ? (isLongContent ? 23 : 26) : 33;
-    const refLineHeight = isSquare ? (isLongContent ? 42 : 46) : 62;
-
-    const proofFontSize = isSquare ? (isLongContent ? 20 : 23) : 29;
-    const proofLineHeight = isSquare ? (isLongContent ? 36 : 40) : 52;
-    const proofSourceFontSize = isSquare ? 17 : 22;
-
-    // Measure Title Lines
-    ctx.font = `bold ${titleFontSize}px "Amiri", "Reem Kufi", serif`;
-    const titleLines = splitTextIntoLines(ctx, titleText, textMaxWidth);
-
-    // Measure Reflection Lines
-    ctx.font = `400 ${refFontSize}px "Amiri", "Cairo", serif`;
-    const refLines = splitTextIntoLines(ctx, refText, textMaxWidth);
-
-    // Measure Proof Lines (if present)
+    let scale = 1.0;
+    let titleLines = [];
+    let refLines = [];
     let proofLines = [];
+    let titleFontSize = baseTitleSize;
+    let titleLineHeight = baseTitleLH;
+    let refFontSize = baseRefSize;
+    let refLineHeight = baseRefLH;
+    let proofFontSize = baseProofSize;
+    let proofLineHeight = baseProofLH;
+    let proofSourceFontSize = isSquare ? 17 : 22;
+    let gapTitleRef = isSquare ? 22 : 40;
+    let gapRefProof = isSquare ? 20 : 40;
+    let boxPaddingTop = isSquare ? 22 : 32;
+    let boxPaddingBottom = isSquare ? 20 : 28;
+    let sourceSpace = 0;
+    let boxHeight = 0;
+
     const proofFontFamily = blessing.proofType === 'quran' ? '"Amiri Quran", "Amiri", serif' : '"Amiri", serif';
-    if (proofText) {
-      ctx.font = `bold italic ${proofFontSize}px ${proofFontFamily}`;
-      proofLines = splitTextIntoLines(ctx, proofText, textMaxWidth - (isSquare ? 100 : 120));
+
+    // Iterative fit test to guarantee ZERO overlap
+    for (let attempt = 0; attempt < 5; attempt++) {
+      titleFontSize = Math.round(baseTitleSize * scale);
+      titleLineHeight = Math.round(baseTitleLH * scale);
+      refFontSize = Math.round(baseRefSize * scale);
+      refLineHeight = Math.round(baseRefLH * scale);
+      proofFontSize = Math.round(baseProofSize * scale);
+      proofLineHeight = Math.round(baseProofLH * scale);
+      proofSourceFontSize = Math.max(14, Math.round((isSquare ? 17 : 22) * scale));
+
+      ctx.font = `bold ${titleFontSize}px "Aref Ruqaa", "Amiri", serif`;
+      titleLines = splitTextIntoLines(ctx, titleText, textMaxWidth);
+
+      ctx.font = `400 ${refFontSize}px "Amiri", "Cairo", serif`;
+      refLines = splitTextIntoLines(ctx, refText, textMaxWidth);
+
+      proofLines = [];
+      if (proofText) {
+        ctx.font = `bold italic ${proofFontSize}px ${proofFontFamily}`;
+        proofLines = splitTextIntoLines(ctx, proofText, textMaxWidth - (isSquare ? 80 : 120));
+      }
+
+      gapTitleRef = Math.round((isSquare ? 22 : 40) * scale);
+      gapRefProof = Math.round((isSquare ? 20 : 40) * scale);
+      boxPaddingTop = Math.round((isSquare ? 22 : 32) * scale);
+      boxPaddingBottom = Math.round((isSquare ? 20 : 28) * scale);
+      const hasSource = Boolean(blessing.proofSource);
+      sourceSpace = hasSource ? Math.round((isSquare ? 28 : 40) * scale) : 0;
+      boxHeight = proofLines.length > 0 ? (boxPaddingTop + (proofLines.length * proofLineHeight) + sourceSpace + boxPaddingBottom) : 0;
+
+      const totalRequiredH = (titleLines.length * titleLineHeight) + gapTitleRef + (refLines.length * refLineHeight) + (boxHeight > 0 ? (gapRefProof + boxHeight) : 0);
+
+      if (totalRequiredH <= availableHeight || scale <= 0.6) {
+        break;
+      }
+      scale = Math.max(0.6, (availableHeight / totalRequiredH) * 0.95);
     }
 
     // Starting Y coordinates
-    let currentY = isSquare ? (isLongContent ? 260 : 275) : 480;
+    let currentY = startY;
 
     // Render Title Lines
-    ctx.font = `bold ${titleFontSize}px "Amiri", "Reem Kufi", serif`;
+    ctx.font = `bold ${titleFontSize}px "Aref Ruqaa", "Amiri", serif`;
     ctx.fillStyle = theme.title;
     for (let i = 0; i < titleLines.length; i++) {
       ctx.fillText(titleLines[i], width / 2, currentY);
@@ -285,7 +326,7 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     }
 
     // Gap between Title and Reflection
-    currentY += isSquare ? (isLongContent ? 24 : 32) : 50;
+    currentY += gapTitleRef;
 
     // Render Reflection Lines
     ctx.font = `400 ${refFontSize}px "Amiri", "Cairo", serif`;
@@ -297,13 +338,8 @@ export async function exportBlessingAsImage(blessing, options = {}) {
 
     // Render Proof Box if present
     if (proofLines.length > 0) {
-      currentY += isSquare ? (isLongContent ? 20 : 30) : 50;
+      currentY += gapRefProof;
 
-      const hasSource = Boolean(blessing.proofSource);
-      const boxPaddingTop = isSquare ? 24 : 34;
-      const boxPaddingBottom = isSquare ? 22 : 30;
-      const sourceSpace = hasSource ? (isSquare ? 32 : 44) : 0;
-      const boxHeight = boxPaddingTop + (proofLines.length * proofLineHeight) + sourceSpace + boxPaddingBottom;
       const boxWidth = textMaxWidth + (isSquare ? 40 : 60);
       const boxX = (width - boxWidth) / 2;
       const boxY = currentY;
@@ -329,7 +365,7 @@ export async function exportBlessingAsImage(blessing, options = {}) {
       }
 
       // Render Proof Source
-      if (hasSource) {
+      if (blessing.proofSource) {
         proofCurrentY += isSquare ? 4 : 8;
         ctx.font = `${proofSourceFontSize}px "Cairo", sans-serif`;
         ctx.fillStyle = theme.proofSource;
@@ -338,7 +374,6 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     }
 
     // Footer at the bottom
-    const footerY = height - (isSquare ? 42 : 75);
     ctx.font = `${isSquare ? '18px' : '22px'} "Cairo", sans-serif`;
     ctx.fillStyle = theme.footer;
     ctx.fillText('منصة نِعْمَة — شارك لتؤجر وذكّر لتشكر', width / 2, footerY);

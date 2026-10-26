@@ -196,7 +196,10 @@ export default function GratitudeJournalDrawer({ isOpen, onClose }) {
               <Calendar size={15} color="var(--color-primary)" />
               <span>{todayArabicDate}</span>
               {isSavedToday && (
-                <span className="saved-badge">✓ تم الحفظ اليوم</span>
+                <span className="saved-badge">
+                  <Check size={12} style={{ display: 'inline', verticalAlign: 'middle', marginLeft: '4px' }} />
+                  تم الحفظ اليوم
+                </span>
               )}
             </div>
 
@@ -267,7 +270,7 @@ export default function GratitudeJournalDrawer({ isOpen, onClose }) {
                   onClick={() => setActiveTab('write')}
                   style={{ marginTop: '12px' }}
                 >
-                  دوّن الآن ✨
+                  دوّن الآن
                 </button>
               </div>
             ) : (

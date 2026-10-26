@@ -38,7 +38,7 @@ export default function NotificationModal({ isOpen, onClose }) {
       if (res === 'granted') {
         setIsEnabled(true);
         localStorage.setItem('nemaa_notifications_enabled', 'true');
-        setStatusMessage('تم تفعيل إشعارات نِعْمَة بنجاح! 🔔');
+        setStatusMessage('تم تفعيل إشعارات نِعْمَة بنجاح.');
       } else {
         setIsEnabled(false);
         localStorage.setItem('nemaa_notifications_enabled', 'false');
@@ -83,7 +83,7 @@ export default function NotificationModal({ isOpen, onClose }) {
       return;
     }
 
-    const title = 'نِعْمَة | تَذَكَّرْ لِتَشْكُرْ 🌿';
+    const title = 'نِعْمَة | تَذَكَّرْ لِتَشْكُرْ';
     const options = {
       body: '«وَإِن تَعُدُّوا نِعْمَتَ اللَّهِ لَا تُحْصُوهَا» • افتح تطبيق نعمة اليوم لتتدبر نعمة مباركة وترطب لسانك بالحمد.',
       icon: './brand/icon-192.png',
@@ -104,7 +104,7 @@ export default function NotificationModal({ isOpen, onClose }) {
       new Notification(title, options);
     }
 
-    setStatusMessage('تم إرسال إشعار التجربة لهاتفك بنجاح! ✨');
+    setStatusMessage('تم إرسال إشعار التجربة لهاتفك بنجاح.');
     setTimeout(() => setStatusMessage(''), 4000);
   };
 

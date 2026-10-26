@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { 
-  X, 
   Minimize2, 
   ChevronRight, 
   ChevronLeft, 

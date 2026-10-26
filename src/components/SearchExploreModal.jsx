@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Search, Sparkles, ArrowLeft, Tag } from 'lucide-react';
+import { X, Search, ArrowLeft } from 'lucide-react';
 import { CATEGORIES } from '../data/blessings';
 
 export default function SearchExploreModal({ isOpen, onClose, allBlessings, onSelectBlessing }) {

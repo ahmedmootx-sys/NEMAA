@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Sparkles, BookOpen } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 import { CATEGORIES } from '../data/blessings';
 
 export default function AddBlessingModal({ isOpen, onClose, onAddBlessing }) {
@@ -159,7 +159,7 @@ export default function AddBlessingModal({ isOpen, onClose, onAddBlessing }) {
           </div>
 
           <button type="submit" className="form-submit-btn">
-            حفظ النعمة وإضافتها للمنصة ✨
+            حفظ النعمة وإضافتها للمنصة
           </button>
         </form>
       </div>

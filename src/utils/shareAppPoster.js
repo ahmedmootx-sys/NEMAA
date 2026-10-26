@@ -166,50 +166,50 @@ export async function generateShareAppPoster() {
   ctx.fillText('— رَوَاهُ مُسْلِمٌ فِي صَحِيحِهِ', 540, hadithBoxY + 104);
 
   // 6. Platform Title & Invitation
-  ctx.font = 'bold 56px "Reem Kufi", "Amiri", serif';
+  ctx.font = 'bold 52px "Aref Ruqaa", "Amiri", serif';
   ctx.fillStyle = '#FFFFFF';
   ctx.fillText('مَنَصَّةُ نِعْمَة الإِسْلَامِيَّة', 540, 830);
 
-  ctx.font = 'bold 30px "Amiri", serif';
+  ctx.font = 'bold 28px "Aref Ruqaa", "Amiri", serif';
   ctx.fillStyle = '#D4AF37';
-  ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', 540, 890);
+  ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', 540, 888);
 
   // Spiritual Narrative
-  ctx.font = '500 29px "Cairo", sans-serif';
+  ctx.font = '500 27px "Cairo", sans-serif';
   ctx.fillStyle = '#F1F5F9';
-  ctx.fillText('تطبيق إسلامي تدبّري يُعينك على استشعار نِعَمِ الله الغامرة', 540, 960);
+  ctx.fillText('تطبيق إسلامي تدبّري يُعينك على استشعار نِعَمِ الله الغامرة', 540, 955);
 
-  ctx.font = '400 26px "Cairo", sans-serif';
+  ctx.font = '400 25px "Cairo", sans-serif';
   ctx.fillStyle = '#CBD5E1';
-  ctx.fillText('وترطيب لسانك بذكر الله وحمده وشكره كل يوم', 540, 1008);
+  ctx.fillText('وترطيب لسانك بذكر الله وحمده وشكره كل يوم', 540, 1002);
 
-  // 7. Three Feature Badges
+  // 7. Three Feature Badges (Solid, Emoji-Free)
   const drawBadge = (text, y) => {
     const badgeW = 780;
-    const badgeH = 64;
+    const badgeH = 60;
     const badgeX = (1080 - badgeW) / 2;
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.strokeStyle = 'rgba(212, 175, 55, 0.35)';
     ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.roundRect(badgeX, y, badgeW, badgeH, 32);
+    ctx.roundRect(badgeX, y, badgeW, badgeH, 30);
     ctx.fill();
     ctx.stroke();
 
-    ctx.font = '600 24px "Cairo", sans-serif';
+    ctx.font = '600 22px "Cairo", sans-serif';
     ctx.fillStyle = '#F8FAFC';
-    ctx.fillText(text, 540, y + 41);
+    ctx.fillText(text, 540, y + 38);
   };
 
-  drawBadge('✨ أكثر من 200 نعمة وشاهد موثق من القرآن والحديث', 1065);
-  drawBadge('🌿 أدعية شكر مأثورة، الوضع التدبري الهادئ، ومفكرة الامتنان', 1145);
-  drawBadge('📱 تطبيق ويب وهاتف خفيف، مجاني لوجه الله وبدون أي إعلانات', 1225);
+  drawBadge('أكثر من 200 نعمة وشاهد موثق من القرآن والحديث', 1060);
+  drawBadge('أدعية شكر مأثورة، الوضع التدبري الهادئ، ومفكرة الامتنان', 1136);
+  drawBadge('تطبيق ويب وهاتف خفيف، مجاني لوجه الله وبدون أي إعلانات', 1212);
 
-  // 8. Premium Showcase Card for Link & QR Code (Fixes the ugly link display)
-  const cardY = 1315;
+  // 8. Premium Showcase Card for Link & QR Code (Guaranteed Zero Overlap)
+  const cardY = 1300;
   const cardW = 880;
-  const cardH = 370;
+  const cardH = 380;
   const cardX = (1080 - cardW) / 2;
 
   // Background for Link/QR Card
@@ -253,76 +253,77 @@ export async function generateShareAppPoster() {
 
     const qrImg = await loadImage(qrDataUrl);
 
-    // Right Side: Framed White QR Card (in RTL: x = 685)
-    const qrBoxX = cardX + cardW - 250;
-    const qrBoxY = cardY + 35;
-    const qrBoxSize = 215;
+    // Right Side: Framed White QR Card
+    const qrBoxSize = 200;
+    const qrBoxX = cardX + cardW - 240;
+    const qrBoxY = cardY + 45;
 
     // White QR Backdrop
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 18);
+    ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 16);
     ctx.fill();
 
     // Gold frame around QR
     ctx.strokeStyle = '#D4AF37';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 18);
+    ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 16);
     ctx.stroke();
 
     // Draw QR image
     ctx.drawImage(qrImg, qrBoxX + 10, qrBoxY + 10, qrBoxSize - 20, qrBoxSize - 20);
 
     // QR Label underneath
-    ctx.font = 'bold 20px "Cairo", sans-serif';
+    ctx.font = 'bold 18px "Cairo", sans-serif';
     ctx.fillStyle = '#E5C358';
     ctx.textAlign = 'center';
-    ctx.fillText('امسح الرمز بكاميرا الجوال 📷', qrBoxX + qrBoxSize / 2, qrBoxY + qrBoxSize + 40);
+    ctx.fillText('امسح الرمز بكاميرا الجوال', qrBoxX + qrBoxSize / 2, qrBoxY + qrBoxSize + 36);
 
-    // Left Side: Link & Action Text (x = cardX + 35)
-    const leftCenterX = cardX + (cardW - 270) / 2;
+    // Left Side: Link & Action Text (width bounded to cardW - 270)
+    const leftW = cardW - 265;
+    const leftCenterX = cardX + leftW / 2;
 
     // Header Title
-    ctx.font = 'bold 30px "Cairo", sans-serif';
+    ctx.font = 'bold 26px "Cairo", sans-serif';
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('رابط المنصة والتطبيق المباشر 🔗', leftCenterX, cardY + 65);
+    ctx.fillText('رابط المنصة والتطبيق المباشر', leftCenterX, cardY + 68);
 
     // Modern Link Pill Box
-    const pillW = 520;
-    const pillH = 68;
+    const pillW = 470;
+    const pillH = 62;
     const pillX = leftCenterX - pillW / 2;
-    const pillY = cardY + 95;
+    const pillY = cardY + 100;
 
     ctx.fillStyle = 'rgba(212, 175, 55, 0.16)';
     ctx.strokeStyle = '#E5C358';
     ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.roundRect(pillX, pillY, pillW, pillH, 34);
+    ctx.roundRect(pillX, pillY, pillW, pillH, 31);
     ctx.fill();
     ctx.stroke();
 
     // Clean Domain inside Pill (Modern Cairo Typography)
-    ctx.font = 'bold 26px "Cairo", sans-serif';
+    ctx.font = 'bold 23px "Cairo", sans-serif';
     ctx.fillStyle = '#F9E498';
     ctx.direction = 'ltr';
-    ctx.fillText(displayDomain, leftCenterX, pillY + 43);
+    ctx.fillText(displayDomain, leftCenterX, pillY + 40);
     ctx.direction = 'rtl';
 
     // Spiritual CTA
-    ctx.font = '500 23px "Cairo", sans-serif';
+    ctx.font = '500 20px "Cairo", sans-serif';
     ctx.fillStyle = '#F1F5F9';
-    ctx.fillText('شاركه في حالتك لتكون صدقة جارية لك ولأحبابك 🤲', leftCenterX, cardY + 225);
+    ctx.fillText('شاركه في حالتك لتكون صدقة جارية لك ولأحبابك', leftCenterX, cardY + 225);
 
     // Offline / PWA Badge
-    ctx.font = '400 20px "Cairo", sans-serif';
+    ctx.font = '400 18px "Cairo", sans-serif';
     ctx.fillStyle = 'rgba(212, 175, 55, 0.9)';
-    ctx.fillText('✨ تطبيق فوري خفيف يعمل بدون إنترنت (PWA)', leftCenterX, cardY + 275);
+    ctx.fillText('تطبيق فوري خفيف يعمل بدون إنترنت (PWA)', leftCenterX, cardY + 270);
 
   } catch (err) {
     console.warn('QR Code drawing fallback:', err);
     // Fallback simple link box
-    ctx.font = 'bold 28px "Cairo", sans-serif';
+    ctx.font = 'bold 26px "Cairo", sans-serif';
     ctx.fillStyle = '#F9E498';
     ctx.fillText(displayDomain, 540, cardY + 120);
   }

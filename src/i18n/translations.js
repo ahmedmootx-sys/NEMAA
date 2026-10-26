@@ -28,10 +28,10 @@ export const TRANSLATIONS = {
     dailyStatsLabel: 'تأملاتك وحمدك اليوم:',
     dailyStatsCount: '{count} مرات',
     milestones: {
-      bronze: 'بداية مباركة بالحمد 🌿',
-      silver: 'حامدٌ شاكرٌ لله ✨',
-      gold: '«وَقَلِيلٌ مِّنْ عِبَادِيَ الشَّكُورُ» 🕊️',
-      diamond: 'نورٌ على نور وبركة دائمة 💫'
+      bronze: 'بداية مباركة بالحمد',
+      silver: 'حامدٌ شاكرٌ لله',
+      gold: '«وَقَلِيلٌ مِّنْ عِبَادِيَ الشَّكُورُ»',
+      diamond: 'نورٌ على نور وبركة دائمة'
     },
 
     // Card Header & Actions
@@ -44,7 +44,7 @@ export const TRANSLATIONS = {
     shareBtn: 'مشاركة النعمة',
     favoriteAdd: 'حفظ في المفضلة',
     favoriteRemove: 'إزالة من المفضلة',
-    customBadge: 'خاصة بك ✍️',
+    customBadge: 'خاصة بك',
     
     // Proof Box
     proofQuran: 'شاهد من كتاب الله',
@@ -61,7 +61,7 @@ export const TRANSLATIONS = {
     newBlessingBtn: 'نِعْمَةٌ جَدِيدَةٌ',
     prevBlessingBtn: 'السابقة',
     nextBlessingBtn: 'التالية',
-    shareToRewardBtn: 'شَارِكْ تُؤْجَرْ 🌿',
+    shareToRewardBtn: 'شَارِكْ تُؤْجَرْ',
     
     // Card Export
     cardThemes: {
@@ -132,10 +132,10 @@ export const TRANSLATIONS = {
     dailyStatsLabel: 'Your praises today:',
     dailyStatsCount: '{count} times',
     milestones: {
-      bronze: 'A blessed beginning of gratitude 🌿',
-      silver: 'Grateful & giving thanks to Allah ✨',
-      gold: '«And few of My servants are grateful» 🕊️',
-      diamond: 'Light upon light and lasting blessing 💫'
+      bronze: 'A blessed beginning of gratitude',
+      silver: 'Grateful & giving thanks to Allah',
+      gold: '«And few of My servants are grateful»',
+      diamond: 'Light upon light and lasting blessing'
     },
 
     // Card Header & Actions
@@ -148,7 +148,7 @@ export const TRANSLATIONS = {
     shareBtn: 'Share Blessing',
     favoriteAdd: 'Save to Favorites',
     favoriteRemove: 'Remove from Favorites',
-    customBadge: 'Custom Blessing ✍️',
+    customBadge: 'Custom Blessing',
     
     // Proof Box
     proofQuran: 'Evidence from the Holy Quran',
@@ -165,7 +165,7 @@ export const TRANSLATIONS = {
     newBlessingBtn: 'NEW BLESSING',
     prevBlessingBtn: 'Previous',
     nextBlessingBtn: 'Next',
-    shareToRewardBtn: 'SHARE & BE REWARDED 🌿',
+    shareToRewardBtn: 'SHARE & BE REWARDED',
     
     // Card Export
     cardThemes: {

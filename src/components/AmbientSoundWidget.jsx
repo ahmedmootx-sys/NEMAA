@@ -52,10 +52,10 @@ export default function AmbientSoundWidget() {
         onChange={handleTrackChange}
         title="اختر صوت السكينة الخلفي"
       >
-        <option value="rain">🌧️ مطر</option>
-        <option value="breeze">🍃 نسيم</option>
-        <option value="birds">🐦 طيور</option>
-        <option value="drone">🕊️ سكون</option>
+        <option value="rain">صوت المطر</option>
+        <option value="breeze">نسيم عليل</option>
+        <option value="birds">تغريد الطيور</option>
+        <option value="drone">سكينة وطمأنينة</option>
       </select>
 
       {/* Volume slider expand toggle */}

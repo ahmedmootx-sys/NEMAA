@@ -10,7 +10,8 @@ import {
   Volume2,
   VolumeX,
   Maximize2,
-  HeartHandshake
+  HeartHandshake,
+  PenTool
 } from 'lucide-react';
 import { subscribeToVoiceChanges, speakArabic, stopSpeaking } from '../utils/speechHelper';
 import { getBlessingGratitudeDua } from '../utils/duaHelper';
@@ -24,6 +25,7 @@ export default function BlessingCard({
   onShare, 
   onDownloadImage,
   onOpenFocusMode,
+  onOpenEdit,
   animatingKey,
   lang = 'ar'
 }) {
@@ -78,8 +80,8 @@ export default function BlessingCard({
 
   const handleCopy = () => {
     const textToCopy = lang === 'en'
-      ? `«${displayBlessing.title}»\n\n${displayBlessing.reflection}\n\n${displayBlessing.proofArabic ? displayBlessing.proofArabic + '\n' : ''}${displayBlessing.proofMeaning ? `Meaning: "${displayBlessing.proofMeaning}"` + (displayBlessing.proofSource ? ` (${displayBlessing.proofSource})` : '') + '\n\n' : ''}From NEMAA Platform ✨ Remember to give thanks`
-      : `«${blessing.title}»\n\n${blessing.reflection}\n\n${blessing.proof ? blessing.proof + (blessing.proofSource ? ` (${blessing.proofSource})` : '') + '\n\n' : ''}${gratitudeDua ? `دعاء شكر النعمة:\n${gratitudeDua.dua}\n\n` : ''}من منصة نِعْمَة ✨ تَذَكَّرْ لِتَشْكُرْ`;
+      ? `«${displayBlessing.title}»\n\n${displayBlessing.reflection}\n\n${displayBlessing.proofArabic ? displayBlessing.proofArabic + '\n' : ''}${displayBlessing.proofMeaning ? `Meaning: "${displayBlessing.proofMeaning}"` + (displayBlessing.proofSource ? ` (${displayBlessing.proofSource})` : '') + '\n\n' : ''}From NEMAA Platform — Remember to give thanks`
+      : `«${blessing.title}»\n\n${blessing.reflection}\n\n${blessing.proof ? blessing.proof + (blessing.proofSource ? ` (${blessing.proofSource})` : '') + '\n\n' : ''}${gratitudeDua ? `دعاء شكر النعمة:\n${gratitudeDua.dua}\n\n` : ''}من منصة نِعْمَة — تَذَكَّرْ لِتَشْكُرْ`;
     navigator.clipboard.writeText(textToCopy).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
@@ -123,10 +125,32 @@ export default function BlessingCard({
                 {t.customBadge}
               </span>
             )}
+
+            {blessing.isCustomized && (
+              <button 
+                type="button"
+                className="card-user-edited-badge"
+                onClick={() => onOpenEdit && onOpenEdit(blessing)}
+                title="تم تخصيص هذه النعمة بصياغتك — اضغط لإعادة التعديل"
+              >
+                <PenTool size={11} />
+                <span>صياغتي الخاصة</span>
+              </button>
+            )}
           </div>
 
           {/* Quick Header Actions */}
           <div className="card-header-actions">
+            {/* Edit / Customize Blessing Button */}
+            <button
+              className={`card-action-btn ${blessing.isCustomized ? 'active-favorite' : ''}`}
+              onClick={() => onOpenEdit && onOpenEdit(blessing)}
+              title="صياغة وتعديل النعمة والتحكم بكلامها"
+              aria-label="صياغة وتعديل النعمة"
+            >
+              <PenTool size={16} />
+            </button>
+
             {/* Focus / Zen Mode Button */}
             <button
               className="card-action-btn"
@@ -273,6 +297,19 @@ export default function BlessingCard({
                 — {gratitudeDua.source}
               </div>
             )}
+          </div>
+        )}
+
+        {/* User Personal Note (خاطرة أو استشعار شخصي) */}
+        {displayBlessing.userNote && (
+          <div className="user-personal-note-box">
+            <div className="user-personal-note-title">
+              <PenTool size={12} />
+              <span>خاطرة واستشعار شخصي خاص بك:</span>
+            </div>
+            <p style={{ margin: 0 }}>
+              {displayBlessing.userNote}
+            </p>
           </div>
         )}
 

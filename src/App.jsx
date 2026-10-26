@@ -12,6 +12,8 @@ import SearchExploreModal from './components/SearchExploreModal';
 import ShareModal from './components/ShareModal';
 import ShareAppModal from './components/ShareAppModal';
 import LanguageSelectModal from './components/LanguageSelectModal';
+import EditBlessingModal from './components/EditBlessingModal';
+import InstallAppToast from './components/InstallAppToast';
 import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
 import { TRANSLATIONS } from './i18n/translations';
@@ -61,7 +63,20 @@ export default function App() {
 
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.ar;
 
-  // 2. Custom Blessings State
+  // PWA Install Deferred Prompt
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  // 2. Custom Blessings State (New blessings created by user)
   const [customBlessings, setCustomBlessings] = useState(() => {
     try {
       const saved = localStorage.getItem('nemaa_custom_blessings');
@@ -71,10 +86,46 @@ export default function App() {
     }
   });
 
-  // Combined Blessings Pool
+  // User-Customized / Rephrased Blessings State (Edits to existing blessings)
+  const [customizedBlessings, setCustomizedBlessings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_customized_blessings');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleSaveCustomization = (blessingId, customizedData) => {
+    const updated = {
+      ...customizedBlessings,
+      [blessingId]: customizedData
+    };
+    setCustomizedBlessings(updated);
+    localStorage.setItem('nemaa_customized_blessings', JSON.stringify(updated));
+  };
+
+  const handleResetCustomization = (blessingId) => {
+    const updated = { ...customizedBlessings };
+    delete updated[blessingId];
+    setCustomizedBlessings(updated);
+    localStorage.setItem('nemaa_customized_blessings', JSON.stringify(updated));
+  };
+
+  // Combined Blessings Pool (with user customized rephrasings merged)
   const allBlessings = useMemo(() => {
-    return [...customBlessings, ...INITIAL_BLESSINGS];
-  }, [customBlessings]);
+    const pool = [...customBlessings, ...INITIAL_BLESSINGS];
+    return pool.map(b => {
+      if (customizedBlessings[b.id]) {
+        return {
+          ...b,
+          ...customizedBlessings[b.id],
+          isCustomized: true
+        };
+      }
+      return b;
+    });
+  }, [customBlessings, customizedBlessings]);
 
   // 3. Category Filter
   const [activeCategory, setActiveCategory] = useState('all');
@@ -287,6 +338,15 @@ export default function App() {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [blessingToShare, setBlessingToShare] = useState(null);
 
+  // Edit / Customize Blessing Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [blessingToEdit, setBlessingToEdit] = useState(null);
+
+  const handleOpenEdit = (blessing) => {
+    setBlessingToEdit(blessing || currentBlessing);
+    setIsEditModalOpen(true);
+  };
+
   const handleOpenShare = (blessing) => {
     setBlessingToShare(blessing || currentBlessing);
     setIsShareOpen(true);
@@ -375,6 +435,13 @@ export default function App() {
           )}
         </div>
 
+        {/* Category Filter Pills Bar (Solid Vector Icons) */}
+        <CategoryFilter
+          categories={categoriesWithCounts}
+          activeCategory={activeCategory}
+          onSelectCategory={setActiveCategory}
+        />
+
         {/* The Central Blessing Card */}
         <BlessingCard
           blessing={currentBlessing}
@@ -383,6 +450,7 @@ export default function App() {
           onShare={handleOpenShare}
           onDownloadImage={handleDownloadImage}
           onOpenFocusMode={() => setIsFocusModeOpen(true)}
+          onOpenEdit={handleOpenEdit}
           animatingKey={animatingKey}
           lang={currentLang}
         />
@@ -478,6 +546,19 @@ export default function App() {
         currentLang={currentLang}
         onSelectLang={handleSelectLanguage}
       />
+
+      {/* Edit / Customize Blessing Modal */}
+      <EditBlessingModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        blessing={blessingToEdit}
+        onSaveCustomization={handleSaveCustomization}
+        onResetCustomization={handleResetCustomization}
+        isCustomized={blessingToEdit ? Boolean(customizedBlessings[blessingToEdit.id]) : false}
+      />
+
+      {/* Subtle PWA Install Notification Toast */}
+      <InstallAppToast deferredPrompt={deferredPrompt} />
     </div>
   );
 }

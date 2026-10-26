@@ -35,7 +35,7 @@ export default function ShareModal({
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://nemaa.app';
   
-  const shareText = `✨ تدبّر في «${blessing.title}»:\n\n"${blessing.reflection}"\n\n${blessing.proof ? `${blessing.proof}\n\n` : ''}من منصة نِعْمَة — تَذَكَّرْ لِتَشْكُرْ 🌿\n${currentUrl}`;
+  const shareText = `تدبّر في «${blessing.title}»:\n\n"${blessing.reflection}"\n\n${blessing.proof ? `${blessing.proof}\n\n` : ''}من منصة نِعْمَة — تَذَكَّرْ لِتَشْكُرْ\n${currentUrl}`;
 
   const encodedText = encodeURIComponent(shareText);
 
@@ -354,7 +354,7 @@ export default function ShareModal({
               cursor: 'pointer'
             }}
           >
-            مشاركة عبر تطبيقات أخرى على هاتفك 📱
+            مشاركة عبر تطبيقات أخرى على هاتفك
           </button>
         )}
       </div>
