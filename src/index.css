@@ -287,6 +287,51 @@ html, body {
     gap: 8px;
   }
 }
+@media (max-width: 480px) {
+  .app-header .container {
+    padding: 0 8px;
+  }
+  .header-inner {
+    height: 56px;
+    gap: 4px;
+  }
+  .brand-wrapper {
+    gap: 5px;
+  }
+  .brand-logo-img {
+    width: 32px;
+    height: 32px;
+  }
+  .brand-title {
+    font-size: 19px;
+  }
+  .mobile-compact-streak {
+    padding: 1px 5px;
+    font-size: 10px;
+    gap: 2px;
+  }
+  .header-actions {
+    gap: 3px;
+  }
+}
+@media (max-width: 360px) {
+  .app-header .container {
+    padding: 0 4px;
+  }
+  .header-inner {
+    gap: 2px;
+  }
+  .brand-logo-img {
+    width: 28px;
+    height: 28px;
+  }
+  .brand-title {
+    font-size: 17px;
+  }
+  .header-actions {
+    gap: 2px;
+  }
+}
 
 .btn-icon {
   width: 36px;
@@ -308,6 +353,28 @@ html, body {
     width: 40px;
     height: 40px;
     min-width: 40px;
+  }
+}
+@media (max-width: 480px) {
+  .btn-icon {
+    width: 31px;
+    height: 31px;
+    min-width: 31px;
+  }
+  .btn-icon svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+@media (max-width: 360px) {
+  .btn-icon {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+  }
+  .btn-icon svg {
+    width: 14px;
+    height: 14px;
   }
 }
 .btn-icon:hover {
@@ -487,7 +554,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 18px;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -496,7 +563,7 @@ html, body {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .card-category-pill {
@@ -551,6 +618,53 @@ html, body {
   .card-action-btn {
     width: 36px;
     height: 36px;
+  }
+}
+@media (max-width: 480px) {
+  .blessing-card {
+    padding: 18px 14px 18px;
+  }
+  .card-header-meta {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .card-category-pill {
+    padding: 3px 8px;
+    font-size: 11px;
+    gap: 4px;
+  }
+  .card-header-actions {
+    gap: 3px;
+  }
+  .card-action-btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+  }
+  .card-action-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+@media (max-width: 360px) {
+  .blessing-card {
+    padding: 16px 10px 16px;
+  }
+  .card-category-pill {
+    padding: 2px 7px;
+    font-size: 10px;
+  }
+  .card-header-actions {
+    gap: 2px;
+  }
+  .card-action-btn {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+  }
+  .card-action-btn svg {
+    width: 13px;
+    height: 13px;
   }
 }
 .card-action-btn:hover {
