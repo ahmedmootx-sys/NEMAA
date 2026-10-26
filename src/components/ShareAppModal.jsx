@@ -93,10 +93,10 @@ export default function ShareAppModal({ isOpen, onClose, currentLang = 'ar' }) {
           position: 'relative',
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
-          boxShadow: 'var(--shadow-lg)',
-          border: '1px solid var(--border-gold)',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(212, 175, 55, 0.2)',
+          border: '1.5px solid var(--border-gold)',
           marginBottom: '20px',
-          background: '#091611',
+          background: 'linear-gradient(180deg, #0A1C15 0%, #163A2D 100%)',
           aspectRatio: '9 / 16',
           maxHeight: '440px',
           display: 'flex',
@@ -105,29 +105,49 @@ export default function ShareAppModal({ isOpen, onClose, currentLang = 'ar' }) {
           margin: '0 auto 20px'
         }}>
           {loading ? (
-            <div style={{ color: 'var(--color-gold)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={24} className="spin-slow" />
-              <span style={{ fontSize: '13px' }}>جارٍ تصميم البوستر بجودة عالية...</span>
+            <div style={{ color: 'var(--color-gold)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <Sparkles size={28} className="spin-slow" />
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>جارٍ تصميم البوستر بجودة فائقة...</span>
             </div>
           ) : posterUrl ? (
-            <img 
-              src={posterUrl} 
-              alt="بوستر شارك تؤجر لتطبيق نعمة" 
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            />
+            <>
+              <img 
+                src={posterUrl} 
+                alt="بوستر شارك تؤجر لتطبيق نعمة" 
+                style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+              />
+              <div style={{
+                position: 'absolute',
+                bottom: '10px',
+                background: 'rgba(10, 28, 21, 0.85)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(212, 175, 55, 0.4)',
+                borderRadius: 'var(--radius-full)',
+                padding: '4px 12px',
+                fontSize: '11px',
+                color: '#E5C358',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}>
+                <Sparkles size={12} />
+                <span>جاهز للمشاركة في حالات واتساب وإنستغرام</span>
+              </div>
+            </>
           ) : null}
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* Download for WhatsApp Status */}
           <button
             type="button"
             className="btn-primary"
             onClick={handleDownload}
-            style={{ width: '100%', gap: '8px', padding: '13px' }}
+            style={{ width: '100%', gap: '10px', padding: '14px 20px', fontSize: '15px' }}
           >
-            <Download size={18} />
+            <Download size={20} />
             <span>{t.shareApp.downloadStoryPoster}</span>
           </button>
 
@@ -137,9 +157,9 @@ export default function ShareAppModal({ isOpen, onClose, currentLang = 'ar' }) {
               type="button"
               className="btn-secondary"
               onClick={handleShare}
-              style={{ gap: '6px', padding: '12px', justifyContent: 'center' }}
+              style={{ gap: '7px', padding: '12px 14px', justifyContent: 'center' }}
             >
-              <Share2 size={16} />
+              <Share2 size={17} />
               <span>{t.shareApp.shareViaApp}</span>
             </button>
 
@@ -147,9 +167,15 @@ export default function ShareAppModal({ isOpen, onClose, currentLang = 'ar' }) {
               type="button"
               className="btn-secondary"
               onClick={handleCopyLink}
-              style={{ gap: '6px', padding: '12px', justifyContent: 'center' }}
+              style={{ 
+                gap: '7px', 
+                padding: '12px 14px', 
+                justifyContent: 'center',
+                borderColor: copied ? '#22C55E' : undefined,
+                color: copied ? '#22C55E' : undefined
+              }}
             >
-              {copied ? <Check size={16} color="#38A169" /> : <Copy size={16} />}
+              {copied ? <Check size={17} color="#22C55E" /> : <Copy size={17} />}
               <span>{copied ? t.shareApp.linkCopied : t.shareApp.copyLink}</span>
             </button>
           </div>

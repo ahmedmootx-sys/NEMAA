@@ -89,7 +89,6 @@ export default function Header({
             title={t.switchLanguage}
             onClick={onToggleLanguage}
             aria-label="Language / اللغة"
-            style={{ fontWeight: 800, fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px', padding: '0 6px', minWidth: '38px', color: 'var(--color-primary)' }}
           >
             <Globe size={14} color="var(--color-gold)" />
             <span>{currentLang === 'ar' ? 'EN' : 'ع'}</span>

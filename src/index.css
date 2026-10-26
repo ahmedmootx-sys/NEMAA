@@ -289,44 +289,56 @@ html, body {
 }
 @media (max-width: 480px) {
   .app-header .container {
-    padding: 0 8px;
+    padding: 0 6px;
   }
   .header-inner {
-    height: 56px;
-    gap: 4px;
+    height: 54px;
+    gap: 3px;
+    overflow: visible;
   }
   .brand-wrapper {
-    gap: 5px;
+    gap: 4px;
+    flex-shrink: 0;
   }
   .brand-logo-img {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
+    padding: 1px;
   }
   .brand-title {
-    font-size: 19px;
+    font-size: 16px;
   }
   .mobile-compact-streak {
-    padding: 1px 5px;
-    font-size: 10px;
+    padding: 1px 4px;
+    font-size: 9.5px;
     gap: 2px;
   }
   .header-actions {
-    gap: 3px;
+    gap: 2.5px;
   }
 }
-@media (max-width: 360px) {
+@media (max-width: 380px) {
   .app-header .container {
     padding: 0 4px;
   }
   .header-inner {
     gap: 2px;
+    height: 50px;
+  }
+  .brand-wrapper {
+    gap: 3px;
   }
   .brand-logo-img {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
   }
   .brand-title {
-    font-size: 17px;
+    font-size: 14.5px;
+  }
+  .mobile-compact-streak {
+    padding: 1px 3px;
+    font-size: 8.5px;
+    gap: 1px;
   }
   .header-actions {
     gap: 2px;
@@ -347,6 +359,22 @@ html, body {
   cursor: pointer;
   transition: all var(--transition-fast);
   position: relative;
+  flex-shrink: 0;
+  padding: 0;
+}
+.btn-icon svg {
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+.btn-lang-toggle {
+  font-weight: 800;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  min-width: 36px;
+  color: var(--color-primary);
 }
 @media (min-width: 640px) {
   .btn-icon {
@@ -357,24 +385,46 @@ html, body {
 }
 @media (max-width: 480px) {
   .btn-icon {
-    width: 31px;
-    height: 31px;
-    min-width: 31px;
-  }
-  .btn-icon svg {
-    width: 15px;
-    height: 15px;
-  }
-}
-@media (max-width: 360px) {
-  .btn-icon {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
+    width: 29px;
+    height: 29px;
+    min-width: 29px;
   }
   .btn-icon svg {
     width: 14px;
     height: 14px;
+  }
+  .btn-lang-toggle {
+    min-width: 29px;
+    height: 29px;
+    padding: 0 4px;
+    font-size: 10px;
+    gap: 2px;
+  }
+  .btn-lang-toggle svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+@media (max-width: 380px) {
+  .btn-icon {
+    width: 26.5px;
+    height: 26.5px;
+    min-width: 26.5px;
+  }
+  .btn-icon svg {
+    width: 12.5px;
+    height: 12.5px;
+  }
+  .btn-lang-toggle {
+    min-width: 26.5px;
+    height: 26.5px;
+    padding: 0 3px;
+    font-size: 9px;
+    gap: 1.5px;
+  }
+  .btn-lang-toggle svg {
+    width: 11px;
+    height: 11px;
   }
 }
 .btn-icon:hover {
@@ -398,6 +448,101 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 0 3px;
+}
+@media (max-width: 480px) {
+  .btn-badge {
+    top: -3px;
+    left: -3px;
+    font-size: 8.5px;
+    min-width: 13px;
+    height: 13px;
+    padding: 0 2px;
+  }
+}
+
+/* ================= Modern Premium Buttons ================= */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #F3D577 0%, #D4AF37 50%, #B89223 100%);
+  color: #0A1C15;
+  font-family: var(--font-arabic-base);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 13px 22px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 4px 18px rgba(212, 175, 55, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  letter-spacing: -0.2px;
+  user-select: none;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(212, 175, 55, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  filter: brightness(1.04);
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 10px rgba(212, 175, 55, 0.25);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--surface-card);
+  color: var(--color-primary);
+  font-family: var(--font-arabic-base);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-gold);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  user-select: none;
+}
+
+.btn-secondary:hover {
+  background: rgba(212, 175, 55, 0.12);
+  border-color: var(--color-gold);
+  color: var(--color-primary-dark);
+  transform: translateY(-1.5px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+}
+
+[data-theme="night"] .btn-primary {
+  background: linear-gradient(135deg, #E5C358 0%, #D4AF37 50%, #997819 100%);
+  color: #06110D;
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.35);
+}
+
+[data-theme="night"] .btn-secondary {
+  background: rgba(21, 59, 47, 0.4);
+  color: #F5E8C7;
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+[data-theme="night"] .btn-secondary:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: #D4AF37;
+  color: #FFFFFF;
 }
 
 /* ================= Category Filter Tabs ================= */
@@ -1709,20 +1854,6 @@ html, body {
   animation: pulseGlow 1.6s infinite;
 }
 
-/* Mobile Header Spacing Adjustments */
-@media (max-width: 440px) {
-  .header-actions {
-    gap: 4px;
-  }
-  .btn-icon {
-    width: 33px;
-    height: 33px;
-    min-width: 33px;
-  }
-  .brand-title {
-    font-size: 20px;
-  }
-}
 
 /* ================= Quranic Uthmanic Script Typography ================= */
 .proof-quote.quran-verse,
