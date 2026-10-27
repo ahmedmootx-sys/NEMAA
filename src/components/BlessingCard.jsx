@@ -27,6 +27,8 @@ export default function BlessingCard({
   onDownloadImage,
   onOpenFocusMode,
   onOpenEdit,
+  onOpenPublishModal,
+  activeCategory,
   animatingKey,
   lang = 'ar'
 }) {
@@ -68,9 +70,67 @@ export default function BlessingCard({
   };
 
   if (!blessing) {
+    if (activeCategory === 'shared') {
+      return (
+        <div className="blessing-card-container">
+          <div className="blessing-card empty-shared-card" style={{ textAlign: 'center', padding: '48px 24px' }}>
+            <div 
+              style={{ 
+                margin: '0 auto 18px', 
+                width: '68px', 
+                height: '68px', 
+                borderRadius: '50%', 
+                background: 'rgba(212, 175, 55, 0.12)', 
+                border: '1.5px solid rgba(212, 175, 55, 0.35)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                boxShadow: '0 0 20px rgba(212, 175, 55, 0.15)'
+              }}
+            >
+              <Globe size={32} color="var(--color-gold)" />
+            </div>
+            <h3 style={{ fontFamily: 'var(--font-arabic-title)', fontSize: '24px', color: 'var(--text-title)', marginBottom: '12px' }}>
+              {lang === 'ar' ? 'كُنْ أَوَّلَ مَنْ يَذْكُرُ وَيُذَكِّرْ ✨' : 'Be the First to Share a Blessing ✨'}
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '15px', lineHeight: '1.8', maxWidth: '440px', margin: '0 auto 24px' }}>
+              {lang === 'ar' 
+                ? 'لم تُنشر أي نعمة متشارَكة بعد.. انشر نعمة الآن من فضل الله عليك لتكون لك صدقة جارية وينال ثوابها كل من قرأها وحمد الله عليها.'
+                : 'No community blessings shared yet. Be the first to share a blessing and inspire others to praise Allah.'}
+            </p>
+            {onOpenPublishModal && (
+              <button 
+                type="button" 
+                className="btn-publish-empty-trigger"
+                onClick={onOpenPublishModal}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'var(--gradient-primary)',
+                  color: '#FFFFFF',
+                  padding: '12px 28px',
+                  borderRadius: 'var(--radius-full)',
+                  border: '1px solid var(--color-gold)',
+                  fontWeight: '700',
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  boxShadow: 'var(--shadow-gold)',
+                  transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                }}
+              >
+                <Sparkles size={18} color="var(--color-gold)" />
+                <span>{lang === 'ar' ? 'انشر أول نعمة الآن' : 'Publish First Blessing Now'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="blessing-card" style={{ textAlign: 'center', padding: '40px 16px' }}>
-        <p style={{ color: 'var(--text-muted)' }}>لا توجد نِعَم متوفرة في هذا التصنيف حالياً.</p>
+        <p style={{ color: 'var(--text-muted)' }}>{lang === 'ar' ? 'لا توجد نِعَم متوفرة في هذا التصنيف حالياً.' : 'No blessings available in this category.'}</p>
       </div>
     );
   }
@@ -127,10 +187,10 @@ export default function BlessingCard({
               </span>
             )}
 
-            {blessing.isShared && (
+            {blessing.isShared && displayBlessing.categoryName !== 'نعم متشارَكة' && (
               <span className="card-shared-badge" title={lang === 'ar' ? 'نعمة متشارَكة مع مجتمع نِعْمَة' : 'Shared community blessing'}>
                 <Globe size={11} />
-                <span>{lang === 'ar' ? 'متشارَكة' : 'Community'}</span>
+                <span className="card-shared-text">{lang === 'ar' ? 'متشارَكة' : 'Community'}</span>
               </span>
             )}
 

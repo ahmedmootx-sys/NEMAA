@@ -78,7 +78,9 @@ export async function fetchSharedBlessings() {
 
     if (!Array.isArray(data)) return [];
 
-    return data.map((item, idx) => formatSharedBlessing(item, idx));
+    return data
+      .filter(item => item && (item.title || '').trim() && (item.reflection || '').trim())
+      .map((item, idx) => formatSharedBlessing(item, idx));
   } catch (err) {
     console.warn('Failed to fetch blessings from Supabase:', err);
     return [];

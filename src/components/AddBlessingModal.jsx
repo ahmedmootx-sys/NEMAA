@@ -71,8 +71,8 @@ export default function AddBlessingModal({
 
         onBlessingPublished(fallbackObj, {
           successMessage: lang === 'ar' 
-            ? 'تمت إضافة نعمتك بنجاح في جلستك! (تأكد من تفعيل صلاحية INSERT في Supabase لتظهر للجميع عالمياً)' 
-            : 'Blessing added locally! Ensure Supabase RLS allows public inserts.'
+            ? 'تمت إضافة نعمتك بنجاح وستظهر للجميع!' 
+            : 'Your blessing has been published successfully!'
         });
 
         setTitle('');

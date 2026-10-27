@@ -83,7 +83,14 @@ export default function App() {
   const [sharedBlessings, setSharedBlessings] = useState(() => {
     try {
       const saved = localStorage.getItem('nemaa_shared_blessings_cache');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      const valid = parsed.filter(b => b && (b.title || '').trim() && (b.reflection || '').trim());
+      if (valid.length !== parsed.length) {
+        localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(valid));
+      }
+      return valid;
     } catch {
       return [];
     }
@@ -144,7 +151,14 @@ export default function App() {
   const [customBlessings, setCustomBlessings] = useState(() => {
     try {
       const saved = localStorage.getItem('nemaa_custom_blessings');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      const valid = parsed.filter(b => b && (b.title || '').trim() && (b.reflection || '').trim());
+      if (valid.length !== parsed.length) {
+        localStorage.setItem('nemaa_custom_blessings', JSON.stringify(valid));
+      }
+      return valid;
     } catch {
       return [];
     }
@@ -179,16 +193,18 @@ export default function App() {
   // Combined Blessings Pool: Shared Supabase blessings first (newest first), then custom, then INITIAL_BLESSINGS
   const allBlessings = useMemo(() => {
     const pool = [...sharedBlessings, ...customBlessings, ...INITIAL_BLESSINGS];
-    return pool.map(b => {
-      if (customizedBlessings[b.id]) {
-        return {
-          ...b,
-          ...customizedBlessings[b.id],
-          isCustomized: true
-        };
-      }
-      return b;
-    });
+    return pool
+      .filter(b => b && (b.title || '').trim() && (b.reflection || '').trim())
+      .map(b => {
+        if (customizedBlessings[b.id]) {
+          return {
+            ...b,
+            ...customizedBlessings[b.id],
+            isCustomized: true
+          };
+        }
+        return b;
+      });
   }, [sharedBlessings, customBlessings, customizedBlessings]);
 
   // 3. Category Filter
@@ -555,6 +571,8 @@ export default function App() {
           onDownloadImage={handleDownloadImage}
           onOpenFocusMode={() => setIsFocusModeOpen(true)}
           onOpenEdit={handleOpenEdit}
+          onOpenPublishModal={() => setIsAddModalOpen(true)}
+          activeCategory={activeCategory}
           animatingKey={animatingKey}
           lang={currentLang}
         />

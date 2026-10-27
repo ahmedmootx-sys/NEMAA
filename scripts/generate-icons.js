@@ -3,9 +3,9 @@ import fs from 'fs';
 import sharp from 'sharp';
 
 async function generateIcons() {
-  const sourcePath = 'public/brand/logo-wordmark.png';
+  const sourcePath = 'public/brand/logo-calligraphy.jpg';
   if (!fs.existsSync(sourcePath)) {
-    console.error('Source logo-wordmark.png not found');
+    console.error('Source logo-calligraphy.jpg not found');
     process.exit(1);
   }
 
@@ -13,20 +13,9 @@ async function generateIcons() {
   const metadata = await sharp(sourcePath).metadata();
   console.log(`Source image dimensions: ${metadata.width}x${metadata.height}`);
 
-  // Create a 512x512 canvas with transparent or subtle circular background
-  // For PWA icons, a white or cream circular card or transparent background with padded wordmark
-  // Let's create high quality 512x512 and 192x192
-  
   // 1. Icon 512
   await sharp(sourcePath)
-    .resize(400, 400, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .extend({
-      top: 56,
-      bottom: 56,
-      left: 56,
-      right: 56,
-      background: { r: 253, g: 251, b: 247, alpha: 1 } // App cream background
-    })
+    .resize(512, 512, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
     .png()
     .toFile('public/brand/icon-512.png');
   
@@ -50,7 +39,7 @@ async function generateIcons() {
       bottom: 96,
       left: 96,
       right: 96,
-      background: { r: 253, g: 251, b: 247, alpha: 1 }
+      background: { r: 255, g: 255, b: 255, alpha: 1 }
     })
     .png()
     .toFile('public/brand/icon-maskable-512.png');
