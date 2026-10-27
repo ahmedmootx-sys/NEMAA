@@ -23,7 +23,8 @@ import {
   getAdminUser, 
   fetchBlessingReports, 
   dismissBlessingReport,
-  deleteSharedBlessing 
+  deleteSharedBlessing,
+  subscribeToReports
 } from '../supabaseClient';
 import EditSharedBlessingModal from './EditSharedBlessingModal';
 
@@ -63,6 +64,25 @@ export default function AdminModal({
     }
     checkAuth();
   }, [isOpen]);
+
+  // Realtime subscription for incoming reports while admin modal is open
+  useEffect(() => {
+    if (!isOpen || !currentUser) return;
+    const unsub = subscribeToReports(
+      (newRep) => {
+        setReports(prev => {
+          if (prev.some(r => r.id === newRep.id)) return prev;
+          return [newRep, ...prev];
+        });
+      },
+      (deletedRep) => {
+        setReports(prev => prev.filter(r => r.id !== deletedRep.id));
+      }
+    );
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [isOpen, currentUser]);
 
   const loadReports = async () => {
     setIsLoadingReports(true);
@@ -111,14 +131,14 @@ export default function AdminModal({
     const blessingId = isObj ? blessingItem.id : blessingItem;
 
     const promptMsg = lang === 'ar'
-      ? `هل أنت متأكد من رغبتك في حذف نعمة «${title}» نهائياً من التطبيق وقاعدة البيانات؟`
-      : `Are you sure you want to permanently delete "${title}"?`;
+      ? `هل أنت متأكد من رغبتك في حذف نعمة «${title}» نهائياً من التطبيق وقاعدة البيانات لجميع المستخدمين؟`
+      : `Are you sure you want to permanently delete "${title}" for all users?`;
     if (!window.confirm(promptMsg)) return;
 
     try {
       // 1. Delete from Supabase & notify app
       if (onDeleteBlessing) {
-        await onDeleteBlessing(blessingItem);
+        await onDeleteBlessing(blessingItem, currentUser?.email || 'admin');
       } else {
         await deleteSharedBlessing(blessingItem);
       }
@@ -132,7 +152,7 @@ export default function AdminModal({
       // Also clean any other reports matching this blessing
       setReports(prev => prev.filter(r => String(r.blessing_id) !== String(blessingId) && r.blessing_title !== title));
 
-      setStatusNotice(lang === 'ar' ? 'تم حذف النعمة نهائياً بنجاح' : 'Blessing permanently deleted');
+      setStatusNotice(lang === 'ar' ? 'تم حذف النعمة نهائياً وتطبيق ذلك لجميع المستخدمين' : 'Blessing permanently deleted for all users');
       setTimeout(() => setStatusNotice(''), 4000);
     } catch (err) {
       console.warn('Failed to delete blessing:', err);

@@ -19,7 +19,17 @@ import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
 import { TRANSLATIONS } from './i18n/translations';
 import { Award, Sparkles, X } from 'lucide-react';
-import { fetchSharedBlessings, subscribeToSharedBlessings, deleteSharedBlessing, updateSharedBlessing, incrementBlessingPraises, simpleHash } from './supabaseClient';
+import { 
+  fetchSharedBlessings, 
+  subscribeToSharedBlessings, 
+  deleteSharedBlessing, 
+  updateSharedBlessing, 
+  incrementBlessingPraises, 
+  simpleHash,
+  recordAdminDeletedBlessing,
+  fetchAdminDeletedBlessings,
+  subscribeToAdminDeletedBlessings
+} from './supabaseClient';
 import confetti from 'canvas-confetti';
 import { audioEngine } from './utils/audioEngine';
 import OnboardingTour from './components/OnboardingTour';
@@ -221,10 +231,29 @@ export default function App() {
       }
     }
 
+    async function loadAdminDeleted() {
+      try {
+        const remoteDeleted = await fetchAdminDeletedBlessings();
+        if (isMounted && Array.isArray(remoteDeleted) && remoteDeleted.length > 0) {
+          setAdminDeletedIds(prev => {
+            const identifiers = remoteDeleted.map(d => d.blessing_title || d.id).filter(Boolean);
+            const combined = [...new Set([...prev, ...identifiers])];
+            try {
+              localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(combined));
+            } catch {}
+            return combined;
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to load admin deleted blessings from Supabase:', err);
+      }
+    }
+
     loadRemoteBlessings();
+    loadAdminDeleted();
 
     // Realtime listener for new and deleted shared blessings
-    const unsubscribe = subscribeToSharedBlessings(
+    const unsubscribeBlessings = subscribeToSharedBlessings(
       (newBlessing) => {
         if (!isMounted) return;
         setSharedBlessings(prev => {
@@ -280,9 +309,44 @@ export default function App() {
       }
     );
 
+    // Realtime listener for blessings deleted by admin (applied instantly to all users)
+    const unsubscribeAdminDeleted = subscribeToAdminDeletedBlessings(
+      (newDeleted) => {
+        if (!isMounted || !newDeleted) return;
+        const identifier = (newDeleted.blessing_title || newDeleted.id || '').trim();
+        if (!identifier) return;
+
+        setAdminDeletedIds(prev => {
+          if (prev.includes(identifier)) return prev;
+          const updated = [...prev, identifier];
+          try {
+            localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+
+        // Also remove from shared blessings immediately if present
+        setSharedBlessings(prev => prev.filter(b => b.title !== identifier && String(b.id) !== identifier));
+      },
+      (restored) => {
+        if (!isMounted || !restored) return;
+        const identifier = (restored.blessing_title || restored.id || '').trim();
+        if (!identifier) return;
+
+        setAdminDeletedIds(prev => {
+          const updated = prev.filter(id => id !== identifier);
+          try {
+            localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+    );
+
     return () => {
       isMounted = false;
-      if (typeof unsubscribe === 'function') unsubscribe();
+      if (typeof unsubscribeBlessings === 'function') unsubscribeBlessings();
+      if (typeof unsubscribeAdminDeleted === 'function') unsubscribeAdminDeleted();
     };
   }, []);
 
@@ -675,7 +739,7 @@ export default function App() {
   };
 
   // Permanently delete any blessing from the app via Admin Panel
-  const handleAdminDeleteBlessing = async (blessingOrId) => {
+  const handleAdminDeleteBlessing = async (blessingOrId, adminEmail = 'admin') => {
     if (!blessingOrId) return;
     const isObj = typeof blessingOrId === 'object' && blessingOrId !== null;
     const strId = isObj ? String(blessingOrId.id) : String(blessingOrId);
@@ -727,7 +791,15 @@ export default function App() {
       console.warn('Admin remote delete error:', err);
     }
 
-    setToastMessage(currentLang === 'ar' ? 'تم حذف النعمة من التطبيق نهائياً' : 'Blessing permanently deleted from the app');
+    // 5. Remote record in Supabase 'admin_deleted_blessings' table
+    // (This ensures all users on all devices have this blessing hidden)
+    try {
+      await recordAdminDeletedBlessing(blessingOrId, adminEmail);
+    } catch (err) {
+      console.warn('Admin record deleted error:', err);
+    }
+
+    setToastMessage(currentLang === 'ar' ? 'تم حذف النعمة نهائياً وتطبيق ذلك لجميع المستخدمين' : 'Blessing permanently deleted for all users');
     setTimeout(() => setToastMessage(''), 4500);
 
     // Move to next blessing smoothly

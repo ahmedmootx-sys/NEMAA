@@ -161,6 +161,7 @@ export async function deleteSharedBlessing(blessingOrId) {
     const reflection = isObj ? (blessingOrId.reflection || '').trim() : '';
 
     let success = false;
+    let deletedCount = 0;
     let lastError = null;
 
     // 1. Try deleting by title and reflection (most reliable since blessings table has no id column)
@@ -173,7 +174,8 @@ export async function deleteSharedBlessing(blessingOrId) {
         .select();
 
       if (!res.error) {
-        success = true;
+        deletedCount = Array.isArray(res.data) ? res.data.length : 0;
+        if (deletedCount > 0) success = true;
       } else {
         lastError = res.error;
       }
@@ -188,7 +190,8 @@ export async function deleteSharedBlessing(blessingOrId) {
         .select();
 
       if (!res.error) {
-        success = true;
+        deletedCount = Array.isArray(res.data) ? res.data.length : 0;
+        if (deletedCount > 0) success = true;
       } else {
         lastError = res.error;
       }
@@ -203,23 +206,24 @@ export async function deleteSharedBlessing(blessingOrId) {
         .select();
 
       if (!res.error) {
-        success = true;
+        deletedCount = Array.isArray(res.data) ? res.data.length : 0;
+        if (deletedCount > 0) success = true;
       } else {
         lastError = res.error;
       }
     }
 
     if (success) {
-      return { success: true };
+      return { success: true, deletedCount };
     }
     if (lastError) {
       console.warn('Supabase delete error:', lastError);
-      return { success: false, error: lastError };
+      return { success: false, deletedCount: 0, error: lastError };
     }
-    return { success: true };
+    return { success: true, deletedCount };
   } catch (err) {
     console.warn('Delete error:', err);
-    return { success: false, error: err };
+    return { success: false, deletedCount: 0, error: err };
   }
 }
 
@@ -343,32 +347,155 @@ export async function incrementBlessingPraises(blessingId) {
 }
 
 /**
+ * Record a blessing as permanently deleted by admin in Supabase
+ * (Syncs across all devices so built-in and shared blessings vanish globally)
+ */
+export async function recordAdminDeletedBlessing(blessingItem, adminEmail = '') {
+  try {
+    const isObj = typeof blessingItem === 'object' && blessingItem !== null;
+    const rawId = isObj ? String(blessingItem.id || '') : String(blessingItem || '');
+    const title = isObj ? (blessingItem.title || '').trim() : '';
+    const recordId = rawId || `del_${simpleHash(title)}_${Date.now()}`;
+
+    const payload = {
+      id: recordId,
+      blessing_title: title || rawId,
+      deleted_by: adminEmail || 'admin',
+      created_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('admin_deleted_blessings')
+      .insert([payload])
+      .select();
+
+    if (error) {
+      console.warn('Error recording admin deleted blessing in Supabase:', error);
+    }
+    return { success: !error, data, error };
+  } catch (err) {
+    console.warn('Failed to record admin deleted blessing:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Fetch all blessings permanently deleted by admin from Supabase
+ */
+export async function fetchAdminDeletedBlessings() {
+  try {
+    const { data, error } = await supabase
+      .from('admin_deleted_blessings')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      return data;
+    }
+    return [];
+  } catch (err) {
+    console.warn('Failed to fetch admin deleted blessings:', err);
+    return [];
+  }
+}
+
+/**
+ * Subscribe to admin_deleted_blessings table in realtime
+ */
+export function subscribeToAdminDeletedBlessings(onDeleted, onRestored) {
+  try {
+    const channel = supabase
+      .channel('realtime_admin_deleted_blessings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'admin_deleted_blessings' },
+        (payload) => {
+          if (payload && payload.eventType === 'INSERT' && payload.new) {
+            if (typeof onDeleted === 'function') {
+              onDeleted(payload.new);
+            }
+          } else if (payload && payload.eventType === 'DELETE' && payload.old) {
+            if (typeof onRestored === 'function') {
+              onRestored(payload.old);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('Admin deleted blessings realtime subscription error:', err);
+    return () => {};
+  }
+}
+
+/**
  * Submit a report for an inappropriate or erroneous blessing
  */
 export async function submitBlessingReport({ blessingId, blessingTitle, reason, notes }) {
   const reportObj = {
-    id: `rep_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-    blessing_id: String(blessingId),
-    blessing_title: blessingTitle || '',
-    reason: reason || 'محتوى غير لائق',
-    notes: notes || '',
+    id: `rep_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    blessing_id: String(blessingId || ''),
+    blessing_title: (blessingTitle || '').trim(),
+    reason: (reason || 'محتوى غير لائق').trim(),
+    notes: (notes || '').trim(),
     created_at: new Date().toISOString(),
     status: 'pending'
   };
 
-  // 1. Try storing in Supabase 'reports' table
-  try {
-    await supabase.from('reports').insert([reportObj]);
-  } catch (err) {}
+  let remoteSuccess = false;
+  let remoteError = null;
 
-  // 2. Always persist in localStorage cache
+  // 1. Store in Supabase 'reports' table
+  try {
+    const { data, error } = await supabase
+      .from('reports')
+      .insert([reportObj])
+      .select();
+
+    if (!error) {
+      remoteSuccess = true;
+    } else {
+      remoteError = error;
+      console.warn('Supabase report insert error:', error);
+    }
+  } catch (err) {
+    remoteError = err;
+    console.warn('Network / report insert error:', err);
+  }
+
+  // 2. Increment reports count on the blessing in 'blessings' table if present
+  try {
+    if (blessingTitle) {
+      const { data: found } = await supabase
+        .from('blessings')
+        .select('title, reports')
+        .eq('title', blessingTitle)
+        .limit(1);
+
+      if (found && found.length > 0) {
+        const nextReports = (Number(found[0].reports) || 0) + 1;
+        await supabase
+          .from('blessings')
+          .update({ reports: nextReports })
+          .eq('title', blessingTitle);
+      }
+    }
+  } catch (err) {
+    // Non-critical
+  }
+
+  // 3. Persist in localStorage cache as fallback / local history
   try {
     const cached = JSON.parse(localStorage.getItem('nemaa_reports_cache') || '[]');
     cached.unshift(reportObj);
     localStorage.setItem('nemaa_reports_cache', JSON.stringify(cached));
   } catch {}
 
-  return { success: true, report: reportObj };
+  return { success: true, remoteSuccess, error: remoteError, report: reportObj };
 }
 
 /**
@@ -381,10 +508,13 @@ export async function fetchBlessingReports() {
       .from('reports')
       .select('*')
       .order('created_at', { ascending: false });
+
     if (!error && Array.isArray(data)) {
       reports = data;
     }
-  } catch (err) {}
+  } catch (err) {
+    console.warn('Failed to query Supabase reports:', err);
+  }
 
   // Merge with local cache
   try {
@@ -405,13 +535,50 @@ export async function fetchBlessingReports() {
 export async function dismissBlessingReport(reportId) {
   try {
     await supabase.from('reports').delete().eq('id', reportId);
-  } catch {}
+  } catch (err) {
+    console.warn('Error deleting report from Supabase:', err);
+  }
+
   try {
     const cached = JSON.parse(localStorage.getItem('nemaa_reports_cache') || '[]');
     const filtered = cached.filter(r => r.id !== reportId);
     localStorage.setItem('nemaa_reports_cache', JSON.stringify(filtered));
   } catch {}
+
   return { success: true };
+}
+
+/**
+ * Realtime subscription to reports (for live admin dashboard)
+ */
+export function subscribeToReports(onNewReport, onDeleteReport) {
+  try {
+    const channel = supabase
+      .channel('realtime_reports_channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reports' },
+        (payload) => {
+          if (payload && payload.eventType === 'INSERT' && payload.new) {
+            if (typeof onNewReport === 'function') {
+              onNewReport(payload.new);
+            }
+          } else if (payload && payload.eventType === 'DELETE' && payload.old) {
+            if (typeof onDeleteReport === 'function') {
+              onDeleteReport(payload.old);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('Reports realtime subscription error:', err);
+    return () => {};
+  }
 }
 
 /**
