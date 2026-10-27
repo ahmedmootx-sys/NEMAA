@@ -14,7 +14,8 @@ import {
   Layers,
   Heart,
   User,
-  RefreshCw
+  RefreshCw,
+  Edit3
 } from 'lucide-react';
 import { 
   adminLogin, 
@@ -24,12 +25,14 @@ import {
   dismissBlessingReport,
   deleteSharedBlessing 
 } from '../supabaseClient';
+import EditSharedBlessingModal from './EditSharedBlessingModal';
 
 export default function AdminModal({ 
   isOpen, 
   onClose, 
   allBlessings = [], 
   onDeleteBlessing,
+  onUpdateBlessing,
   lang = 'ar' 
 }) {
   const [currentUser, setCurrentUser] = useState(null);
@@ -45,6 +48,8 @@ export default function AdminModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [statusNotice, setStatusNotice] = useState('');
+  const [editingBlessing, setEditingBlessing] = useState(null);
+  const [associatedReportId, setAssociatedReportId] = useState(null);
 
   // Check admin session on mount / open
   useEffect(() => {
@@ -142,6 +147,52 @@ export default function AdminModal({
     setReports(prev => prev.filter(r => r.id !== reportId));
     setStatusNotice(lang === 'ar' ? 'تم حفظ وتجاهل البلاغ' : 'Report dismissed');
     setTimeout(() => setStatusNotice(''), 3000);
+  };
+
+  // Start editing a blessing from the Reports tab
+  const handleStartEditFromReport = (rep) => {
+    const match = allBlessings.find(b => 
+      String(b.id) === String(rep.blessing_id) || 
+      (b.title || '').trim() === (rep.blessing_title || '').trim()
+    ) || {
+      id: rep.blessing_id,
+      title: rep.blessing_title || '',
+      reflection: '',
+      isShared: true
+    };
+    setEditingBlessing(match);
+    setAssociatedReportId(rep.id);
+  };
+
+  // Start editing a blessing directly from the Management list
+  const handleStartEdit = (blessing) => {
+    setEditingBlessing(blessing);
+    setAssociatedReportId(null);
+  };
+
+  // Save the edited blessing (updates Supabase & local state, auto-resolves report if from report)
+  const handleSaveBlessingEdit = async (updatedFields) => {
+    if (!editingBlessing) return;
+    try {
+      if (onUpdateBlessing) {
+        await onUpdateBlessing(editingBlessing, updatedFields);
+      }
+
+      // If the edit came from a report, auto-dismiss the resolved report
+      if (associatedReportId) {
+        await dismissBlessingReport(associatedReportId);
+        setReports(prev => prev.filter(r => r.id !== associatedReportId));
+      }
+
+      setStatusNotice(lang === 'ar' ? 'تم تصحيح وحفظ النعمة بنجاح ✨' : 'Blessing updated successfully ✨');
+      setTimeout(() => setStatusNotice(''), 4000);
+      setEditingBlessing(null);
+      setAssociatedReportId(null);
+    } catch (err) {
+      console.warn('Admin edit save error:', err);
+      setStatusNotice(lang === 'ar' ? 'حدث خطأ أثناء حفظ التعديلات' : 'Failed to update blessing');
+      setTimeout(() => setStatusNotice(''), 4000);
+    }
   };
 
   // Filtered blessings list for Management tab
@@ -483,6 +534,28 @@ export default function AdminModal({
 
                               <button
                                 type="button"
+                                onClick={() => handleStartEditFromReport(rep)}
+                                title="تعديل وتصحيح الخطأ الإملائي للنعمة"
+                                style={{
+                                  background: 'rgba(212, 175, 55, 0.15)',
+                                  color: 'var(--color-gold-hover)',
+                                  border: '1px solid var(--color-gold)',
+                                  borderRadius: 'var(--radius-full)',
+                                  padding: '7px 14px',
+                                  fontSize: '12.5px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}
+                              >
+                                <Edit3 size={13} />
+                                <span>تعديل وتصحيح</span>
+                              </button>
+
+                              <button
+                                type="button"
                                 onClick={() => handleDeleteBlessingAction({ id: rep.blessing_id, title: rep.blessing_title }, rep.id)}
                                 title="حذف النعمة نهائياً من التطبيق"
                                 style={{
@@ -598,7 +671,29 @@ export default function AdminModal({
                           </p>
                         </div>
 
-                        <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(b)}
+                            title="تعديل وتصحيح محتوى النعمة"
+                            style={{
+                              background: 'rgba(212, 175, 55, 0.15)',
+                              color: 'var(--color-gold-hover)',
+                              border: '1px solid var(--color-gold)',
+                              borderRadius: 'var(--radius-full)',
+                              padding: '7px 14px',
+                              fontSize: '12.5px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }}
+                          >
+                            <Edit3 size={13} />
+                            <span>تعديل</span>
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => handleDeleteBlessingAction(b)}
@@ -629,6 +724,19 @@ export default function AdminModal({
           </div>
         )}
       </div>
+
+      {/* Sub-Modal: Admin Edit Blessing */}
+      <EditSharedBlessingModal
+        isOpen={Boolean(editingBlessing)}
+        onClose={() => {
+          setEditingBlessing(null);
+          setAssociatedReportId(null);
+        }}
+        blessing={editingBlessing}
+        onSave={handleSaveBlessingEdit}
+        isAdmin={true}
+        lang={lang}
+      />
     </div>
   );
 }

@@ -15,7 +15,8 @@ import {
   Globe,
   Trash2,
   User,
-  Flag
+  Flag,
+  Edit3
 } from 'lucide-react';
 import { subscribeToVoiceChanges, speakArabic, stopSpeaking } from '../utils/speechHelper';
 import { getBlessingGratitudeDua } from '../utils/duaHelper';
@@ -32,6 +33,7 @@ export default function BlessingCard({
   onOpenEdit,
   onOpenPublishModal,
   isMyPublished,
+  onEditPublished,
   onDeletePublished,
   onOpenReport,
   praisesCount,
@@ -296,6 +298,19 @@ export default function BlessingCard({
             >
               <Share2 size={16} />
             </button>
+
+            {/* Edit Published Blessing (shown only for user's own published blessings) */}
+            {isMyPublished && (
+              <button
+                className="card-action-btn btn-edit-published"
+                onClick={() => onEditPublished && onEditPublished(blessing)}
+                title={lang === 'ar' ? 'تعديل وتصحيح هذه النعمة المنشورة' : 'Edit published blessing'}
+                aria-label="تعديل النعمة المنشورة"
+                style={{ color: 'var(--color-gold)' }}
+              >
+                <Edit3 size={15} />
+              </button>
+            )}
 
             {/* Delete Published Blessing (shown only for user's own published blessings) */}
             {isMyPublished && (

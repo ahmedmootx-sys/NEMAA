@@ -13,12 +13,13 @@ import ShareModal from './components/ShareModal';
 import ShareAppModal from './components/ShareAppModal';
 import LanguageSelectModal from './components/LanguageSelectModal';
 import EditBlessingModal from './components/EditBlessingModal';
+import EditSharedBlessingModal from './components/EditSharedBlessingModal';
 import InstallAppToast from './components/InstallAppToast';
 import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
 import { TRANSLATIONS } from './i18n/translations';
 import { Award, Sparkles, X } from 'lucide-react';
-import { fetchSharedBlessings, subscribeToSharedBlessings, deleteSharedBlessing, incrementBlessingPraises, simpleHash } from './supabaseClient';
+import { fetchSharedBlessings, subscribeToSharedBlessings, deleteSharedBlessing, updateSharedBlessing, incrementBlessingPraises, simpleHash } from './supabaseClient';
 import confetti from 'canvas-confetti';
 import { audioEngine } from './utils/audioEngine';
 import OnboardingTour from './components/OnboardingTour';
@@ -251,6 +252,25 @@ export default function App() {
             if (deletedRow.title && deletedRow.reflection && b.title === deletedRow.title && b.reflection === deletedRow.reflection) return false;
             if (deletedRow.title && b.title === deletedRow.title) return false;
             return true;
+          });
+          try {
+            localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      },
+      (updatedBlessing, oldRow) => {
+        if (!isMounted || !updatedBlessing) return;
+        setSharedBlessings(prev => {
+          const updated = prev.map(b => {
+            const isMatch = (oldRow && oldRow.id && String(b.id) === String(oldRow.id)) ||
+                            (oldRow && oldRow.title && b.title === oldRow.title) ||
+                            (String(b.id) === String(updatedBlessing.id)) ||
+                            (b.title === updatedBlessing.title);
+            if (isMatch) {
+              return { ...b, ...updatedBlessing };
+            }
+            return b;
           });
           try {
             localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
@@ -714,6 +734,72 @@ export default function App() {
     handleNext();
   };
 
+  // Update a blessing (Used both by Admin and by Publisher)
+  const handleUpdateBlessing = async (oldBlessing, newFields) => {
+    if (!oldBlessing || !newFields) return;
+    const oldTitle = (oldBlessing.title || '').trim();
+    const oldId = String(oldBlessing.id || '');
+
+    // 1. Update in Supabase remote
+    let updatedRemote = null;
+    try {
+      const res = await updateSharedBlessing(oldBlessing, newFields);
+      if (res && res.data) {
+        updatedRemote = res.data;
+      }
+    } catch (err) {
+      console.warn('Error updating blessing in Supabase:', err);
+    }
+
+    const mergedUpdated = updatedRemote || {
+      ...oldBlessing,
+      ...newFields,
+      title: newFields.title || oldTitle,
+      reflection: newFields.reflection || oldBlessing.reflection
+    };
+
+    // 2. Update in sharedBlessings state & cache
+    setSharedBlessings(prev => {
+      const updated = prev.map(b => {
+        if ((oldId && String(b.id) === oldId) || (oldTitle && b.title === oldTitle)) {
+          return { ...b, ...mergedUpdated };
+        }
+        return b;
+      });
+      try {
+        localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 3. Update in customBlessings if present
+    setCustomBlessings(prev => {
+      const updated = prev.map(b => {
+        if ((oldId && String(b.id) === oldId) || (oldTitle && b.title === oldTitle)) {
+          return { ...b, ...mergedUpdated };
+        }
+        return b;
+      });
+      try {
+        localStorage.setItem('nemaa_custom_blessings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 4. If this blessing was customized locally, sync customization
+    if (customizedBlessings[oldBlessing.id]) {
+      handleSaveCustomization(oldBlessing.id, {
+        ...customizedBlessings[oldBlessing.id],
+        ...newFields
+      });
+    }
+
+    setToastMessage(currentLang === 'ar' ? 'تم حفظ التعديلات وتحديث النعمة بنجاح ✨' : 'Blessing updated successfully ✨');
+    setTimeout(() => setToastMessage(''), 4500);
+
+    return mergedUpdated;
+  };
+
   // Admin secret entry: ONLY triggered by 10 consecutive clicks on footer quote/verse
   const footerClicksRef = useRef({ count: 0, timer: null });
   const handleFooterSecretClick = () => {
@@ -756,6 +842,15 @@ export default function App() {
   const handleOpenEdit = (blessing) => {
     setBlessingToEdit(blessing || currentBlessing);
     setIsEditModalOpen(true);
+  };
+
+  // Edit Published Blessing Modal State (للمستخدم الناشر)
+  const [isEditPublishedOpen, setIsEditPublishedOpen] = useState(false);
+  const [blessingToEditPublished, setBlessingToEditPublished] = useState(null);
+
+  const handleOpenEditPublished = (blessing) => {
+    setBlessingToEditPublished(blessing || currentBlessing);
+    setIsEditPublishedOpen(true);
   };
 
   const handleOpenShare = (blessing) => {
@@ -865,6 +960,7 @@ export default function App() {
           onOpenEdit={handleOpenEdit}
           onOpenPublishModal={() => setIsAddModalOpen(true)}
           isMyPublished={currentBlessing ? myPublishedIds.includes(String(currentBlessing.id)) : false}
+          onEditPublished={handleOpenEditPublished}
           onDeletePublished={handleDeletePublished}
           onOpenReport={(b) => {
             setBlessingToReport(b);
@@ -1028,6 +1124,19 @@ export default function App() {
         onClose={() => setIsAdminModalOpen(false)}
         allBlessings={allBlessings}
         onDeleteBlessing={handleAdminDeleteBlessing}
+        onUpdateBlessing={handleUpdateBlessing}
+        lang={currentLang}
+      />
+
+      {/* Edit Published Blessing Modal (للناشر لتعديل وتصحيح نعمته المنشورة) */}
+      <EditSharedBlessingModal
+        isOpen={isEditPublishedOpen}
+        onClose={() => setIsEditPublishedOpen(false)}
+        blessing={blessingToEditPublished}
+        onSave={async (fields) => {
+          await handleUpdateBlessing(blessingToEditPublished, fields);
+        }}
+        isAdmin={false}
         lang={currentLang}
       />
 

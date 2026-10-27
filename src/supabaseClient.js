@@ -224,6 +224,100 @@ export async function deleteSharedBlessing(blessingOrId) {
 }
 
 /**
+ * Update an existing shared blessing in Supabase by matching original title/reflection or ID
+ */
+export async function updateSharedBlessing(oldBlessing, newFields) {
+  try {
+    const isObj = typeof oldBlessing === 'object' && oldBlessing !== null;
+    const oldTitle = (isObj ? oldBlessing.title || '' : String(oldBlessing || '')).trim();
+    const oldReflection = (isObj ? oldBlessing.reflection || '' : '').trim();
+    const blessingId = isObj ? oldBlessing.id : null;
+
+    const cleanTitle = (newFields.title || oldTitle).trim();
+    const cleanReflection = (newFields.reflection || oldReflection).trim();
+    const rawAuthor = (newFields.author !== undefined ? newFields.author : (isObj ? oldBlessing.author || '' : '')).trim();
+    const cleanAuthor = (rawAuthor && rawAuthor !== 'محب للخير') ? rawAuthor : null;
+    const cleanProof = (newFields.proof !== undefined ? newFields.proof : (isObj ? oldBlessing.proof || '' : '')).trim();
+    const cleanProofSource = (newFields.proofSource !== undefined ? newFields.proofSource : (isObj ? oldBlessing.proofSource || '' : '')).trim();
+
+    const updatePayload = {
+      title: cleanTitle,
+      reflection: cleanReflection,
+      author: cleanAuthor,
+      proof: cleanProof || null,
+      proof_source: cleanProofSource || null
+    };
+
+    let updatedRow = null;
+    let lastError = null;
+
+    // 1. Try updating by original title and reflection (most unique match)
+    if (oldTitle && oldReflection) {
+      const res = await supabase
+        .from('blessings')
+        .update(updatePayload)
+        .eq('title', oldTitle)
+        .eq('reflection', oldReflection)
+        .select();
+
+      if (!res.error && Array.isArray(res.data) && res.data.length > 0) {
+        updatedRow = res.data[0];
+      } else if (res.error) {
+        lastError = res.error;
+      }
+    }
+
+    // 2. Fallback: match by old title only
+    if (!updatedRow && oldTitle) {
+      const res = await supabase
+        .from('blessings')
+        .update(updatePayload)
+        .eq('title', oldTitle)
+        .select();
+
+      if (!res.error && Array.isArray(res.data) && res.data.length > 0) {
+        updatedRow = res.data[0];
+      } else if (res.error) {
+        lastError = res.error;
+      }
+    }
+
+    // 3. Fallback: match by numeric/UUID id if not synthetic
+    if (!updatedRow && blessingId && !String(blessingId).startsWith('sb_') && !String(blessingId).startsWith('custom_')) {
+      const res = await supabase
+        .from('blessings')
+        .update(updatePayload)
+        .eq('id', blessingId)
+        .select();
+
+      if (!res.error && Array.isArray(res.data) && res.data.length > 0) {
+        updatedRow = res.data[0];
+      } else if (res.error) {
+        lastError = res.error;
+      }
+    }
+
+    const formattedUpdated = formatSharedBlessing(
+      updatedRow || { ...(isObj ? oldBlessing : {}), ...updatePayload },
+      blessingId || Date.now()
+    );
+
+    return {
+      success: true,
+      data: formattedUpdated,
+      persistedRemote: Boolean(updatedRow),
+      error: lastError
+    };
+  } catch (err) {
+    console.warn('Update shared blessing error:', err);
+    return {
+      success: false,
+      error: err
+    };
+  }
+}
+
+/**
  * Increment praises count for a blessing
  */
 export async function incrementBlessingPraises(blessingId) {
@@ -357,7 +451,7 @@ export async function getAdminUser() {
 /**
  * Subscribe to realtime inserts and deletes on the 'blessings' table
  */
-export function subscribeToSharedBlessings(onNewBlessing, onDeleteBlessing) {
+export function subscribeToSharedBlessings(onNewBlessing, onDeleteBlessing, onUpdateBlessing) {
   try {
     const channel = supabase
       .channel('realtime_shared_blessings')
@@ -367,7 +461,14 @@ export function subscribeToSharedBlessings(onNewBlessing, onDeleteBlessing) {
         (payload) => {
           if (payload && payload.eventType === 'INSERT' && payload.new) {
             const formatted = formatSharedBlessing(payload.new, Date.now());
-            onNewBlessing(formatted);
+            if (typeof onNewBlessing === 'function') {
+              onNewBlessing(formatted);
+            }
+          } else if (payload && payload.eventType === 'UPDATE' && payload.new) {
+            const formatted = formatSharedBlessing(payload.new, Date.now());
+            if (typeof onUpdateBlessing === 'function') {
+              onUpdateBlessing(formatted, payload.old);
+            }
           } else if (payload && payload.eventType === 'DELETE' && payload.old) {
             if (typeof onDeleteBlessing === 'function') {
               onDeleteBlessing(payload.old);
