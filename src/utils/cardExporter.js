@@ -210,24 +210,24 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     ctx.direction = 'rtl';
 
     // 1. Header: App Title & Slogan
-    const headerTitleY = isSquare ? 88 : 175;
-    const headerSloganY = isSquare ? 128 : 225;
+    const headerTitleY = isSquare ? 72 : 175;
+    const headerSloganY = isSquare ? 108 : 225;
 
-    ctx.font = `bold ${isSquare ? '40px' : '54px'} "Aref Ruqaa", "Amiri", serif`;
+    ctx.font = `bold ${isSquare ? '38px' : '54px'} "Aref Ruqaa", "Amiri", serif`;
     ctx.fillStyle = theme.appTitle;
     ctx.fillText('نِعْمَة', width / 2, headerTitleY);
 
-    ctx.font = `${isSquare ? '19px' : '23px'} "Cairo", "Tajawal", sans-serif`;
+    ctx.font = `${isSquare ? '18px' : '23px'} "Cairo", "Tajawal", sans-serif`;
     ctx.fillStyle = theme.slogan;
     ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', width / 2, headerSloganY);
 
     // 2. Category Badge
-    ctx.font = `600 ${isSquare ? '18px' : '22px'} "Cairo", "Tajawal", sans-serif`;
+    ctx.font = `600 ${isSquare ? '17px' : '22px'} "Cairo", "Tajawal", sans-serif`;
     const badgeText = blessing.categoryName || 'نعم الله';
-    const badgeWidth = ctx.measureText(badgeText).width + (isSquare ? 44 : 56);
+    const badgeWidth = ctx.measureText(badgeText).width + (isSquare ? 40 : 56);
     const badgeX = (width - badgeWidth) / 2;
-    const badgeY = isSquare ? 155 : 265;
-    const badgeH = isSquare ? 32 : 40;
+    const badgeY = isSquare ? 136 : 265;
+    const badgeH = isSquare ? 30 : 40;
 
     ctx.fillStyle = theme.badgeBg;
     ctx.beginPath();
@@ -235,29 +235,29 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     ctx.fill();
 
     ctx.fillStyle = theme.badgeText;
-    ctx.fillText(badgeText, width / 2, badgeY + (isSquare ? 22 : 28));
+    ctx.fillText(badgeText, width / 2, badgeY + (isSquare ? 21 : 28));
 
     // Dynamic Non-Overlapping Layout Calculation: startY strictly below badge
     const badgeBottom = badgeY + badgeH;
-    const gapBadgeTitle = isSquare ? 30 : 50;
-    const startY = badgeBottom + gapBadgeTitle + (isSquare ? 36 : 48);
+    const gapBadgeTitle = isSquare ? 24 : 50;
+    const startY = badgeBottom + gapBadgeTitle + (isSquare ? 32 : 48);
 
-    const textMaxWidth = isSquare ? 880 : 860;
-    const footerY = height - (isSquare ? 42 : 75);
-    const maxUsableY = footerY - (isSquare ? 28 : 50);
+    const textMaxWidth = isSquare ? 900 : 860;
+    const footerY = height - (isSquare ? 36 : 75);
+    const maxUsableY = footerY - (isSquare ? 18 : 50);
     const availableHeight = maxUsableY - startY;
 
     const titleText = blessing.title || '';
     const refText = blessing.reflection || '';
     const proofText = blessing.proof || '';
 
-    // Base font configurations
-    let baseTitleSize = isSquare ? 36 : 50;
-    let baseTitleLH = isSquare ? 56 : 76;
-    let baseRefSize = isSquare ? 25 : 32;
-    let baseRefLH = isSquare ? 44 : 58;
-    let baseProofSize = isSquare ? 21 : 28;
-    let baseProofLH = isSquare ? 38 : 50;
+    // Base font configurations (Larger Aref Ruqaa with compact Quranic proof box for 1:1)
+    let baseTitleSize = isSquare ? 46 : 52;
+    let baseTitleLH = isSquare ? 68 : 78;
+    let baseRefSize = isSquare ? 31 : 33;
+    let baseRefLH = isSquare ? 52 : 58;
+    let baseProofSize = isSquare ? 19 : 28;
+    let baseProofLH = isSquare ? 30 : 50;
 
     let scale = 1.0;
     let titleLines = [];
@@ -269,17 +269,17 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     let refLineHeight = baseRefLH;
     let proofFontSize = baseProofSize;
     let proofLineHeight = baseProofLH;
-    let proofSourceFontSize = isSquare ? 17 : 22;
-    let gapTitleRef = isSquare ? 22 : 40;
-    let gapRefProof = isSquare ? 20 : 40;
-    let boxPaddingTop = isSquare ? 22 : 32;
-    let boxPaddingBottom = isSquare ? 20 : 28;
+    let proofSourceFontSize = isSquare ? 14 : 22;
+    let gapTitleRef = isSquare ? 20 : 40;
+    let gapRefProof = isSquare ? 14 : 40;
+    let boxPaddingTop = isSquare ? 14 : 32;
+    let boxPaddingBottom = isSquare ? 12 : 28;
     let sourceSpace = 0;
     let boxHeight = 0;
 
     const proofFontFamily = blessing.proofType === 'quran' ? '"Amiri Quran", "Amiri", serif' : '"Amiri", serif';
 
-    // Iterative fit test to guarantee ZERO overlap
+    // Iterative fit test to guarantee ZERO overlap and readable font size
     for (let attempt = 0; attempt < 5; attempt++) {
       titleFontSize = Math.round(baseTitleSize * scale);
       titleLineHeight = Math.round(baseTitleLH * scale);
@@ -287,34 +287,34 @@ export async function exportBlessingAsImage(blessing, options = {}) {
       refLineHeight = Math.round(baseRefLH * scale);
       proofFontSize = Math.round(baseProofSize * scale);
       proofLineHeight = Math.round(baseProofLH * scale);
-      proofSourceFontSize = Math.max(14, Math.round((isSquare ? 17 : 22) * scale));
+      proofSourceFontSize = Math.max(13, Math.round((isSquare ? 14 : 22) * scale));
 
       ctx.font = `bold ${titleFontSize}px "Aref Ruqaa", "Amiri", serif`;
       titleLines = splitTextIntoLines(ctx, titleText, textMaxWidth);
 
-      ctx.font = `400 ${refFontSize}px "Amiri", "Cairo", serif`;
+      ctx.font = `bold ${refFontSize}px "Aref Ruqaa", "Amiri", serif`;
       refLines = splitTextIntoLines(ctx, refText, textMaxWidth);
 
       proofLines = [];
       if (proofText) {
         ctx.font = `bold italic ${proofFontSize}px ${proofFontFamily}`;
-        proofLines = splitTextIntoLines(ctx, proofText, textMaxWidth - (isSquare ? 80 : 120));
+        proofLines = splitTextIntoLines(ctx, proofText, textMaxWidth - (isSquare ? 60 : 120));
       }
 
-      gapTitleRef = Math.round((isSquare ? 22 : 40) * scale);
-      gapRefProof = Math.round((isSquare ? 20 : 40) * scale);
-      boxPaddingTop = Math.round((isSquare ? 22 : 32) * scale);
-      boxPaddingBottom = Math.round((isSquare ? 20 : 28) * scale);
+      gapTitleRef = Math.round((isSquare ? 20 : 40) * scale);
+      gapRefProof = Math.round((isSquare ? 14 : 40) * scale);
+      boxPaddingTop = Math.round((isSquare ? 14 : 32) * scale);
+      boxPaddingBottom = Math.round((isSquare ? 12 : 28) * scale);
       const hasSource = Boolean(blessing.proofSource);
-      sourceSpace = hasSource ? Math.round((isSquare ? 28 : 40) * scale) : 0;
+      sourceSpace = hasSource ? Math.round((isSquare ? 22 : 40) * scale) : 0;
       boxHeight = proofLines.length > 0 ? (boxPaddingTop + (proofLines.length * proofLineHeight) + sourceSpace + boxPaddingBottom) : 0;
 
       const totalRequiredH = (titleLines.length * titleLineHeight) + gapTitleRef + (refLines.length * refLineHeight) + (boxHeight > 0 ? (gapRefProof + boxHeight) : 0);
 
-      if (totalRequiredH <= availableHeight || scale <= 0.6) {
+      if (totalRequiredH <= availableHeight || scale <= 0.72) {
         break;
       }
-      scale = Math.max(0.6, (availableHeight / totalRequiredH) * 0.95);
+      scale = Math.max(0.72, (availableHeight / totalRequiredH) * 0.95);
     }
 
     // Starting Y coordinates
@@ -332,7 +332,7 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     currentY += gapTitleRef;
 
     // Render Reflection Lines
-    ctx.font = `400 ${refFontSize}px "Amiri", "Cairo", serif`;
+    ctx.font = `bold ${refFontSize}px "Aref Ruqaa", "Amiri", serif`;
     ctx.fillStyle = theme.reflection;
     for (let i = 0; i < refLines.length; i++) {
       ctx.fillText(refLines[i], width / 2, currentY);

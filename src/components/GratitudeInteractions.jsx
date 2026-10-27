@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import confetti from 'canvas-confetti';
 import { 
   Sparkles, 
   RefreshCw, 
@@ -31,9 +30,11 @@ export default function GratitudeInteractions({
   const [comfortPhrase, setComfortPhrase] = useState('');
   const [copied, setCopied] = useState(false);
   const [isSparkling, setIsSparkling] = useState(false);
+  const [noorParticles, setNoorParticles] = useState([]);
+  const [showAura, setShowAura] = useState(false);
 
-  const handleAlhamdulillahClick = (e) => {
-    // 1. Play soft spiritual chime
+  const handleAlhamdulillahClick = () => {
+    // 1. Play deep, warm spiritual chime
     audioEngine.playGratitudeChime();
 
     // 2. Increment daily counter
@@ -43,24 +44,25 @@ export default function GratitudeInteractions({
     const randomPhrase = GRATITUDE_PHRASES[Math.floor(Math.random() * GRATITUDE_PHRASES.length)];
     setComfortPhrase(randomPhrase);
 
-    // 4. Trigger confetti particles with gold & emerald tones
+    // 4. Trigger serene Noor Aura & floating light particles (بديل الكونفيتي الروحي)
     setIsSparkling(true);
-    setTimeout(() => setIsSparkling(false), 800);
+    setShowAura(true);
+    setTimeout(() => setIsSparkling(false), 900);
+    setTimeout(() => setShowAura(false), 1400);
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (rect.left + rect.width / 2) / window.innerWidth;
-    const y = (rect.top + rect.height / 2) / window.innerHeight;
+    // Generate 10 gentle floating light sparks
+    const batchId = Date.now();
+    const sparks = Array.from({ length: 10 }, (_, i) => ({
+      id: `${batchId}_${i}`,
+      dx: `${(Math.random() - 0.5) * 140}px`,
+      size: `${6 + Math.random() * 8}px`,
+      delay: `${i * 0.05}s`
+    }));
 
-    confetti({
-      particleCount: 32,
-      spread: 55,
-      origin: { x, y },
-      colors: ['#D4AF37', '#2C4A3E', '#F5D77F', '#528974', '#FFF9E6'],
-      ticks: 180,
-      gravity: 0.85,
-      scalar: 0.85,
-      shapes: ['circle', 'square']
-    });
+    setNoorParticles(prev => [...prev.slice(-10), ...sparks]);
+    setTimeout(() => {
+      setNoorParticles(prev => prev.filter(p => !p.id.startsWith(String(batchId))));
+    }, 1800);
   };
 
   const handleCopy = () => {
@@ -76,18 +78,35 @@ export default function GratitudeInteractions({
 
   return (
     <div className="gratitude-action-section">
-      {/* Prominent "الحمد لله" Button */}
-      <button
-        id="btn-alhamdulillah-main"
-        className={`btn-alhamdulillah ${isSparkling ? 'pulse-glow' : ''}`}
-        onClick={handleAlhamdulillahClick}
-        title="اضغط للحمد والامتنان"
-        aria-label={t.alhamdulillahBtn}
-      >
-        <Sparkles size={20} color="#1A2B25" />
-        <span>{t.alhamdulillahBtn}</span>
-        <Sparkles size={20} color="#1A2B25" />
-      </button>
+      {/* Prominent "الحمد لله" Button with Serene Noor Aura & Particles */}
+      <div className="gratitude-btn-wrapper">
+        {showAura && <div className="noor-aura-ring" aria-hidden="true" />}
+        {noorParticles.map(p => (
+          <div 
+            key={p.id}
+            className="noor-sparkle-particle"
+            style={{
+              '--dx': p.dx,
+              width: p.size,
+              height: p.size,
+              animationDelay: p.delay
+            }}
+            aria-hidden="true"
+          />
+        ))}
+
+        <button
+          id="btn-alhamdulillah-main"
+          className={`btn-alhamdulillah ${isSparkling ? 'pulse-glow' : ''}`}
+          onClick={handleAlhamdulillahClick}
+          title="اضغط للحمد والامتنان واستشعار السكينة"
+          aria-label={t.alhamdulillahBtn}
+        >
+          <Sparkles size={20} color="#1A2B25" />
+          <span>{t.alhamdulillahBtn}</span>
+          <Sparkles size={20} color="#1A2B25" />
+        </button>
+      </div>
 
       {/* Floating Comforting Gratitude Phrase */}
       {comfortPhrase && (

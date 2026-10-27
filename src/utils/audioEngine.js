@@ -53,39 +53,64 @@ class SpiritualAudioEngine {
     this.currentTrack = null;
   }
 
-  // Play peaceful chime when clicking "الحمد لله"
+  // Play deeply serene, warm spiritual chime when clicking "الحمد لله"
   playGratitudeChime() {
     this.init();
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
-    // Pentatonic frequencies in Hz (spiritual scale: C5, E5, G5, A5, C6)
-    const notes = [523.25, 659.25, 783.99, 880.00, 1046.50];
-    const pickedNote = notes[Math.floor(Math.random() * notes.length)];
+    // Serene, grounding spiritual frequencies in Hz (432Hz healing harmonic scale: D4, E4, G4, A4)
+    const spiritualNotes = [288.0, 324.0, 384.0, 432.0];
+    const baseFreq = spiritualNotes[Math.floor(Math.random() * spiritualNotes.length)];
 
-    const osc = this.ctx.createOscillator();
-    const osc2 = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+    // 1. Warm fundamental tone (pure, deep sine)
+    const oscRoot = this.ctx.createOscillator();
+    const gainRoot = this.ctx.createGain();
+    oscRoot.type = 'sine';
+    oscRoot.frequency.setValueAtTime(baseFreq, now);
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(pickedNote, now);
+    // 2. Harmonic overtone (perfect fifth for spiritual harmony)
+    const oscFifth = this.ctx.createOscillator();
+    const gainFifth = this.ctx.createGain();
+    oscFifth.type = 'sine';
+    oscFifth.frequency.setValueAtTime(baseFreq * 1.5, now);
 
-    osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(pickedNote * 2, now); // soft octave harmonic
+    // 3. Warm meditative undertone (chest resonance, gentle grounding)
+    const oscSub = this.ctx.createOscillator();
+    const gainSub = this.ctx.createGain();
+    oscSub.type = 'sine';
+    oscSub.frequency.setValueAtTime(baseFreq * 0.5, now);
 
-    // Delicate bell envelope
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.25, now + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+    // Gentle, peaceful envelope: soft attack, long soothing decay (2.5 seconds)
+    gainRoot.gain.setValueAtTime(0, now);
+    gainRoot.gain.linearRampToValueAtTime(0.22, now + 0.08);
+    gainRoot.gain.exponentialRampToValueAtTime(0.0001, now + 2.5);
 
-    osc.connect(gain);
-    osc2.connect(gain);
-    gain.connect(this.masterGain);
+    gainFifth.gain.setValueAtTime(0, now);
+    gainFifth.gain.linearRampToValueAtTime(0.09, now + 0.12);
+    gainFifth.gain.exponentialRampToValueAtTime(0.0001, now + 2.0);
 
-    osc.start(now);
-    osc2.start(now);
-    osc.stop(now + 1.9);
-    osc2.stop(now + 1.9);
+    gainSub.gain.setValueAtTime(0, now);
+    gainSub.gain.linearRampToValueAtTime(0.12, now + 0.06);
+    gainSub.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+
+    // Connect nodes
+    oscRoot.connect(gainRoot);
+    oscFifth.connect(gainFifth);
+    oscSub.connect(gainSub);
+
+    gainRoot.connect(this.masterGain);
+    gainFifth.connect(this.masterGain);
+    gainSub.connect(this.masterGain);
+
+    // Start & Stop with graceful tail
+    oscRoot.start(now);
+    oscFifth.start(now);
+    oscSub.start(now);
+
+    oscRoot.stop(now + 2.6);
+    oscFifth.stop(now + 2.6);
+    oscSub.stop(now + 2.6);
   }
 
   // Start selected ambient soundscape

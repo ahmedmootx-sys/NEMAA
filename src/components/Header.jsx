@@ -9,7 +9,8 @@ import {
   Download,
   BookOpen,
   Bell,
-  Globe
+  Globe,
+  Compass
 } from 'lucide-react';
 import { TRANSLATIONS } from '../i18n/translations';
 
@@ -26,7 +27,8 @@ export default function Header({
   streak,
   currentLang = 'ar',
   onToggleLanguage,
-  onOpenLanguageModal
+  onOpenLanguageModal,
+  onOpenGuide
 }) {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
@@ -92,6 +94,18 @@ export default function Header({
           >
             <Globe size={14} color="var(--color-gold)" />
             <span>{currentLang === 'ar' ? 'EN' : 'ع'}</span>
+          </button>
+
+          {/* App Guide & What's New Button */}
+          <button
+            id="btn-app-guide"
+            className="btn-icon btn-guide-toggle"
+            title={currentLang === 'ar' ? 'دليل الأزرار والتحديثات' : 'App Guide & Updates'}
+            onClick={onOpenGuide}
+            aria-label="دليل التطبيق والتحديثات"
+            style={{ color: 'var(--color-gold)' }}
+          >
+            <Compass size={18} />
           </button>
 
           {/* Gratitude Journal Button */}

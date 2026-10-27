@@ -148,19 +148,44 @@ export async function publishSharedBlessing({ title, reflection, author, proof, 
 }
 
 /**
- * Subscribe to realtime inserts on the 'blessings' table
+ * Delete a shared blessing from Supabase by ID
  */
-export function subscribeToSharedBlessings(onNewBlessing) {
+export async function deleteSharedBlessing(blessingId) {
+  try {
+    const { error } = await supabase
+      .from('blessings')
+      .delete()
+      .eq('id', blessingId);
+
+    if (error) {
+      console.warn('Supabase delete error:', error);
+      return { success: false, error };
+    }
+    return { success: true };
+  } catch (err) {
+    console.warn('Delete error:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Subscribe to realtime inserts and deletes on the 'blessings' table
+ */
+export function subscribeToSharedBlessings(onNewBlessing, onDeleteBlessing) {
   try {
     const channel = supabase
       .channel('realtime_shared_blessings')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'blessings' },
+        { event: '*', schema: 'public', table: 'blessings' },
         (payload) => {
-          if (payload && payload.new) {
+          if (payload && payload.eventType === 'INSERT' && payload.new) {
             const formatted = formatSharedBlessing(payload.new, Date.now());
             onNewBlessing(formatted);
+          } else if (payload && payload.eventType === 'DELETE' && payload.old) {
+            if (typeof onDeleteBlessing === 'function') {
+              onDeleteBlessing(payload.old.id);
+            }
           }
         }
       )

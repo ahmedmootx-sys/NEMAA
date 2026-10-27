@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Sparkles, Send, Loader2, Globe, User, BookOpen, Quote } from 'lucide-react';
 import { publishSharedBlessing } from '../supabaseClient';
+import { validateBlessingContent } from '../utils/contentValidator';
 
 export default function AddBlessingModal({ 
   isOpen, 
@@ -21,8 +22,11 @@ export default function AddBlessingModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim() || !reflection.trim()) {
-      setError(lang === 'ar' ? 'يرجى كتابة عنوان النعمة والتدبّر' : 'Please provide both title and reflection');
+    
+    // Strict content validation against gibberish, profanity and incomplete thoughts
+    const validation = validateBlessingContent({ title, reflection });
+    if (!validation.isValid) {
+      setError(validation.errorMessage);
       return;
     }
 

@@ -18,9 +18,11 @@ import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
 import { TRANSLATIONS } from './i18n/translations';
 import { Award, Sparkles, X } from 'lucide-react';
-import { fetchSharedBlessings, subscribeToSharedBlessings } from './supabaseClient';
+import { fetchSharedBlessings, subscribeToSharedBlessings, deleteSharedBlessing } from './supabaseClient';
 import confetti from 'canvas-confetti';
 import { audioEngine } from './utils/audioEngine';
+import OnboardingTour from './components/OnboardingTour';
+import AppGuideModal from './components/AppGuideModal';
 
 export default function App() {
   // 1. Theme State (Day / Night)
@@ -48,6 +50,29 @@ export default function App() {
   });
 
   const [isShareAppModalOpen, setIsShareAppModalOpen] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(false);
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+
+  // User's own published blessings IDs (to allow deletion of what they shared)
+  const [myPublishedIds, setMyPublishedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_my_published_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Automatically start tour for first-time visitors
+  useEffect(() => {
+    const hasSeenTour = localStorage.getItem('nemaa_tour_seen');
+    if (!hasSeenTour) {
+      const timer = setTimeout(() => {
+        setIsTourOpen(true);
+      }, 1400);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const handleSelectLanguage = (newLang) => {
     setCurrentLang(newLang);
@@ -120,26 +145,38 @@ export default function App() {
 
     loadRemoteBlessings();
 
-    // Realtime listener for new shared blessings
-    const unsubscribe = subscribeToSharedBlessings((newBlessing) => {
-      if (!isMounted) return;
-      setSharedBlessings(prev => {
-        // Prevent duplicate
-        if (prev.some(b => String(b.id) === String(newBlessing.id) || (b.title === newBlessing.title && b.reflection === newBlessing.reflection))) {
-          return prev;
-        }
-        const updated = [newBlessing, ...prev];
-        try {
-          localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
-        } catch {}
+    // Realtime listener for new and deleted shared blessings
+    const unsubscribe = subscribeToSharedBlessings(
+      (newBlessing) => {
+        if (!isMounted) return;
+        setSharedBlessings(prev => {
+          // Prevent duplicate
+          if (prev.some(b => String(b.id) === String(newBlessing.id) || (b.title === newBlessing.title && b.reflection === newBlessing.reflection))) {
+            return prev;
+          }
+          const updated = [newBlessing, ...prev];
+          try {
+            localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
+          } catch {}
 
-        // Show gentle realtime notification toast
-        setToastMessage(currentLangRef.current === 'ar' ? 'نعمة جديدة أضيفت للتو من أحد المتدبرين ✨' : 'A new blessing was just shared by the community ✨');
-        setTimeout(() => setToastMessage(''), 5000);
+          // Show gentle realtime notification toast
+          setToastMessage(currentLangRef.current === 'ar' ? 'نعمة جديدة أضيفت للتو من أحد المتدبرين ✨' : 'A new blessing was just shared by the community ✨');
+          setTimeout(() => setToastMessage(''), 5000);
 
-        return updated;
-      });
-    });
+          return updated;
+        });
+      },
+      (deletedId) => {
+        if (!isMounted) return;
+        setSharedBlessings(prev => {
+          const updated = prev.filter(b => String(b.id) !== String(deletedId));
+          try {
+            localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+    );
 
     return () => {
       isMounted = false;
@@ -414,6 +451,18 @@ export default function App() {
       return updated;
     });
 
+    // Also register in user's own published IDs list so they can manage/delete it
+    if (newBlessing && newBlessing.id) {
+      const strId = String(newBlessing.id);
+      setMyPublishedIds(prev => {
+        const updated = [strId, ...prev.filter(id => id !== strId)];
+        try {
+          localStorage.setItem('nemaa_my_published_ids', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    }
+
     // Immediately display the newly added blessing
     setActiveCategory('all');
     setCurrentIndex(0);
@@ -436,6 +485,57 @@ export default function App() {
         colors: ['#D4AF37', '#2C4A3E', '#F5D77F', '#528974', '#FFFFFF']
       });
     } catch {}
+  };
+
+  // Delete a user's own published blessing
+  const handleDeletePublished = async (blessing) => {
+    if (!blessing) return;
+    const confirmPrompt = currentLang === 'ar' 
+      ? `هل أنت متأكد من رغبتك في حذف نعمة «${blessing.title}» من النعم المنشورة للجميع؟` 
+      : `Are you sure you want to remove "${blessing.title}" from published blessings?`;
+    if (!window.confirm(confirmPrompt)) return;
+
+    const strId = String(blessing.id);
+
+    // Remove from local published IDs
+    setMyPublishedIds(prev => {
+      const updated = prev.filter(id => id !== strId);
+      try {
+        localStorage.setItem('nemaa_my_published_ids', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // Remove from shared blessings state & cache
+    setSharedBlessings(prev => {
+      const updated = prev.filter(b => String(b.id) !== strId);
+      try {
+        localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // Remove from custom blessings state & storage
+    setCustomBlessings(prev => {
+      const updated = prev.filter(b => String(b.id) !== strId);
+      try {
+        localStorage.setItem('nemaa_custom_blessings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // Call Supabase delete
+    try {
+      await deleteSharedBlessing(blessing.id);
+    } catch (err) {
+      console.warn('Error deleting shared blessing from Supabase:', err);
+    }
+
+    const deletedMsg = currentLang === 'ar' ? 'تم حذف النعمة المنشورة بنجاح' : 'Published blessing deleted successfully';
+    setToastMessage(deletedMsg);
+    setTimeout(() => {
+      setToastMessage('');
+    }, 4500);
   };
 
   // 8. Select Blessing from Modal
@@ -524,6 +624,7 @@ export default function App() {
         onOpenNotifications={() => setIsNotificationsOpen(true)}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenGuide={() => setIsGuideModalOpen(true)}
         theme={theme}
         onToggleTheme={toggleTheme}
         dailyCount={dailyStats.count}
@@ -572,6 +673,8 @@ export default function App() {
           onOpenFocusMode={() => setIsFocusModeOpen(true)}
           onOpenEdit={handleOpenEdit}
           onOpenPublishModal={() => setIsAddModalOpen(true)}
+          isMyPublished={currentBlessing ? myPublishedIds.includes(String(currentBlessing.id)) : false}
+          onDeletePublished={handleDeletePublished}
           activeCategory={activeCategory}
           animatingKey={animatingKey}
           lang={currentLang}
@@ -679,6 +782,34 @@ export default function App() {
         onSaveCustomization={handleSaveCustomization}
         onResetCustomization={handleResetCustomization}
         isCustomized={blessingToEdit ? Boolean(customizedBlessings[blessingToEdit.id]) : false}
+      />
+
+      {/* Interactive Onboarding Spotlight Tour */}
+      <OnboardingTour
+        isOpen={isTourOpen}
+        onClose={() => {
+          setIsTourOpen(false);
+          try {
+            localStorage.setItem('nemaa_tour_seen', 'true');
+          } catch {}
+        }}
+        onComplete={() => {
+          setIsTourOpen(false);
+          try {
+            localStorage.setItem('nemaa_tour_seen', 'true');
+          } catch {}
+        }}
+      />
+
+      {/* App Guide & Buttons Reference Modal with Changelog */}
+      <AppGuideModal
+        isOpen={isGuideModalOpen}
+        onClose={() => setIsGuideModalOpen(false)}
+        onStartInteractiveTour={() => {
+          setIsGuideModalOpen(false);
+          setTimeout(() => setIsTourOpen(true), 250);
+        }}
+        lang={currentLang}
       />
 
       {/* Friendly Success Notification Toast */}

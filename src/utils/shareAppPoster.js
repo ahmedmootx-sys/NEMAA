@@ -175,36 +175,36 @@ export async function generateShareAppPoster() {
   ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', 540, 882);
 
   // Spiritual Narrative
-  ctx.font = '500 27px "Cairo", sans-serif';
+  ctx.font = 'bold 30px "Cairo", sans-serif';
   ctx.fillStyle = '#F1F5F9';
-  ctx.fillText('تطبيق إسلامي تدبّري يُعينك على استشعار نِعَمِ الله الغامرة', 540, 955);
+  ctx.fillText('تطبيق إسلامي تدبّري يُعينك على استشعار نِعَمِ الله الغامرة', 540, 945);
 
-  ctx.font = '400 25px "Cairo", sans-serif';
+  ctx.font = '500 27px "Cairo", sans-serif';
   ctx.fillStyle = '#CBD5E1';
-  ctx.fillText('وترطيب لسانك بذكر الله وحمده وشكره كل يوم', 540, 1002);
+  ctx.fillText('وترطيب لسانك بذكر الله وحمده وشكره كل يوم', 540, 995);
 
-  // 7. Three Feature Badges (Solid, Emoji-Free)
+  // 7. Three Feature Badges (Solid, Emoji-Free, Large & Readable)
   const drawBadge = (text, y) => {
-    const badgeW = 780;
-    const badgeH = 60;
+    const badgeW = 800;
+    const badgeH = 64;
     const badgeX = (1080 - badgeW) / 2;
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.strokeStyle = 'rgba(212, 175, 55, 0.35)';
-    ctx.lineWidth = 1.2;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.4)';
+    ctx.lineWidth = 1.3;
     ctx.beginPath();
-    ctx.roundRect(badgeX, y, badgeW, badgeH, 30);
+    ctx.roundRect(badgeX, y, badgeW, badgeH, 32);
     ctx.fill();
     ctx.stroke();
 
-    ctx.font = '600 22px "Cairo", sans-serif';
-    ctx.fillStyle = '#F8FAFC';
-    ctx.fillText(text, 540, y + 38);
+    ctx.font = 'bold 24px "Cairo", sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(text, 540, y + 41);
   };
 
-  drawBadge('أكثر من 200 نعمة وشاهد موثق من القرآن والحديث', 1060);
-  drawBadge('أدعية شكر مأثورة، الوضع التدبري الهادئ، ومفكرة الامتنان', 1136);
-  drawBadge('تطبيق ويب وهاتف خفيف، مجاني لوجه الله وبدون أي إعلانات', 1212);
+  drawBadge('أكثر من 200 نعمة وشاهد موثق من القرآن والحديث', 1055);
+  drawBadge('أدعية شكر مأثورة، الوضع التدبري الهادئ، ومفكرة الامتنان', 1133);
+  drawBadge('تطبيق ويب وهاتف خفيف، مجاني لوجه الله وبدون أي إعلانات', 1211);
 
   // 8. Premium Showcase Card for Link & QR Code (Guaranteed Zero Overlap)
   const cardY = 1300;

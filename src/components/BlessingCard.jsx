@@ -12,7 +12,8 @@ import {
   Maximize2,
   HeartHandshake,
   PenTool,
-  Globe
+  Globe,
+  Trash2
 } from 'lucide-react';
 import { subscribeToVoiceChanges, speakArabic, stopSpeaking } from '../utils/speechHelper';
 import { getBlessingGratitudeDua } from '../utils/duaHelper';
@@ -28,6 +29,8 @@ export default function BlessingCard({
   onOpenFocusMode,
   onOpenEdit,
   onOpenPublishModal,
+  isMyPublished,
+  onDeletePublished,
   activeCategory,
   animatingKey,
   lang = 'ar'
@@ -271,6 +274,19 @@ export default function BlessingCard({
             >
               <Share2 size={16} />
             </button>
+
+            {/* Delete Published Blessing (shown only for user's own published blessings) */}
+            {isMyPublished && (
+              <button
+                className="card-action-btn btn-delete-published"
+                onClick={() => onDeletePublished && onDeletePublished(blessing)}
+                title={lang === 'ar' ? 'حذف هذه النعمة من النشر للجميع' : 'Delete this blessing from publication'}
+                aria-label="حذف النعمة من النشر"
+                style={{ color: '#E53E3E' }}
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
 
             {/* Favorite Bookmark */}
             <button
