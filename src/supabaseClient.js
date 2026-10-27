@@ -151,18 +151,70 @@ export async function publishSharedBlessing({ title, reflection, author, proof, 
 }
 
 /**
- * Delete a shared blessing from Supabase by ID
+ * Delete a shared blessing from Supabase by title/reflection or ID
  */
-export async function deleteSharedBlessing(blessingId) {
+export async function deleteSharedBlessing(blessingOrId) {
   try {
-    const { error } = await supabase
-      .from('blessings')
-      .delete()
-      .eq('id', blessingId);
+    const isObj = typeof blessingOrId === 'object' && blessingOrId !== null;
+    const blessingId = isObj ? blessingOrId.id : blessingOrId;
+    const title = isObj ? (blessingOrId.title || '').trim() : '';
+    const reflection = isObj ? (blessingOrId.reflection || '').trim() : '';
 
-    if (error) {
-      console.warn('Supabase delete error:', error);
-      return { success: false, error };
+    let success = false;
+    let lastError = null;
+
+    // 1. Try deleting by title and reflection (most reliable since blessings table has no id column)
+    if (title && reflection) {
+      const res = await supabase
+        .from('blessings')
+        .delete()
+        .eq('title', title)
+        .eq('reflection', reflection)
+        .select();
+
+      if (!res.error) {
+        success = true;
+      } else {
+        lastError = res.error;
+      }
+    }
+
+    // 2. Fallback: try by title only
+    if (!success && title) {
+      const res = await supabase
+        .from('blessings')
+        .delete()
+        .eq('title', title)
+        .select();
+
+      if (!res.error) {
+        success = true;
+      } else {
+        lastError = res.error;
+      }
+    }
+
+    // 3. Fallback: try by id if it is not a synthetic client ID
+    if (!success && blessingId && !String(blessingId).startsWith('sb_') && !String(blessingId).startsWith('custom_')) {
+      const res = await supabase
+        .from('blessings')
+        .delete()
+        .eq('id', blessingId)
+        .select();
+
+      if (!res.error) {
+        success = true;
+      } else {
+        lastError = res.error;
+      }
+    }
+
+    if (success) {
+      return { success: true };
+    }
+    if (lastError) {
+      console.warn('Supabase delete error:', lastError);
+      return { success: false, error: lastError };
     }
     return { success: true };
   } catch (err) {
@@ -318,7 +370,7 @@ export function subscribeToSharedBlessings(onNewBlessing, onDeleteBlessing) {
             onNewBlessing(formatted);
           } else if (payload && payload.eventType === 'DELETE' && payload.old) {
             if (typeof onDeleteBlessing === 'function') {
-              onDeleteBlessing(payload.old.id);
+              onDeleteBlessing(payload.old);
             }
           }
         }

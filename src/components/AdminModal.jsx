@@ -100,18 +100,22 @@ export default function AdminModal({
   };
 
   // Delete blessing from Admin Panel
-  const handleDeleteBlessingAction = async (blessingId, blessingTitle, reportIdToDismiss = null) => {
+  const handleDeleteBlessingAction = async (blessingItem, reportIdToDismiss = null) => {
+    const isObj = typeof blessingItem === 'object' && blessingItem !== null;
+    const title = isObj ? (blessingItem.title || '') : String(blessingItem);
+    const blessingId = isObj ? blessingItem.id : blessingItem;
+
     const promptMsg = lang === 'ar'
-      ? `هل أنت متأكد من رغبتك في حذف نعمة «${blessingTitle}» نهائياً من التطبيق وقاعدة البيانات؟`
-      : `Are you sure you want to permanently delete "${blessingTitle}"?`;
+      ? `هل أنت متأكد من رغبتك في حذف نعمة «${title}» نهائياً من التطبيق وقاعدة البيانات؟`
+      : `Are you sure you want to permanently delete "${title}"?`;
     if (!window.confirm(promptMsg)) return;
 
     try {
       // 1. Delete from Supabase & notify app
       if (onDeleteBlessing) {
-        await onDeleteBlessing(blessingId);
+        await onDeleteBlessing(blessingItem);
       } else {
-        await deleteSharedBlessing(blessingId);
+        await deleteSharedBlessing(blessingItem);
       }
 
       // 2. If called from reports, dismiss the report
@@ -120,8 +124,8 @@ export default function AdminModal({
         setReports(prev => prev.filter(r => r.id !== reportIdToDismiss));
       }
 
-      // Also clean any other reports matching this blessingId
-      setReports(prev => prev.filter(r => String(r.blessing_id) !== String(blessingId)));
+      // Also clean any other reports matching this blessing
+      setReports(prev => prev.filter(r => String(r.blessing_id) !== String(blessingId) && r.blessing_title !== title));
 
       setStatusNotice(lang === 'ar' ? 'تم حذف النعمة نهائياً بنجاح' : 'Blessing permanently deleted');
       setTimeout(() => setStatusNotice(''), 4000);
@@ -479,7 +483,7 @@ export default function AdminModal({
 
                               <button
                                 type="button"
-                                onClick={() => handleDeleteBlessingAction(rep.blessing_id, rep.blessing_title, rep.id)}
+                                onClick={() => handleDeleteBlessingAction({ id: rep.blessing_id, title: rep.blessing_title }, rep.id)}
                                 title="حذف النعمة نهائياً من التطبيق"
                                 style={{
                                   background: '#C53030',
@@ -597,7 +601,7 @@ export default function AdminModal({
                         <div>
                           <button
                             type="button"
-                            onClick={() => handleDeleteBlessingAction(b.id, b.title)}
+                            onClick={() => handleDeleteBlessingAction(b)}
                             style={{
                               background: 'rgba(229, 62, 62, 0.12)',
                               color: '#E53E3E',

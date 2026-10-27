@@ -243,10 +243,15 @@ export default function App() {
           return updated;
         });
       },
-      (deletedId) => {
-        if (!isMounted) return;
+      (deletedRow) => {
+        if (!isMounted || !deletedRow) return;
         setSharedBlessings(prev => {
-          const updated = prev.filter(b => String(b.id) !== String(deletedId));
+          const updated = prev.filter(b => {
+            if (deletedRow.id && String(b.id) === String(deletedRow.id)) return false;
+            if (deletedRow.title && deletedRow.reflection && b.title === deletedRow.title && b.reflection === deletedRow.reflection) return false;
+            if (deletedRow.title && b.title === deletedRow.title) return false;
+            return true;
+          });
           try {
             localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
           } catch {}
@@ -310,7 +315,7 @@ export default function App() {
     const pool = [...sharedBlessings, ...customBlessings, ...INITIAL_BLESSINGS];
     return pool
       .filter(b => b && (b.title || '').trim() && (b.reflection || '').trim())
-      .filter(b => !adminDeletedIds.includes(String(b.id)))
+      .filter(b => !adminDeletedIds.includes(String(b.id)) && !adminDeletedIds.includes(b.title))
       .map(b => {
         if (customizedBlessings[b.id]) {
           return {
@@ -637,7 +642,7 @@ export default function App() {
 
     // Call Supabase delete
     try {
-      await deleteSharedBlessing(blessing.id);
+      await deleteSharedBlessing(blessing);
     } catch (err) {
       console.warn('Error deleting shared blessing from Supabase:', err);
     }
@@ -650,13 +655,18 @@ export default function App() {
   };
 
   // Permanently delete any blessing from the app via Admin Panel
-  const handleAdminDeleteBlessing = async (blessingId) => {
-    if (!blessingId) return;
-    const strId = String(blessingId);
+  const handleAdminDeleteBlessing = async (blessingOrId) => {
+    if (!blessingOrId) return;
+    const isObj = typeof blessingOrId === 'object' && blessingOrId !== null;
+    const strId = isObj ? String(blessingOrId.id) : String(blessingOrId);
+    const title = isObj ? (blessingOrId.title || '').trim() : '';
+    const reflection = isObj ? (blessingOrId.reflection || '').trim() : '';
 
-    // 1. Permanently register as deleted in adminDeletedIds
+    // 1. Permanently register as deleted in adminDeletedIds (both ID and title)
     setAdminDeletedIds(prev => {
-      const updated = [...new Set([...prev, strId])];
+      const identifiers = [strId];
+      if (title) identifiers.push(title);
+      const updated = [...new Set([...prev, ...identifiers])];
       try {
         localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(updated));
       } catch {}
@@ -665,7 +675,12 @@ export default function App() {
 
     // 2. Remove from shared blessings cache and state
     setSharedBlessings(prev => {
-      const updated = prev.filter(b => String(b.id) !== strId);
+      const updated = prev.filter(b => {
+        if (strId && String(b.id) === strId) return false;
+        if (title && reflection && b.title === title && b.reflection === reflection) return false;
+        if (title && b.title === title) return false;
+        return true;
+      });
       try {
         localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
       } catch {}
@@ -674,7 +689,11 @@ export default function App() {
 
     // 3. Remove from custom blessings
     setCustomBlessings(prev => {
-      const updated = prev.filter(b => String(b.id) !== strId);
+      const updated = prev.filter(b => {
+        if (strId && String(b.id) === strId) return false;
+        if (title && b.title === title) return false;
+        return true;
+      });
       try {
         localStorage.setItem('nemaa_custom_blessings', JSON.stringify(updated));
       } catch {}
@@ -683,7 +702,7 @@ export default function App() {
 
     // 4. Remote delete from Supabase if shared
     try {
-      await deleteSharedBlessing(blessingId);
+      await deleteSharedBlessing(blessingOrId);
     } catch (err) {
       console.warn('Admin remote delete error:', err);
     }
@@ -695,19 +714,7 @@ export default function App() {
     handleNext();
   };
 
-  // Admin entry: listen for #admin hash
-  useEffect(() => {
-    const handleHash = () => {
-      if (window.location.hash === '#admin') {
-        setIsAdminModalOpen(true);
-      }
-    };
-    handleHash();
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
-  }, []);
-
-  // Admin secret entry: 10 quick clicks on footer quote
+  // Admin secret entry: ONLY triggered by 10 consecutive clicks on footer quote/verse
   const footerClicksRef = useRef({ count: 0, timer: null });
   const handleFooterSecretClick = () => {
     clearTimeout(footerClicksRef.current.timer);
@@ -718,7 +725,7 @@ export default function App() {
     } else {
       footerClicksRef.current.timer = setTimeout(() => {
         footerClicksRef.current.count = 0;
-      }, 4000);
+      }, 3500);
     }
   };
 
@@ -1018,12 +1025,7 @@ export default function App() {
       {/* Hidden Admin Management Modal */}
       <AdminModal
         isOpen={isAdminModalOpen}
-        onClose={() => {
-          setIsAdminModalOpen(false);
-          if (window.location.hash === '#admin') {
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          }
-        }}
+        onClose={() => setIsAdminModalOpen(false)}
         allBlessings={allBlessings}
         onDeleteBlessing={handleAdminDeleteBlessing}
         lang={currentLang}
