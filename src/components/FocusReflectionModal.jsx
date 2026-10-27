@@ -44,6 +44,8 @@ export default function FocusReflectionModal({
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.ar;
   const displayBlessing = getBlessingInLang(blessing, currentLang) || blessing;
   const duaInfo = getBlessingGratitudeDua(blessing);
+  const hasProof = Boolean(blessing.proof && blessing.proof.trim());
+  const shouldShowDua = !blessing.isShared && !blessing.isCustom && Boolean(duaInfo);
 
   return (
     <div className="focus-modal-overlay" role="dialog" aria-modal="true" aria-label="الوضع التدبري الهادئ">
@@ -90,7 +92,7 @@ export default function FocusReflectionModal({
         </p>
 
         {/* Quranic Ayah / Hadith Callout */}
-        {blessing.proof && (
+        {hasProof && (
           <div className="focus-proof-box">
             <div className="focus-proof-badge">
               <Quote size={13} />
@@ -127,8 +129,8 @@ export default function FocusReflectionModal({
           </div>
         )}
 
-        {/* Gratitude Dua Section */}
-        {duaInfo && (
+        {/* Gratitude Dua Section - Strictly for built-in blessings */}
+        {shouldShowDua && (
           <div className="focus-dua-box">
             <div className="focus-dua-header">
               <HeartHandshake size={14} color="var(--color-gold)" />

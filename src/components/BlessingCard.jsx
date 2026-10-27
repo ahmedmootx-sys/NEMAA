@@ -145,11 +145,14 @@ export default function BlessingCard({
   const t = TRANSLATIONS[lang] || TRANSLATIONS.ar;
   const displayBlessing = getBlessingInLang(blessing, lang) || blessing;
   const gratitudeDua = getBlessingGratitudeDua(blessing);
+  const hasProof = Boolean(blessing.proof && blessing.proof.trim());
+  // Gratitude dua appears strictly for built-in app blessings, never for user-published or shared blessings
+  const shouldShowGratitudeDua = !blessing.isShared && !blessing.isCustom && Boolean(gratitudeDua);
 
   const handleCopy = () => {
     const textToCopy = lang === 'en'
-      ? `«${displayBlessing.title}»\n\n${displayBlessing.reflection}\n\n${displayBlessing.proofArabic ? displayBlessing.proofArabic + '\n' : ''}${displayBlessing.proofMeaning ? `Meaning: "${displayBlessing.proofMeaning}"` + (displayBlessing.proofSource ? ` (${displayBlessing.proofSource})` : '') + '\n\n' : ''}From NEMAA Platform — Remember to give thanks`
-      : `«${blessing.title}»\n\n${blessing.reflection}\n\n${blessing.proof ? blessing.proof + (blessing.proofSource ? ` (${blessing.proofSource})` : '') + '\n\n' : ''}${gratitudeDua ? `دعاء شكر النعمة:\n${gratitudeDua.dua}\n\n` : ''}من منصة نِعْمَة — تَذَكَّرْ لِتَشْكُرْ`;
+      ? `«${displayBlessing.title}»\n\n${displayBlessing.reflection}\n\n${hasProof && displayBlessing.proofArabic ? displayBlessing.proofArabic + '\n' : ''}${hasProof && displayBlessing.proofMeaning ? `Meaning: "${displayBlessing.proofMeaning}"` + (displayBlessing.proofSource ? ` (${displayBlessing.proofSource})` : '') + '\n\n' : ''}From NEMAA Platform — Remember to give thanks`
+      : `«${blessing.title}»\n\n${blessing.reflection}\n\n${hasProof ? blessing.proof + (blessing.proofSource ? ` (${blessing.proofSource})` : '') + '\n\n' : ''}${shouldShowGratitudeDua ? `دعاء شكر النعمة:\n${gratitudeDua.dua}\n\n` : ''}من منصة نِعْمَة — تَذَكَّرْ لِتَشْكُرْ`;
     navigator.clipboard.writeText(textToCopy).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
@@ -345,7 +348,7 @@ export default function BlessingCard({
         </p>
 
         {/* Quranic Verse / Prophetic Hadith Callout Box */}
-        {blessing.proof && (
+        {hasProof && (
           <div className="spiritual-proof-box">
             <div className="proof-header">
               <Quote size={14} />
@@ -383,8 +386,8 @@ export default function BlessingCard({
           </div>
         )}
 
-        {/* Gratitude Dua Section (دعاء شكر النعمة) */}
-        {gratitudeDua && (
+        {/* Gratitude Dua Section (دعاء شكر النعمة) - Strictly for built-in curated blessings */}
+        {shouldShowGratitudeDua && (
           <div className="gratitude-dua-box">
             <div className="dua-box-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

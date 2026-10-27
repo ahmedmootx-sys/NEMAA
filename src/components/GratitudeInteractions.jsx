@@ -47,22 +47,22 @@ export default function GratitudeInteractions({
     // 4. Trigger serene Noor Aura & floating light particles (بديل الكونفيتي الروحي)
     setIsSparkling(true);
     setShowAura(true);
-    setTimeout(() => setIsSparkling(false), 900);
-    setTimeout(() => setShowAura(false), 1400);
+    setTimeout(() => setIsSparkling(false), 800);
+    setTimeout(() => setShowAura(false), 1200);
 
-    // Generate 10 gentle floating light sparks
+    // Generate 4 gentle, delicate floating light sparks
     const batchId = Date.now();
-    const sparks = Array.from({ length: 10 }, (_, i) => ({
+    const sparks = Array.from({ length: 4 }, (_, i) => ({
       id: `${batchId}_${i}`,
-      dx: `${(Math.random() - 0.5) * 140}px`,
-      size: `${6 + Math.random() * 8}px`,
-      delay: `${i * 0.05}s`
+      dx: `${(Math.random() - 0.5) * 70}px`,
+      size: `${3 + Math.random() * 3.5}px`,
+      delay: `${i * 0.06}s`
     }));
 
-    setNoorParticles(prev => [...prev.slice(-10), ...sparks]);
+    setNoorParticles(prev => [...prev.slice(-6), ...sparks]);
     setTimeout(() => {
       setNoorParticles(prev => prev.filter(p => !p.id.startsWith(String(batchId))));
-    }, 1800);
+    }, 1500);
   };
 
   const handleCopy = () => {

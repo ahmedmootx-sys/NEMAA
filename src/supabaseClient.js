@@ -38,10 +38,10 @@ export function formatSharedBlessing(raw, index = 0) {
     title,
     reflection,
     author,
-    category: raw.category || 'hidden',
+    category: raw.category || 'shared',
     categoryName: raw.category_name || raw.categoryName || 'نعم متشارَكة',
-    proof: raw.proof || '',
-    proofSource: raw.proof_source || raw.proofSource || (author ? `مشاركة بواسطة: ${author}` : ''),
+    proof: (raw.proof || '').trim(),
+    proofSource: (raw.proof_source || raw.proofSource || '').trim(),
     proofType: raw.proof_type || raw.proofType || 'wisdom',
     tags: Array.isArray(raw.tags) && raw.tags.length > 0 
       ? raw.tags 

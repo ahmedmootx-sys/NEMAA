@@ -78,7 +78,7 @@ class SpiritualAudioEngine {
     woodFilter.Q.setValueAtTime(4.2, now);
 
     const woodGain = this.ctx.createGain();
-    woodGain.gain.setValueAtTime(0.28, now);
+    woodGain.gain.setValueAtTime(0.14, now);
     woodGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
 
     noiseSource.connect(woodFilter);
@@ -93,7 +93,7 @@ class SpiritualAudioEngine {
     oscBody.frequency.setValueAtTime(135, now);
     oscBody.frequency.exponentialRampToValueAtTime(50, now + 0.035);
 
-    gainBody.gain.setValueAtTime(0.22, now);
+    gainBody.gain.setValueAtTime(0.10, now);
     gainBody.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
 
     oscBody.connect(gainBody);
