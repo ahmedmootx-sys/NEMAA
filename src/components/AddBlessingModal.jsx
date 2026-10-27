@@ -37,7 +37,7 @@ export default function AddBlessingModal({
       const result = await publishSharedBlessing({
         title: title.trim(),
         reflection: reflection.trim(),
-        author: author.trim() || 'محب للخير',
+        author: author.trim(),
         proof: proof.trim(),
         proofSource: proofSource.trim()
       });
@@ -63,7 +63,7 @@ export default function AddBlessingModal({
           id: `custom_${Date.now()}`,
           title: title.trim(),
           reflection: reflection.trim(),
-          author: author.trim() || 'محب للخير',
+          author: author.trim(),
           category: 'shared',
           categoryName: 'نعم متشارَكة',
           proof: proof.trim(),

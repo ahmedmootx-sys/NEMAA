@@ -18,11 +18,13 @@ import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
 import { TRANSLATIONS } from './i18n/translations';
 import { Award, Sparkles, X } from 'lucide-react';
-import { fetchSharedBlessings, subscribeToSharedBlessings, deleteSharedBlessing } from './supabaseClient';
+import { fetchSharedBlessings, subscribeToSharedBlessings, deleteSharedBlessing, incrementBlessingPraises, simpleHash } from './supabaseClient';
 import confetti from 'canvas-confetti';
 import { audioEngine } from './utils/audioEngine';
 import OnboardingTour from './components/OnboardingTour';
 import AppGuideModal from './components/AppGuideModal';
+import ReportModal from './components/ReportModal';
+import AdminModal from './components/AdminModal';
 
 export default function App() {
   // 1. Theme State (Day / Night)
@@ -52,6 +54,33 @@ export default function App() {
   const [isShareAppModalOpen, setIsShareAppModalOpen] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+
+  // Report Modal State
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [blessingToReport, setBlessingToReport] = useState(null);
+
+  // Hidden Admin Management Modal State
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Admin permanently deleted blessing IDs (filtered out from entire app)
+  const [adminDeletedIds, setAdminDeletedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_admin_deleted_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Praises count tracking for each blessing (persisted locally and synced with Supabase)
+  const [blessingPraises, setBlessingPraises] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_blessing_praises');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
 
   // User's own published blessings IDs (to allow deletion of what they shared)
   const [myPublishedIds, setMyPublishedIds] = useState(() => {
@@ -276,10 +305,12 @@ export default function App() {
   };
 
   // Combined Blessings Pool: Shared Supabase blessings first (newest first), then custom, then INITIAL_BLESSINGS
+  // Filter out any blessing permanently deleted by the admin
   const allBlessings = useMemo(() => {
     const pool = [...sharedBlessings, ...customBlessings, ...INITIAL_BLESSINGS];
     return pool
       .filter(b => b && (b.title || '').trim() && (b.reflection || '').trim())
+      .filter(b => !adminDeletedIds.includes(String(b.id)))
       .map(b => {
         if (customizedBlessings[b.id]) {
           return {
@@ -290,7 +321,22 @@ export default function App() {
         }
         return b;
       });
-  }, [sharedBlessings, customBlessings, customizedBlessings]);
+  }, [sharedBlessings, customBlessings, customizedBlessings, adminDeletedIds]);
+
+  // Compute live praise count for any blessing (offline durable + remote sync)
+  const getBlessingPraises = useCallback((blessing) => {
+    if (!blessing) return 1;
+    const strId = String(blessing.id);
+    if (blessingPraises[strId] !== undefined) {
+      return blessingPraises[strId];
+    }
+    if (blessing.praisesCount) {
+      return blessing.praisesCount;
+    }
+    // Authentic deterministic baseline for built-in blessings based on content hash
+    const hashNum = parseInt(simpleHash(blessing.title || strId), 36) || 42;
+    return (hashNum % 140) + 18;
+  }, [blessingPraises]);
 
   // 3. Category Filter
   const [activeCategory, setActiveCategory] = useState('all');
@@ -475,6 +521,23 @@ export default function App() {
       localStorage.setItem('nemaa_daily_stats', JSON.stringify(updated));
       return updated;
     });
+
+    // Increment praise counter for the current blessing (both shared and app blessings)
+    if (currentBlessing?.id) {
+      const strId = String(currentBlessing.id);
+      const currentCount = getBlessingPraises(currentBlessing);
+      const newCount = currentCount + 1;
+      setBlessingPraises(prev => {
+        const updated = { ...prev, [strId]: newCount };
+        try {
+          localStorage.setItem('nemaa_blessing_praises', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+      if (currentBlessing.isShared) {
+        incrementBlessingPraises(currentBlessing.id).catch(() => {});
+      }
+    }
   };
 
   // 7. Publish Shared Blessing to Supabase & Local State
@@ -584,6 +647,79 @@ export default function App() {
     setTimeout(() => {
       setToastMessage('');
     }, 4500);
+  };
+
+  // Permanently delete any blessing from the app via Admin Panel
+  const handleAdminDeleteBlessing = async (blessingId) => {
+    if (!blessingId) return;
+    const strId = String(blessingId);
+
+    // 1. Permanently register as deleted in adminDeletedIds
+    setAdminDeletedIds(prev => {
+      const updated = [...new Set([...prev, strId])];
+      try {
+        localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 2. Remove from shared blessings cache and state
+    setSharedBlessings(prev => {
+      const updated = prev.filter(b => String(b.id) !== strId);
+      try {
+        localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 3. Remove from custom blessings
+    setCustomBlessings(prev => {
+      const updated = prev.filter(b => String(b.id) !== strId);
+      try {
+        localStorage.setItem('nemaa_custom_blessings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 4. Remote delete from Supabase if shared
+    try {
+      await deleteSharedBlessing(blessingId);
+    } catch (err) {
+      console.warn('Admin remote delete error:', err);
+    }
+
+    setToastMessage(currentLang === 'ar' ? 'تم حذف النعمة من التطبيق نهائياً' : 'Blessing permanently deleted from the app');
+    setTimeout(() => setToastMessage(''), 4500);
+
+    // Move to next blessing smoothly
+    handleNext();
+  };
+
+  // Admin entry: listen for #admin hash
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === '#admin') {
+        setIsAdminModalOpen(true);
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
+  // Admin secret entry: 10 quick clicks on footer quote
+  const footerClicksRef = useRef({ count: 0, timer: null });
+  const handleFooterSecretClick = () => {
+    clearTimeout(footerClicksRef.current.timer);
+    footerClicksRef.current.count += 1;
+    if (footerClicksRef.current.count >= 10) {
+      footerClicksRef.current.count = 0;
+      setIsAdminModalOpen(true);
+    } else {
+      footerClicksRef.current.timer = setTimeout(() => {
+        footerClicksRef.current.count = 0;
+      }, 4000);
+    }
   };
 
   // 8. Select Blessing from Modal
@@ -723,6 +859,11 @@ export default function App() {
           onOpenPublishModal={() => setIsAddModalOpen(true)}
           isMyPublished={currentBlessing ? myPublishedIds.includes(String(currentBlessing.id)) : false}
           onDeletePublished={handleDeletePublished}
+          onOpenReport={(b) => {
+            setBlessingToReport(b);
+            setIsReportModalOpen(true);
+          }}
+          praisesCount={getBlessingPraises(currentBlessing)}
           activeCategory={activeCategory}
           animatingKey={animatingKey}
           lang={currentLang}
@@ -743,8 +884,12 @@ export default function App() {
           lang={currentLang}
         />
 
-        {/* Spiritual Quote Footer Note */}
-        <div style={{ textAlign: 'center', marginTop: '30px', padding: '0 10px', color: 'var(--text-muted)', fontSize: '13px' }}>
+        {/* Spiritual Quote Footer Note (Secret 10-click trigger for admin dashboard) */}
+        <div 
+          onClick={handleFooterSecretClick}
+          style={{ textAlign: 'center', marginTop: '30px', padding: '0 10px', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', userSelect: 'none' }}
+          title={currentLang === 'ar' ? 'منصة نِعْمَة — تذكّر لتشكر' : 'NEMAA Platform — Remember to give thanks'}
+        >
           <p style={{ fontFamily: 'var(--font-arabic-body)', fontSize: '17px', color: 'var(--color-primary)', marginBottom: '4px' }}>
             ﴿وَآتَاكُم مِّن كُلِّ مَا سَأَلْتُمُوهُ ۚ وَإِن تَعُدُّوا نِعْمَتَ اللَّهِ لَا تُحْصُوهَا﴾
           </p>
@@ -859,6 +1004,28 @@ export default function App() {
           setIsGuideModalOpen(false);
           setTimeout(() => setIsTourOpen(true), 250);
         }}
+        lang={currentLang}
+      />
+
+      {/* Report Blessing Modal */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        blessing={blessingToReport}
+        lang={currentLang}
+      />
+
+      {/* Hidden Admin Management Modal */}
+      <AdminModal
+        isOpen={isAdminModalOpen}
+        onClose={() => {
+          setIsAdminModalOpen(false);
+          if (window.location.hash === '#admin') {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+        }}
+        allBlessings={allBlessings}
+        onDeleteBlessing={handleAdminDeleteBlessing}
         lang={currentLang}
       />
 

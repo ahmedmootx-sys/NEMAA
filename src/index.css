@@ -48,6 +48,9 @@
   --shadow-lg: 0 16px 40px rgba(44, 74, 62, 0.09), 0 4px 12px rgba(212, 175, 55, 0.06);
   --shadow-glow: 0 0 25px rgba(212, 175, 55, 0.35);
 
+  --gradient-primary: linear-gradient(135deg, #1A382B 0%, #2C4A3E 60%, #15261F 100%);
+  --gradient-gold: linear-gradient(135deg, #F5D77F 0%, #D4AF37 50%, #AA8022 100%);
+
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 22px;
@@ -737,17 +740,18 @@ html, body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 18px;
-  gap: 8px;
+  gap: 10px;
+  row-gap: 10px;
   width: 100%;
   box-sizing: border-box;
+  flex-wrap: wrap;
 }
 
 .card-meta-left {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
-  flex: 0 1 auto;
+  flex-wrap: wrap;
 }
 
 .card-category-pill {
@@ -778,6 +782,48 @@ html, body {
   white-space: nowrap;
 }
 
+.card-author-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--color-gold);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.card-praises-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: rgba(44, 74, 62, 0.12);
+  color: var(--color-primary);
+  border: 1px solid rgba(44, 74, 62, 0.25);
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+[data-theme="night"] .card-praises-badge {
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--color-gold);
+  border-color: rgba(212, 175, 55, 0.25);
+}
+.card-praises-badge .praises-num {
+  font-weight: 800;
+  font-size: 12px;
+}
+.card-praises-badge .praises-text {
+  font-size: 10.5px;
+  opacity: 0.85;
+}
+
 .card-header-actions {
   display: flex;
   align-items: center;
@@ -797,6 +843,10 @@ html, body {
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition-fast);
+}
+.card-action-btn.btn-report-blessing:hover {
+  color: #E53E3E;
+  background: rgba(229, 62, 62, 0.12);
 }
 @media (min-width: 640px) {
   .card-action-btn {

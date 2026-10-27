@@ -13,7 +13,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 /**
  * Generate a consistent string hash code for fallback IDs
  */
-function simpleHash(str = '') {
+export function simpleHash(str = '') {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
@@ -29,7 +29,8 @@ function simpleHash(str = '') {
 export function formatSharedBlessing(raw, index = 0) {
   const title = (raw.title || '').trim();
   const reflection = (raw.reflection || '').trim();
-  const author = (raw.author || '').trim() || 'محب للخير';
+  const rawAuthor = (raw.author || '').trim();
+  const author = (rawAuthor && rawAuthor !== 'محب للخير') ? rawAuthor : '';
   const id = raw.id ? String(raw.id) : `sb_${simpleHash(title + reflection)}_${index}`;
 
   return {
@@ -40,12 +41,13 @@ export function formatSharedBlessing(raw, index = 0) {
     category: raw.category || 'hidden',
     categoryName: raw.category_name || raw.categoryName || 'نعم متشارَكة',
     proof: raw.proof || '',
-    proofSource: raw.proof_source || raw.proofSource || (author !== 'محب للخير' ? `مشاركة بواسطة: ${author}` : ''),
+    proofSource: raw.proof_source || raw.proofSource || (author ? `مشاركة بواسطة: ${author}` : ''),
     proofType: raw.proof_type || raw.proofType || 'wisdom',
     tags: Array.isArray(raw.tags) && raw.tags.length > 0 
       ? raw.tags 
       : ['نعمة_متشارَكة', 'مجتمع_نعمة'],
     isShared: true,
+    praisesCount: Number(raw.praises_count || raw.praisesCount || 0),
     createdAt: raw.created_at || raw.createdAt || new Date().toISOString()
   };
 }
@@ -93,7 +95,8 @@ export async function fetchSharedBlessings() {
 export async function publishSharedBlessing({ title, reflection, author, proof, proofSource }) {
   const cleanTitle = (title || '').trim();
   const cleanReflection = (reflection || '').trim();
-  const cleanAuthor = (author || '').trim() || 'محب للخير';
+  const rawAuthor = (author || '').trim();
+  const cleanAuthor = (rawAuthor && rawAuthor !== 'محب للخير') ? rawAuthor : null;
   const cleanProof = (proof || '').trim();
   const cleanProofSource = (proofSource || '').trim();
 
@@ -165,6 +168,137 @@ export async function deleteSharedBlessing(blessingId) {
   } catch (err) {
     console.warn('Delete error:', err);
     return { success: false, error: err };
+  }
+}
+
+/**
+ * Increment praises count for a blessing
+ */
+export async function incrementBlessingPraises(blessingId) {
+  try {
+    const { data: current } = await supabase
+      .from('blessings')
+      .select('praises_count')
+      .eq('id', blessingId)
+      .single();
+
+    if (current) {
+      const nextCount = (current.praises_count || 0) + 1;
+      await supabase
+        .from('blessings')
+        .update({ praises_count: nextCount })
+        .eq('id', blessingId);
+      return nextCount;
+    }
+  } catch (err) {
+    // Non-critical: column might not exist or network unavailable
+  }
+  return null;
+}
+
+/**
+ * Submit a report for an inappropriate or erroneous blessing
+ */
+export async function submitBlessingReport({ blessingId, blessingTitle, reason, notes }) {
+  const reportObj = {
+    id: `rep_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    blessing_id: String(blessingId),
+    blessing_title: blessingTitle || '',
+    reason: reason || 'محتوى غير لائق',
+    notes: notes || '',
+    created_at: new Date().toISOString(),
+    status: 'pending'
+  };
+
+  // 1. Try storing in Supabase 'reports' table
+  try {
+    await supabase.from('reports').insert([reportObj]);
+  } catch (err) {}
+
+  // 2. Always persist in localStorage cache
+  try {
+    const cached = JSON.parse(localStorage.getItem('nemaa_reports_cache') || '[]');
+    cached.unshift(reportObj);
+    localStorage.setItem('nemaa_reports_cache', JSON.stringify(cached));
+  } catch {}
+
+  return { success: true, report: reportObj };
+}
+
+/**
+ * Fetch all reports (from Supabase or local cache)
+ */
+export async function fetchBlessingReports() {
+  let reports = [];
+  try {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && Array.isArray(data)) {
+      reports = data;
+    }
+  } catch (err) {}
+
+  // Merge with local cache
+  try {
+    const local = JSON.parse(localStorage.getItem('nemaa_reports_cache') || '[]');
+    local.forEach(r => {
+      if (!reports.some(item => item.id === r.id)) {
+        reports.push(r);
+      }
+    });
+  } catch {}
+
+  return reports;
+}
+
+/**
+ * Dismiss / resolve a report
+ */
+export async function dismissBlessingReport(reportId) {
+  try {
+    await supabase.from('reports').delete().eq('id', reportId);
+  } catch {}
+  try {
+    const cached = JSON.parse(localStorage.getItem('nemaa_reports_cache') || '[]');
+    const filtered = cached.filter(r => r.id !== reportId);
+    localStorage.setItem('nemaa_reports_cache', JSON.stringify(filtered));
+  } catch {}
+  return { success: true };
+}
+
+/**
+ * Admin Authentication via Supabase Auth User
+ */
+export async function adminLogin(email, password) {
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: (email || '').trim(),
+      password: password
+    });
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true, user: data.user, session: data.session };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function adminLogout() {
+  try {
+    await supabase.auth.signOut();
+  } catch {}
+  return { success: true };
+}
+
+export async function getAdminUser() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user;
+  } catch {
+    return null;
   }
 }
 

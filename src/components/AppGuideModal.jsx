@@ -233,22 +233,22 @@ export default function AppGuideModal({
                     if (onStartInteractiveTour) onStartInteractiveTour();
                   }}
                   style={{
-                    background: 'var(--gradient-primary)',
+                    background: 'linear-gradient(135deg, #1A382B 0%, #2C4A3E 60%, #15261F 100%)',
                     color: '#FFFFFF',
-                    border: '1px solid var(--color-gold)',
+                    border: '1.5px solid #D4AF37',
                     borderRadius: 'var(--radius-full)',
-                    padding: '8px 18px',
-                    fontSize: '13px',
+                    padding: '9px 20px',
+                    fontSize: '13.5px',
                     fontWeight: '700',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: 'var(--shadow-gold)'
+                    gap: '7px',
+                    boxShadow: '0 4px 16px rgba(212, 175, 55, 0.4)'
                   }}
                 >
-                  <Play size={14} fill="#FFFFFF" />
-                  <span>بدء الجولة المباشرة</span>
+                  <Play size={14} fill="#FFFFFF" color="#FFFFFF" />
+                  <span style={{ color: '#FFFFFF', fontWeight: '700' }}>بدء الجولة المباشرة</span>
                 </button>
               </div>
 

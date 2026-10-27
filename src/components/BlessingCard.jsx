@@ -13,7 +13,9 @@ import {
   HeartHandshake,
   PenTool,
   Globe,
-  Trash2
+  Trash2,
+  User,
+  Flag
 } from 'lucide-react';
 import { subscribeToVoiceChanges, speakArabic, stopSpeaking } from '../utils/speechHelper';
 import { getBlessingGratitudeDua } from '../utils/duaHelper';
@@ -31,6 +33,8 @@ export default function BlessingCard({
   onOpenPublishModal,
   isMyPublished,
   onDeletePublished,
+  onOpenReport,
+  praisesCount,
   activeCategory,
   animatingKey,
   lang = 'ar'
@@ -110,20 +114,20 @@ export default function BlessingCard({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
-                  background: 'var(--gradient-primary)',
+                  background: 'linear-gradient(135deg, #1A382B 0%, #2C4A3E 60%, #15261F 100%)',
                   color: '#FFFFFF',
                   padding: '12px 28px',
                   borderRadius: 'var(--radius-full)',
-                  border: '1px solid var(--color-gold)',
+                  border: '1.5px solid #D4AF37',
                   fontWeight: '700',
                   fontSize: '15px',
                   cursor: 'pointer',
-                  boxShadow: 'var(--shadow-gold)',
+                  boxShadow: '0 4px 16px rgba(212, 175, 55, 0.4)',
                   transition: 'transform 0.2s ease, box-shadow 0.2s ease'
                 }}
               >
                 <Sparkles size={18} color="var(--color-gold)" />
-                <span>{lang === 'ar' ? 'انشر أول نعمة الآن' : 'Publish First Blessing Now'}</span>
+                <span style={{ color: '#FFFFFF', fontWeight: '700' }}>{lang === 'ar' ? 'انشر أول نعمة الآن' : 'Publish First Blessing Now'}</span>
               </button>
             )}
           </div>
@@ -182,6 +186,21 @@ export default function BlessingCard({
             <span className="card-category-pill">
               <Sparkles size={12} color="var(--color-gold)" />
               <span>{displayBlessing.categoryName}</span>
+            </span>
+
+            {/* Author Badge if provided */}
+            {blessing.author && blessing.author !== 'محب للخير' && (
+              <span className="card-author-badge" title={lang === 'ar' ? `ناشر النعمة: ${blessing.author}` : `Published by: ${blessing.author}`}>
+                <User size={11} color="var(--color-gold)" />
+                <span>{lang === 'ar' ? `بقلم: ${blessing.author}` : `By: ${blessing.author}`}</span>
+              </span>
+            )}
+
+            {/* Praise Counter Badge */}
+            <span className="card-praises-badge" title={lang === 'ar' ? 'عدد الذين تدبّروا وحمدوا الله بسبب هذه النعمة' : 'Number of people who praised Allah for this blessing'}>
+              <Heart size={11} fill="var(--color-gold)" color="var(--color-gold)" />
+              <span className="praises-num">{praisesCount || blessing.praisesCount || 1}</span>
+              <span className="praises-text">{lang === 'ar' ? 'حمدوا الله عليها' : 'praised'}</span>
             </span>
 
             {blessing.isCustom && (
@@ -287,6 +306,16 @@ export default function BlessingCard({
                 <Trash2 size={15} />
               </button>
             )}
+
+            {/* Report Button (للنعم المشاركة ونعم التطبيق) */}
+            <button
+              className="card-action-btn btn-report-blessing"
+              onClick={() => onOpenReport && onOpenReport(blessing)}
+              title={lang === 'ar' ? 'إبلاغ عن محتوى غير لائق أو خطأ' : 'Report content or issue'}
+              aria-label="إبلاغ عن نعمة"
+            >
+              <Flag size={15} />
+            </button>
 
             {/* Favorite Bookmark */}
             <button
