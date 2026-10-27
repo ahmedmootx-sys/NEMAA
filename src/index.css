@@ -2356,4 +2356,214 @@ html, body {
   gap: 6px;
 }
 
+/* ================= Supabase Shared Blessings & Publish UI ================= */
+.btn-publish-blessing-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 440px;
+  margin: 10px auto 0;
+  padding: 11px 18px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(44, 74, 62, 0.1));
+  border: 1.5px solid var(--color-gold);
+  border-radius: var(--radius-full);
+  color: var(--color-primary);
+  font-family: var(--font-arabic-ui);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="night"] .btn-publish-blessing-trigger {
+  color: var(--color-gold);
+  background: rgba(212, 175, 55, 0.09);
+}
+
+.btn-publish-blessing-trigger:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 18px rgba(212, 175, 55, 0.22);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(44, 74, 62, 0.16));
+}
+
+.publish-modal-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: var(--radius-md);
+  margin-bottom: 18px;
+}
+
+.publish-intro-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.publish-intro-text strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--text-heading);
+  margin-bottom: 2px;
+}
+
+.publish-intro-text p {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.publish-modal-alert {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.publish-modal-alert.error {
+  background: rgba(229, 62, 62, 0.12);
+  color: #E53E3E;
+  border: 1px solid rgba(229, 62, 62, 0.25);
+}
+
+.publish-submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light)) !important;
+  color: #FFFFFF !important;
+  padding: 14px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  border-radius: var(--radius-md) !important;
+  border: none !important;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 4px 14px rgba(44, 74, 62, 0.22);
+  margin-top: 14px;
+  width: 100%;
+}
+
+.publish-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 20px rgba(44, 74, 62, 0.32);
+}
+
+.publish-submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.card-shared-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  background: rgba(82, 137, 116, 0.16);
+  border: 1px solid rgba(82, 137, 116, 0.35);
+  color: var(--color-primary);
+}
+
+[data-theme="night"] .card-shared-badge {
+  color: #68D391;
+  background: rgba(104, 211, 145, 0.14);
+  border-color: rgba(104, 211, 145, 0.35);
+}
+
+/* Floating Success Notification Toast */
+.shared-blessing-success-toast {
+  position: fixed;
+  top: 24px;
+  right: 20px;
+  left: 20px;
+  max-width: 480px;
+  margin: 0 auto;
+  z-index: 2000;
+  background: var(--surface-card);
+  border: 1.5px solid var(--color-gold);
+  border-radius: var(--radius-lg);
+  padding: 13px 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2), 0 0 24px var(--color-gold-glow);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideDownToast 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  backdrop-filter: blur(14px);
+}
+
+@keyframes slideDownToast {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(212, 175, 55, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-text-content {
+  flex: 1;
+  font-family: var(--font-arabic-heading);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-heading);
+  line-height: 1.45;
+}
+
+.toast-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.toast-close-btn:hover {
+  color: var(--text-heading);
+  background: var(--surface-card-subtle);
+}
+
+.spinner-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+
 

@@ -210,24 +210,24 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     ctx.direction = 'rtl';
 
     // 1. Header: App Title & Slogan
-    const headerTitleY = isSquare ? 105 : 190;
-    const headerSloganY = isSquare ? 144 : 242;
+    const headerTitleY = isSquare ? 88 : 175;
+    const headerSloganY = isSquare ? 128 : 225;
 
-    ctx.font = `bold ${isSquare ? '44px' : '58px'} "Aref Ruqaa", "Amiri", serif`;
+    ctx.font = `bold ${isSquare ? '40px' : '54px'} "Aref Ruqaa", "Amiri", serif`;
     ctx.fillStyle = theme.appTitle;
     ctx.fillText('نِعْمَة', width / 2, headerTitleY);
 
-    ctx.font = `${isSquare ? '20px' : '25px'} "Cairo", "Tajawal", sans-serif`;
+    ctx.font = `${isSquare ? '19px' : '23px'} "Cairo", "Tajawal", sans-serif`;
     ctx.fillStyle = theme.slogan;
     ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', width / 2, headerSloganY);
 
     // 2. Category Badge
-    ctx.font = `600 ${isSquare ? '19px' : '23px'} "Cairo", "Tajawal", sans-serif`;
+    ctx.font = `600 ${isSquare ? '18px' : '22px'} "Cairo", "Tajawal", sans-serif`;
     const badgeText = blessing.categoryName || 'نعم الله';
-    const badgeWidth = ctx.measureText(badgeText).width + (isSquare ? 48 : 60);
+    const badgeWidth = ctx.measureText(badgeText).width + (isSquare ? 44 : 56);
     const badgeX = (width - badgeWidth) / 2;
-    const badgeY = isSquare ? 175 : 295;
-    const badgeH = isSquare ? 34 : 42;
+    const badgeY = isSquare ? 155 : 265;
+    const badgeH = isSquare ? 32 : 40;
 
     ctx.fillStyle = theme.badgeBg;
     ctx.beginPath();
@@ -235,11 +235,14 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     ctx.fill();
 
     ctx.fillStyle = theme.badgeText;
-    ctx.fillText(badgeText, width / 2, badgeY + (isSquare ? 24 : 30));
+    ctx.fillText(badgeText, width / 2, badgeY + (isSquare ? 22 : 28));
 
-    // Dynamic Non-Overlapping Layout Calculation
+    // Dynamic Non-Overlapping Layout Calculation: startY strictly below badge
+    const badgeBottom = badgeY + badgeH;
+    const gapBadgeTitle = isSquare ? 30 : 50;
+    const startY = badgeBottom + gapBadgeTitle + (isSquare ? 36 : 48);
+
     const textMaxWidth = isSquare ? 880 : 860;
-    const startY = isSquare ? 230 : 420;
     const footerY = height - (isSquare ? 42 : 75);
     const maxUsableY = footerY - (isSquare ? 28 : 50);
     const availableHeight = maxUsableY - startY;

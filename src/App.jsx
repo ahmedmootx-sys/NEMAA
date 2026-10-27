@@ -17,7 +17,10 @@ import InstallAppToast from './components/InstallAppToast';
 import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
 import { TRANSLATIONS } from './i18n/translations';
-import { Award, Sparkles } from 'lucide-react';
+import { Award, Sparkles, X } from 'lucide-react';
+import { fetchSharedBlessings, subscribeToSharedBlessings } from './supabaseClient';
+import confetti from 'canvas-confetti';
+import { audioEngine } from './utils/audioEngine';
 
 export default function App() {
   // 1. Theme State (Day / Night)
@@ -76,7 +79,68 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
-  // 2. Custom Blessings State (New blessings created by user)
+  // 2. Shared Blessings from Supabase
+  const [sharedBlessings, setSharedBlessings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_shared_blessings_cache');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [toastMessage, setToastMessage] = useState('');
+  const currentLangRef = useRef(currentLang);
+  currentLangRef.current = currentLang;
+
+  // Fetch from Supabase and subscribe to realtime updates
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadRemoteBlessings() {
+      try {
+        const remote = await fetchSharedBlessings();
+        if (isMounted && Array.isArray(remote)) {
+          setSharedBlessings(remote);
+          try {
+            localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(remote));
+          } catch {}
+        }
+      } catch (err) {
+        console.warn('Failed to load shared blessings from Supabase:', err);
+      }
+    }
+
+    loadRemoteBlessings();
+
+    // Realtime listener for new shared blessings
+    const unsubscribe = subscribeToSharedBlessings((newBlessing) => {
+      if (!isMounted) return;
+      setSharedBlessings(prev => {
+        // Prevent duplicate
+        if (prev.some(b => String(b.id) === String(newBlessing.id) || (b.title === newBlessing.title && b.reflection === newBlessing.reflection))) {
+          return prev;
+        }
+        const updated = [newBlessing, ...prev];
+        try {
+          localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
+        } catch {}
+
+        // Show gentle realtime notification toast
+        setToastMessage(currentLangRef.current === 'ar' ? 'نعمة جديدة أضيفت للتو من أحد المتدبرين ✨' : 'A new blessing was just shared by the community ✨');
+        setTimeout(() => setToastMessage(''), 5000);
+
+        return updated;
+      });
+    });
+
+    return () => {
+      isMounted = false;
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
+  // 3. Custom Blessings State (New blessings created by user)
   const [customBlessings, setCustomBlessings] = useState(() => {
     try {
       const saved = localStorage.getItem('nemaa_custom_blessings');
@@ -112,9 +176,9 @@ export default function App() {
     localStorage.setItem('nemaa_customized_blessings', JSON.stringify(updated));
   };
 
-  // Combined Blessings Pool (with user customized rephrasings merged)
+  // Combined Blessings Pool: Shared Supabase blessings first (newest first), then custom, then INITIAL_BLESSINGS
   const allBlessings = useMemo(() => {
-    const pool = [...customBlessings, ...INITIAL_BLESSINGS];
+    const pool = [...sharedBlessings, ...customBlessings, ...INITIAL_BLESSINGS];
     return pool.map(b => {
       if (customizedBlessings[b.id]) {
         return {
@@ -125,13 +189,14 @@ export default function App() {
       }
       return b;
     });
-  }, [customBlessings, customizedBlessings]);
+  }, [sharedBlessings, customBlessings, customizedBlessings]);
 
   // 3. Category Filter
   const [activeCategory, setActiveCategory] = useState('all');
 
   const filteredBlessings = useMemo(() => {
     if (activeCategory === 'all') return allBlessings;
+    if (activeCategory === 'shared') return allBlessings.filter(b => b.isShared);
     return allBlessings.filter(b => b.category === activeCategory);
   }, [allBlessings, activeCategory]);
 
@@ -140,6 +205,10 @@ export default function App() {
     return CATEGORIES.map(cat => {
       if (cat.id === 'all') {
         return { ...cat, count: allBlessings.length };
+      }
+      if (cat.id === 'shared') {
+        const count = allBlessings.filter(b => b.isShared).length;
+        return { ...cat, count };
       }
       const count = allBlessings.filter(b => b.category === cat.id).length;
       return { ...cat, count };
@@ -307,15 +376,50 @@ export default function App() {
     });
   };
 
-  // 7. Add Custom Blessing
-  const handleAddCustomBlessing = (newBlessing) => {
-    const updated = [newBlessing, ...customBlessings];
-    setCustomBlessings(updated);
-    localStorage.setItem('nemaa_custom_blessings', JSON.stringify(updated));
+  // 7. Publish Shared Blessing to Supabase & Local State
+  const handleBlessingPublished = (newBlessing, meta = {}) => {
+    // Prepend to shared blessings
+    setSharedBlessings(prev => {
+      const filtered = prev.filter(b => b.id !== newBlessing.id);
+      const updated = [newBlessing, ...filtered];
+      try {
+        localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // Also persist in customBlessings for offline durability
+    setCustomBlessings(prev => {
+      const filtered = prev.filter(b => b.id !== newBlessing.id);
+      const updated = [newBlessing, ...filtered];
+      try {
+        localStorage.setItem('nemaa_custom_blessings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
     // Immediately display the newly added blessing
     setActiveCategory('all');
     setCurrentIndex(0);
     setAnimatingKey(Date.now());
+
+    // Show friendly success toast notification
+    const successMsg = meta.successMessage || (currentLang === 'ar' ? 'تمت إضافة نعمتك بنجاح وستظهر للجميع!' : 'Your blessing has been published successfully!');
+    setToastMessage(successMsg);
+    setTimeout(() => {
+      setToastMessage('');
+    }, 5000);
+
+    // Audio chime & celebration
+    try {
+      audioEngine.playGratitudeChime();
+      confetti({
+        particleCount: 45,
+        spread: 65,
+        origin: { y: 0.6 },
+        colors: ['#D4AF37', '#2C4A3E', '#F5D77F', '#528974', '#FFFFFF']
+      });
+    } catch {}
   };
 
   // 8. Select Blessing from Modal
@@ -465,6 +569,7 @@ export default function App() {
           onDownloadImage={handleDownloadImage}
           onShare={handleOpenShare}
           onOpenShareApp={() => setIsShareAppModalOpen(true)}
+          onOpenPublishModal={() => setIsAddModalOpen(true)}
           dailyCount={dailyStats.count}
           lang={currentLang}
         />
@@ -515,7 +620,8 @@ export default function App() {
       <AddBlessingModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onAddBlessing={handleAddCustomBlessing}
+        onBlessingPublished={handleBlessingPublished}
+        lang={currentLang}
       />
 
       <SearchExploreModal
@@ -556,6 +662,26 @@ export default function App() {
         onResetCustomization={handleResetCustomization}
         isCustomized={blessingToEdit ? Boolean(customizedBlessings[blessingToEdit.id]) : false}
       />
+
+      {/* Friendly Success Notification Toast */}
+      {toastMessage && (
+        <div className="shared-blessing-success-toast" role="alert" dir="rtl">
+          <div className="toast-icon-wrap" aria-hidden="true">
+            <Sparkles size={18} color="var(--color-gold)" />
+          </div>
+          <div className="toast-text-content">
+            {toastMessage}
+          </div>
+          <button 
+            type="button" 
+            className="toast-close-btn" 
+            onClick={() => setToastMessage('')}
+            aria-label="إغلاق"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
 
       {/* Subtle PWA Install Notification Toast */}
       <InstallAppToast deferredPrompt={deferredPrompt} />

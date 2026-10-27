@@ -9,7 +9,8 @@ import {
   Share2, 
   Copy, 
   Check, 
-  HeartHandshake
+  HeartHandshake,
+  Send
 } from 'lucide-react';
 import { GRATITUDE_PHRASES } from '../data/blessings';
 import { audioEngine } from '../utils/audioEngine';
@@ -24,7 +25,7 @@ export default function GratitudeInteractions({
   onDownloadImage,
   onShare,
   onOpenShareApp,
-  dailyCount,
+  onOpenPublishModal,
   lang = 'ar'
 }) {
   const [comfortPhrase, setComfortPhrase] = useState('');
@@ -159,6 +160,19 @@ export default function GratitudeInteractions({
           <span>{t.shareBtn}</span>
         </button>
       </div>
+
+      {/* Community Publish Button (انشر نِعمة على نِعْمَة) */}
+      <button
+        type="button"
+        id="btn-publish-blessing-trigger"
+        className="btn-publish-blessing-trigger"
+        onClick={onOpenPublishModal}
+        title={lang === 'ar' ? 'انشر نِعمة استشعرتها مع جميع زوار المنصة لتُؤجر على تذكيرهم' : 'Publish a blessing to all visitors worldwide'}
+      >
+        <Send size={16} style={{ transform: lang === 'ar' ? 'scaleX(-1)' : 'none' }} />
+        <span>{lang === 'ar' ? 'انشر نِعمة على نِعْمَة' : 'Publish a Blessing on NEMAA'}</span>
+        <Sparkles size={15} color="var(--color-gold)" />
+      </button>
 
       {/* Dedicated Spiritual Share Button (شَارِكْ تُؤْجَرْ — صَدَقَةٌ جَارِيَةٌ) */}
       <button

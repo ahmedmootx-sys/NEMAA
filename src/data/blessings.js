@@ -5,6 +5,7 @@
 
 export const CATEGORIES = [
   { id: 'all', label: 'كافة النعم', icon: null, count: 0 },
+  { id: 'shared', label: 'نعم متشارَكة', icon: null, count: 0 },
   { id: 'hidden', label: 'نعم باطنة وخفية', icon: null, count: 0 },
   { id: 'body', label: 'الصحة والجسد', icon: null, count: 0 },
   { id: 'spiritual', label: 'نعم إيمانية وروحية', icon: null, count: 0 },

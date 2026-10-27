@@ -17,6 +17,11 @@ if (fs.existsSync(indexPath)) {
   if (!html.includes('/src/main.jsx')) {
     html = html.replace('</head>', '    <script type="module" src="/src/main.jsx"></script>\n  </head>');
   }
+  // Reset hashed brand icon links back to canonical ./brand/ paths
+  html = html.replace(/(\.\/)?assets\/icon-192-.*?\.png/g, './brand/icon-192.png');
+  html = html.replace(/(\.\/)?assets\/icon-512-.*?\.png/g, './brand/icon-512.png');
+  html = html.replace(/(\.\/)?assets\/logo-calligraphy-.*?\.jpg/g, './brand/logo-calligraphy.jpg');
+
   fs.writeFileSync(indexPath, html, 'utf8');
-  console.log('✅ Prepared index.html with /src/main.jsx entry');
+  console.log('✅ Prepared index.html with /src/main.jsx entry and clean brand assets');
 }

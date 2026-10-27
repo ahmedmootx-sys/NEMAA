@@ -1,6 +1,7 @@
 import React from 'react';
 import { 
   Layers, 
+  Globe,
   ShieldCheck, 
   Activity, 
   Compass, 
@@ -10,6 +11,7 @@ import {
 
 const CATEGORY_ICONS = {
   all: Layers,
+  shared: Globe,
   hidden: ShieldCheck,
   body: Activity,
   spiritual: Compass,

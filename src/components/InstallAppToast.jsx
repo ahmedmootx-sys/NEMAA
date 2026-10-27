@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X, Smartphone, Check } from 'lucide-react';
+import { X, Smartphone, Check } from 'lucide-react';
 
 export default function InstallAppToast({ deferredPrompt }) {
   const [isVisible, setIsVisible] = useState(false);

@@ -11,7 +11,8 @@ import {
   VolumeX,
   Maximize2,
   HeartHandshake,
-  PenTool
+  PenTool,
+  Globe
 } from 'lucide-react';
 import { subscribeToVoiceChanges, speakArabic, stopSpeaking } from '../utils/speechHelper';
 import { getBlessingGratitudeDua } from '../utils/duaHelper';
@@ -123,6 +124,13 @@ export default function BlessingCard({
             {blessing.isCustom && (
               <span className="card-custom-badge">
                 {t.customBadge}
+              </span>
+            )}
+
+            {blessing.isShared && (
+              <span className="card-shared-badge" title={lang === 'ar' ? 'نعمة متشارَكة مع مجتمع نِعْمَة' : 'Shared community blessing'}>
+                <Globe size={11} />
+                <span>{lang === 'ar' ? 'متشارَكة' : 'Community'}</span>
               </span>
             )}
 

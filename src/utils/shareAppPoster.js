@@ -166,13 +166,13 @@ export async function generateShareAppPoster() {
   ctx.fillText('— رَوَاهُ مُسْلِمٌ فِي صَحِيحِهِ', 540, hadithBoxY + 104);
 
   // 6. Platform Title & Invitation
-  ctx.font = 'bold 52px "Aref Ruqaa", "Amiri", serif';
+  ctx.font = 'bold 50px "Cairo", "Tajawal", sans-serif';
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText('مَنَصَّةُ نِعْمَة الإِسْلَامِيَّة', 540, 830);
+  ctx.fillText('مَنَصَّةُ نِعْمَة', 540, 830);
 
-  ctx.font = 'bold 28px "Aref Ruqaa", "Amiri", serif';
+  ctx.font = '600 26px "Cairo", "Tajawal", sans-serif';
   ctx.fillStyle = '#D4AF37';
-  ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', 540, 888);
+  ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', 540, 882);
 
   // Spiritual Narrative
   ctx.font = '500 27px "Cairo", sans-serif';
