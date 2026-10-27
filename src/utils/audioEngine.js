@@ -53,64 +53,81 @@ class SpiritualAudioEngine {
     this.currentTrack = null;
   }
 
-  // Play deeply serene, warm spiritual chime when clicking "الحمد لله"
+  // Play serene organic wooden tasbeeh bead click (100% non-musical spiritual dhikr sound)
   playGratitudeChime() {
     this.init();
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
-    // Serene, grounding spiritual frequencies in Hz (432Hz healing harmonic scale: D4, E4, G4, A4)
-    const spiritualNotes = [288.0, 324.0, 384.0, 432.0];
-    const baseFreq = spiritualNotes[Math.floor(Math.random() * spiritualNotes.length)];
 
-    // 1. Warm fundamental tone (pure, deep sine)
-    const oscRoot = this.ctx.createOscillator();
-    const gainRoot = this.ctx.createGain();
-    oscRoot.type = 'sine';
-    oscRoot.frequency.setValueAtTime(baseFreq, now);
+    // 1. Tactile Wooden Bead Impact Transient (Organic resonant wood knock, zero musical notes)
+    const bufferSize = Math.floor(this.ctx.sampleRate * 0.05); // 50ms burst
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.007));
+    }
 
-    // 2. Harmonic overtone (perfect fifth for spiritual harmony)
-    const oscFifth = this.ctx.createOscillator();
-    const gainFifth = this.ctx.createGain();
-    oscFifth.type = 'sine';
-    oscFifth.frequency.setValueAtTime(baseFreq * 1.5, now);
+    const noiseSource = this.ctx.createBufferSource();
+    noiseSource.buffer = noiseBuffer;
 
-    // 3. Warm meditative undertone (chest resonance, gentle grounding)
-    const oscSub = this.ctx.createOscillator();
-    const gainSub = this.ctx.createGain();
-    oscSub.type = 'sine';
-    oscSub.frequency.setValueAtTime(baseFreq * 0.5, now);
+    // Resonant bandpass filter modeling solid olive wood contact
+    const woodFilter = this.ctx.createBiquadFilter();
+    woodFilter.type = 'bandpass';
+    woodFilter.frequency.setValueAtTime(720 + (Math.random() * 30 - 15), now);
+    woodFilter.Q.setValueAtTime(4.2, now);
 
-    // Gentle, peaceful envelope: soft attack, long soothing decay (2.5 seconds)
-    gainRoot.gain.setValueAtTime(0, now);
-    gainRoot.gain.linearRampToValueAtTime(0.22, now + 0.08);
-    gainRoot.gain.exponentialRampToValueAtTime(0.0001, now + 2.5);
+    const woodGain = this.ctx.createGain();
+    woodGain.gain.setValueAtTime(0.28, now);
+    woodGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
 
-    gainFifth.gain.setValueAtTime(0, now);
-    gainFifth.gain.linearRampToValueAtTime(0.09, now + 0.12);
-    gainFifth.gain.exponentialRampToValueAtTime(0.0001, now + 2.0);
+    noiseSource.connect(woodFilter);
+    woodFilter.connect(woodGain);
+    woodGain.connect(this.masterGain);
+    noiseSource.start(now);
 
-    gainSub.gain.setValueAtTime(0, now);
-    gainSub.gain.linearRampToValueAtTime(0.12, now + 0.06);
-    gainSub.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
+    // 2. Physical mass knock (tactile micro-body of the bead, decaying in 35ms)
+    const oscBody = this.ctx.createOscillator();
+    const gainBody = this.ctx.createGain();
+    oscBody.type = 'triangle';
+    oscBody.frequency.setValueAtTime(135, now);
+    oscBody.frequency.exponentialRampToValueAtTime(50, now + 0.035);
 
-    // Connect nodes
-    oscRoot.connect(gainRoot);
-    oscFifth.connect(gainFifth);
-    oscSub.connect(gainSub);
+    gainBody.gain.setValueAtTime(0.22, now);
+    gainBody.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
 
-    gainRoot.connect(this.masterGain);
-    gainFifth.connect(this.masterGain);
-    gainSub.connect(this.masterGain);
+    oscBody.connect(gainBody);
+    gainBody.connect(this.masterGain);
+    oscBody.start(now);
+    oscBody.stop(now + 0.055);
 
-    // Start & Stop with graceful tail
-    oscRoot.start(now);
-    oscFifth.start(now);
-    oscSub.start(now);
+    // 3. Gentle breath of serenity (very soft, quiet air whisper of relief and peace)
+    const airSize = Math.floor(this.ctx.sampleRate * 0.22);
+    const airBuffer = this.ctx.createBuffer(1, airSize, this.ctx.sampleRate);
+    const airData = airBuffer.getChannelData(0);
+    let lastOut = 0.0;
+    for (let i = 0; i < airSize; i++) {
+      const white = Math.random() * 2 - 1;
+      lastOut = (lastOut + 0.02 * white) / 1.02;
+      airData[i] = lastOut;
+    }
 
-    oscRoot.stop(now + 2.6);
-    oscFifth.stop(now + 2.6);
-    oscSub.stop(now + 2.6);
+    const airSource = this.ctx.createBufferSource();
+    airSource.buffer = airBuffer;
+
+    const airFilter = this.ctx.createBiquadFilter();
+    airFilter.type = 'lowpass';
+    airFilter.frequency.setValueAtTime(360, now);
+
+    const airGain = this.ctx.createGain();
+    airGain.gain.setValueAtTime(0, now);
+    airGain.gain.linearRampToValueAtTime(0.06, now + 0.03);
+    airGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
+    airSource.connect(airFilter);
+    airFilter.connect(airGain);
+    airGain.connect(this.masterGain);
+    airSource.start(now);
   }
 
   // Start selected ambient soundscape

@@ -1271,6 +1271,14 @@ html, body {
   }
 }
 
+.guide-modal-content {
+  background: var(--surface-card) !important;
+  border: 1.5px solid var(--border-gold) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), 0 0 35px rgba(212, 175, 55, 0.2) !important;
+  color: var(--text-main);
+}
+
 .modal-header {
   display: flex;
   align-items: center;

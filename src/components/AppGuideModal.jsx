@@ -34,7 +34,7 @@ export default function AppGuideModal({
     {
       icon: <Sparkles size={22} color="var(--color-gold)" />,
       title: 'زر «الحمد لله» وهالة السكينة',
-      desc: 'الزر الأساسي في المنصة؛ عند الضغط عليه بعد تدبّر النعمة يفيض نبض نوراني ذهبي دافئ مع رنين روحي هادئ يزيدك خشوعاً، ويوثق الحمد في عداد امتنانك اليومي.'
+      desc: 'الزر الأساسي في المنصة؛ عند الضغط عليه بعد تدبّر النعمة يفيض نبض نوراني ذهبي دافئ مع نقرة خشبية وقورة لخرزة المسبحة ونفحة سكينة تزيدك خشوعاً دون أي آلات موسيقية.'
     },
     {
       icon: <RefreshCw size={20} color="var(--color-primary)" />,
@@ -72,11 +72,6 @@ export default function AppGuideModal({
       desc: 'توليد بوستر دعوي فخم بالخط العربي المعتمد ورابط المنصة ورمز الباركود؛ لمشاركته في حالات واتساب ونيل أجر الدال على الخير كفاعله.'
     },
     {
-      icon: <Headphones size={20} color="var(--color-primary)" />,
-      title: 'أصوات الطبيعة والسكينة في الخلفية',
-      desc: 'ودجت جانبي يتيح لك الاستماع لأصوات طبيعية هادئة مولّدة صوتياً (صوت المطر الناعم، نسيم الرياح، أو ذبذبات السكينة 432Hz) لتهدئة النفس.'
-    },
-    {
       icon: <HeartHandshake size={20} color="#E53E3E" />,
       title: 'مفكرة الامتنان وقائمة المفضلة',
       desc: 'مفكرة لتدوين 3 نعم شكرت الله عليها اليوم مع أرشيف أسبوعي، بالإضافة لخاصية حفظ النعم المحببة إلى قلبك في قائمة المفضلة للرجوع إليها.'
@@ -91,7 +86,7 @@ export default function AppGuideModal({
       items: [
         '✨ تكامل Supabase العالمي: إمكانية نشر وتشارك النعم بين جميع زوار المنصة وتحديثها لحظياً (Realtime).',
         '🗑️ إمكانية حذف النعمة المنشورة: يملك ناشر النعمة خيار حذفها من النشر العام في أي وقت بكل سهولة.',
-        '🕊️ هالة السكينة ونور الحمد: استبدال القصاصات بهالة نور ذهبية صاعدة مع رنين روحي عميق يبعث الطمأنينة في القلب.',
+        '🕊️ هالة السكينة ونور الحمد: استبدال القصاصات بهالة نور ذهبية ونقر تسبيحة وقورة غير موسيقية تبعث الطمأنينة والخشوع في القلب.',
         '🛡️ فحص جودة الكلام والأدب: نظام ذكي يمنع الألفاظ البذيئة والنصوص غير المفهومة، مع إتاحة تسمية النعمة بكلمة واحدة مفهومة.',
         '🎨 تحسين مقاس المنشور المربع (1:1): تكبير خط الرقعة وضبط تباعد النصوص والشاهد لسهولة القراءة التامة بدون أي تداخل.',
         '🧭 دليل التطبيق التفاعلي: جولة النقطة المضيئة (Spotlight) ودليل الأزرار الشامل عند فتح التطبيق لأول مرة.'
@@ -113,21 +108,31 @@ export default function AppGuideModal({
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div 
-        className="modal-card guide-modal-card" 
+        className="modal-content guide-modal-content" 
         onClick={e => e.stopPropagation()}
-        style={{ maxWidth: '640px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}
+        style={{ 
+          maxWidth: '680px', 
+          maxHeight: '90vh', 
+          display: 'flex', 
+          flexDirection: 'column',
+          padding: 0,
+          background: 'var(--surface-card)',
+          border: '1.5px solid var(--border-gold)',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.65), 0 0 30px rgba(212, 175, 55, 0.15)',
+          overflow: 'hidden'
+        }}
       >
         {/* Modal Header */}
-        <div className="modal-header" style={{ paddingBottom: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.12)', border: '1px solid var(--border-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Compass size={20} color="var(--color-gold)" />
+        <div className="modal-header" style={{ padding: '20px 24px 16px', margin: 0, borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-card)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '42px', height: '42px', borderRadius: '14px', background: 'rgba(212, 175, 55, 0.14)', border: '1px solid var(--border-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Compass size={22} color="var(--color-gold)" />
             </div>
             <div>
-              <h2 style={{ fontSize: '19px', fontFamily: 'var(--font-arabic-title)', margin: 0 }}>
+              <h2 style={{ fontSize: '20px', fontFamily: 'var(--font-arabic-title)', margin: 0, color: 'var(--text-title)' }}>
                 {lang === 'ar' ? 'دليل منصة نِعْمَة والتحديثات' : 'NEMAA Guide & Updates'}
               </h2>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '3px 0 0' }}>
                 {lang === 'ar' ? 'تعرّف على كافة أزرار التطبيق وميزاته الجديدة' : 'Explore app buttons and recent updates'}
               </p>
             </div>
@@ -135,11 +140,12 @@ export default function AppGuideModal({
 
           <button 
             type="button" 
-            className="modal-close-btn" 
+            className="btn-icon" 
             onClick={onClose}
             aria-label="إغلاق"
+            style={{ width: '36px', height: '36px' }}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 

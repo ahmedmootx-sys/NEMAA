@@ -21,7 +21,7 @@ const CATEGORY_ICONS = {
 
 export default function CategoryFilter({ categories, activeCategory, onSelectCategory }) {
   return (
-    <div className="category-filter-bar" role="tablist" aria-label="تصنيفات النعم">
+    <div id="category-filter-bar" className="category-filter-bar" role="tablist" aria-label="تصنيفات النعم">
       {categories.map((cat) => {
         const isActive = activeCategory === cat.id;
         const IconComponent = CATEGORY_ICONS[cat.id] || Layers;

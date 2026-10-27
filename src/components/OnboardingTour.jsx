@@ -5,104 +5,123 @@ export const TOUR_STEPS = [
   {
     targetId: 'blessing-card-exportable',
     title: 'بطاقة النعمة والتدبّر اليومي',
-    description: 'كل بطاقة تعرض نعمة من نعم الله الباطنة والظاهرة مع تأمل يلامس القلب وشواهد موثقة من القرآن الكريم والحديث الشريف لترسيخ الحمد والامتنان.',
-    position: 'bottom'
+    description: 'كل بطاقة تعرض نعمة من نعم الله الباطنة والظاهرة مع تأمل يلامس القلب وشواهد موثقة من القرآن الكريم والحديث الشريف لترسيخ الحمد والامتنان.'
   },
   {
     targetId: 'btn-alhamdulillah-main',
-    title: 'زر الحمد لله ونور السكينة',
-    description: 'اضغط لترطيب لسانك بحمد الله عند تدبّر النعمة؛ يفيض حول الزر نبض نوراني دافئ مع رنين روحي هادئ يزيدك طمأنينة ويُحصي ذكرك في عداد الامتنان اليومي.',
-    position: 'top'
+    title: 'زر «الحمد لله» وهالة السكينة',
+    description: 'اضغط لترطيب لسانك بحمد الله عند تدبّر النعمة؛ يفيض حول الزر نبض نوراني دافئ مع نقر تسبيحة وقورة يدخل الطمأنينة ويُحصي ذكرك في عداد الامتنان اليومي.'
   },
   {
     targetSelector: '.navigation-bar',
     title: 'التنقل واستكشاف النعم',
-    description: 'تنقّل بين النعم بالأسهم السابقة والتالية، أو اضغط زر «نعمة جديدة» لتتدبّر نعمة عشوائية ملهمة (أو اضغط زر المسافة Spacebar في لوحة المفاتيح).',
-    position: 'top'
+    description: 'تنقّل بين النعم بالأسهم السابقة والتالية، أو اضغط زر «نعمة جديدة» لتتدبّر نعمة عشوائية ملهمة (أو اضغط زر المسافة Spacebar في لوحة المفاتيح).'
   },
   {
     targetSelector: '.card-header-actions',
     title: 'أدوات التحكم وتخصيص النعمة',
-    description: 'أعلى كل بطاقة تجد أدوات متعددة: صياغة النعمة بكلامك الخاص وتعديلها، وضع الخلوة والتدبر الصامت، الاستماع الصوتي للنعمة، نسخ النص، وحفظ النعمة في مفضلتك.',
-    position: 'bottom'
+    description: 'أعلى كل بطاقة تجد أدوات متعددة: صياغة النعمة بكلامك الخاص وتعديلها، وضع الخلوة والتدبر الصامت، الاستماع الصوتي للنعمة، نسخ النص، وحفظ النعمة في مفضلتك.'
   },
   {
-    targetSelector: '.category-filter-scroll',
+    targetSelector: '#category-filter-bar, .category-filter-bar',
     title: 'أبواب النعم والنعم المتشاركة',
-    description: 'صنّف النعم حسب أبوابها (باطنة، ظاهرة، حواس، قلبية، إيمانية) مع تبويب «نعم متشارَكة» الذي يجمع ما شاركه المتدبرون في مجتمع نِعْمَة.',
-    position: 'bottom'
+    description: 'صنّف النعم حسب أبوابها (باطنة، ظاهرة، حواس، قلبية، إيمانية) مع تبويب «نعم متشارَكة» الذي يجمع ما شاركه المتدبرون في مجتمع نِعْمَة.'
   },
   {
-    targetId: 'btn-open-publish-modal',
+    targetId: 'btn-publish-blessing-trigger',
     title: 'انشر نعمة وشارك الأجر',
-    description: 'اكتب نعمة من فضل الله عليك وشاركها مع سائر المسلمين لتظهر للجميع فوراً وتكون لك صدقة جارية وينال ثوابها كل من قرأها وحمد الله عليها.',
-    position: 'top'
+    description: 'اكتب نعمة من فضل الله عليك وشاركها مع سائر المسلمين لتظهر للجميع فوراً وتكون لك صدقة جارية وينال ثوابها كل من قرأها وحمد الله عليها.'
   },
   {
-    targetId: 'btn-share-app-trigger',
+    targetId: 'btn-share-to-reward-main',
     title: 'بوستر «شَارِكْ تُؤْجَرْ»',
-    description: 'أنشئ بوستر فخم ومزخرف بالخط العربي ورمز الباركود لنشر التطبيق في حالات واتساب ومواقع التواصل لنيل أجر الدال على الخير.',
-    position: 'top'
-  },
-  {
-    targetId: 'btn-ambient-sound',
-    title: 'أصوات السكينة والخلوة',
-    description: 'شغّل أصوات الطبيعة الروحية الهادئة في الخلفية (صوت المطر الرقيق، نسيم الهواء، أو تغريد الفجر) لصفاء الذهن واستحضار الخشوع أثناء الشكر.',
-    position: 'bottom'
+    description: 'أنشئ بوستر فخم ومزخرف بالخط العربي ورمز الباركود لنشر التطبيق في حالات واتساب ومواقع التواصل لنيل أجر الدال على الخير.'
   }
 ];
 
 export default function OnboardingTour({ isOpen, onClose, onComplete }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState(null);
-  const resizeObserverRef = useRef(null);
+  const rafIdRef = useRef(null);
+  const scrollTimeoutRef = useRef(null);
 
   const step = TOUR_STEPS[currentStepIndex];
 
-  // Update target element coordinates
+  // Helper to find step element in DOM
+  const findTarget = () => {
+    if (!step) return null;
+    let el = null;
+    if (step.targetId) {
+      el = document.getElementById(step.targetId);
+    }
+    if (!el && step.targetSelector) {
+      el = document.querySelector(step.targetSelector);
+    }
+    return el;
+  };
+
+  // 1. Smooth scroll ONCE on step change (never in scroll handler to prevent infinite loops / lag!)
   useEffect(() => {
     if (!isOpen || !step) return;
 
-    const findTarget = () => {
-      let el = null;
-      if (step.targetId) {
-        el = document.getElementById(step.targetId);
-      } else if (step.targetSelector) {
-        el = document.querySelector(step.targetSelector);
-      }
-      return el;
-    };
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
 
-    const updatePosition = () => {
+    scrollTimeoutRef.current = setTimeout(() => {
       const el = findTarget();
       if (el) {
-        // Scroll into view smoothly if not fully visible
         const rect = el.getBoundingClientRect();
-        if (rect.top < 60 || rect.bottom > window.innerHeight - 60) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const isInView = rect.top >= 50 && rect.bottom <= window.innerHeight - 50;
+        
+        // Scroll into view if not comfortably visible
+        if (!isInView) {
+          try {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } catch {
+            // fallback
+          }
         }
-        setTargetRect(el.getBoundingClientRect());
+
+        // Measure after scroll has begun/settled
+        setTimeout(() => {
+          if (el) {
+            setTargetRect(el.getBoundingClientRect());
+          }
+        }, 180);
       } else {
-        // If element not rendered in current view, fallback to center
         setTargetRect(null);
       }
-    };
-
-    // Initial query
-    updatePosition();
-    const timer = setTimeout(updatePosition, 300);
-
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
+    }, 60);
 
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
-  }, [isOpen, currentStepIndex, step]);
+  }, [isOpen, currentStepIndex]);
 
-  if (!isOpen) return null;
+  // 2. Passive position updater for resize and manual scroll (throttled with RAF)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePassiveUpdate = () => {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = requestAnimationFrame(() => {
+        const el = findTarget();
+        if (el) {
+          setTargetRect(el.getBoundingClientRect());
+        }
+      });
+    };
+
+    window.addEventListener('resize', handlePassiveUpdate, { passive: true });
+    window.addEventListener('scroll', handlePassiveUpdate, { passive: true });
+
+    return () => {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      window.removeEventListener('resize', handlePassiveUpdate);
+      window.removeEventListener('scroll', handlePassiveUpdate);
+    };
+  }, [isOpen, currentStepIndex]);
+
+  if (!isOpen || !step) return null;
 
   const handleNext = () => {
     if (currentStepIndex < TOUR_STEPS.length - 1) {
@@ -126,48 +145,36 @@ export default function OnboardingTour({ isOpen, onClose, onComplete }) {
     if (onClose) onClose();
   };
 
-  // Calculate tooltip position relative to target
-  let tooltipStyle = {};
-  if (targetRect) {
-    const isMobile = window.innerWidth <= 600;
-    const padding = 14;
-    const tooltipWidth = isMobile ? Math.min(window.innerWidth - 32, 340) : 380;
-    
-    // Calculate vertical placement
-    const spaceBelow = window.innerHeight - targetRect.bottom;
-    const spaceAbove = targetRect.top;
-    const placeBelow = spaceBelow > 220 || spaceBelow > spaceAbove;
+  // Determine smart card positioning:
+  // If target element is in the bottom half of the screen, place the card at the TOP.
+  // If target element is in the top half of the screen, place the card at the BOTTOM.
+  // This guarantees the card NEVER covers the target and buttons NEVER get pushed off-screen!
+  const isTargetInBottomHalf = targetRect 
+    ? (targetRect.top + targetRect.height / 2 > window.innerHeight * 0.44) 
+    : false;
 
-    let top = placeBelow 
-      ? targetRect.bottom + padding 
-      : Math.max(16, targetRect.top - 200 - padding);
-
-    // Keep horizontally within screen
-    let left = targetRect.left + (targetRect.width / 2) - (tooltipWidth / 2);
-    left = Math.max(16, Math.min(window.innerWidth - tooltipWidth - 16, left));
-
-    tooltipStyle = {
-      position: 'fixed',
-      top: `${top}px`,
-      left: `${left}px`,
-      width: `${tooltipWidth}px`,
-      zIndex: 10001
-    };
-  } else {
-    // Center modal fallback
-    tooltipStyle = {
-      position: 'fixed',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      width: 'min(90vw, 400px)',
-      zIndex: 10001
-    };
-  }
+  const cardPositionStyle = targetRect
+    ? {
+        position: 'fixed',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'min(calc(100vw - 28px), 480px)',
+        top: isTargetInBottomHalf ? '18px' : 'auto',
+        bottom: isTargetInBottomHalf ? 'auto' : '18px',
+        zIndex: 10002
+      }
+    : {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 'min(calc(100vw - 28px), 460px)',
+        zIndex: 10002
+      };
 
   return (
     <div className="onboarding-tour-root" role="dialog" aria-modal="true">
-      {/* Dark Dim Backdrop with SVG Cutout or Box Shadow Spotlight */}
+      {/* Dark Dim Backdrop with Gold Spotlight around the target */}
       {targetRect ? (
         <div 
           className="spotlight-highlight-box"
@@ -178,11 +185,11 @@ export default function OnboardingTour({ isOpen, onClose, onComplete }) {
             width: `${targetRect.width + 16}px`,
             height: `${targetRect.height + 16}px`,
             borderRadius: '18px',
-            boxShadow: '0 0 0 9999px rgba(5, 14, 10, 0.78), 0 0 25px rgba(212, 175, 55, 0.65)',
-            border: '2px solid var(--color-gold)',
+            boxShadow: '0 0 0 9999px rgba(5, 14, 10, 0.82), 0 0 25px rgba(212, 175, 55, 0.7)',
+            border: '2px solid var(--color-gold, #D4AF37)',
             pointerEvents: 'none',
             zIndex: 10000,
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+            transition: 'top 0.25s ease-out, left 0.25s ease-out, width 0.25s ease-out, height 0.25s ease-out'
           }}
         />
       ) : (
@@ -191,30 +198,33 @@ export default function OnboardingTour({ isOpen, onClose, onComplete }) {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(5, 14, 10, 0.78)',
+            background: 'rgba(5, 14, 10, 0.82)',
             zIndex: 10000
           }}
         />
       )}
 
-      {/* Floating Explanatory Tooltip Card */}
+      {/* Floating Explanatory Tour Card */}
       <div 
         className="tour-tooltip-card"
         style={{
-          ...tooltipStyle,
-          background: 'var(--surface-card)',
-          border: '1.5px solid var(--border-gold)',
-          borderRadius: '20px',
-          padding: '22px 20px',
-          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(212, 175, 55, 0.25)',
-          color: 'var(--text-main)',
-          direction: 'rtl'
+          ...cardPositionStyle,
+          background: 'var(--surface-card, #FFFFFF)',
+          border: '2px solid var(--border-gold, #D4AF37)',
+          borderRadius: '22px',
+          padding: '20px',
+          boxShadow: '0 18px 50px rgba(0, 0, 0, 0.65), 0 0 35px rgba(212, 175, 55, 0.25)',
+          color: 'var(--text-main, #2D3748)',
+          direction: 'rtl',
+          maxHeight: '48vh',
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
-        {/* Header: Step counter & close button */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: 'var(--color-gold)', background: 'rgba(212, 175, 55, 0.12)', padding: '3px 10px', borderRadius: '9999px' }}>
-            <Compass size={13} />
+        {/* Header: Step Badge & Close button */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800', color: '#B78A1E', background: 'rgba(212, 175, 55, 0.16)', padding: '4px 12px', borderRadius: '9999px', border: '1px solid rgba(212, 175, 55, 0.3)' }}>
+            <Compass size={14} color="#B78A1E" />
             <span>خطوة {currentStepIndex + 1} من {TOUR_STEPS.length}</span>
           </div>
 
@@ -222,45 +232,48 @@ export default function OnboardingTour({ isOpen, onClose, onComplete }) {
             type="button"
             onClick={handleFinish}
             title="تخطي الجولة"
+            aria-label="تخطي الجولة"
             style={{
-              background: 'transparent',
+              background: 'rgba(0, 0, 0, 0.05)',
               border: 'none',
-              color: 'var(--text-muted)',
+              color: 'var(--text-muted, #718096)',
               cursor: 'pointer',
-              padding: '4px',
+              padding: '6px',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px'
             }}
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Title */}
-        <h3 style={{ fontFamily: 'var(--font-arabic-title)', fontSize: '20px', color: 'var(--text-title)', marginBottom: '8px' }}>
-          {step.title}
-        </h3>
+        {/* Content Body */}
+        <div style={{ flex: 1, overflowY: 'auto', marginBottom: '16px' }}>
+          <h3 style={{ fontFamily: 'var(--font-arabic-title, "Aref Ruqaa", serif)', fontSize: '20px', fontWeight: 700, color: 'var(--color-primary, #2C4A3E)', margin: '0 0 6px 0' }}>
+            {step.title}
+          </h3>
+          <p style={{ fontSize: '13.5px', lineHeight: '1.7', color: 'var(--text-main, #2D3748)', margin: 0, opacity: 0.95 }}>
+            {step.description}
+          </p>
+        </div>
 
-        {/* Description */}
-        <p style={{ fontSize: '14px', lineHeight: '1.7', color: 'var(--text-main)', marginBottom: '18px', opacity: 0.9 }}>
-          {step.description}
-        </p>
-
-        {/* Controls: Prev, Next, Skip */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+        {/* Controls: Skip, Prev, Next */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-subtle, rgba(0,0,0,0.08))' }}>
           <button
             type="button"
             onClick={handleFinish}
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'var(--text-muted)',
+              color: 'var(--text-muted, #718096)',
               fontSize: '13px',
               fontWeight: '600',
               cursor: 'pointer',
-              padding: '6px 10px'
+              padding: '8px 10px'
             }}
           >
             تخطي الشرح
@@ -272,12 +285,12 @@ export default function OnboardingTour({ isOpen, onClose, onComplete }) {
                 type="button"
                 onClick={handlePrev}
                 style={{
-                  background: 'var(--surface-hover)',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-main)',
-                  padding: '7px 14px',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: '13px',
+                  background: 'var(--surface-sunken, #F7FAFC)',
+                  border: '1px solid var(--border-subtle, #E2E8F0)',
+                  color: 'var(--text-main, #2D3748)',
+                  padding: '8px 16px',
+                  borderRadius: '9999px',
+                  fontSize: '13.5px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'inline-flex',
@@ -290,26 +303,34 @@ export default function OnboardingTour({ isOpen, onClose, onComplete }) {
               </button>
             )}
 
+            {/* Next Button - Ultra Clear, Solid High-Contrast Styling */}
             <button
               type="button"
               onClick={handleNext}
               style={{
-                background: 'var(--gradient-primary)',
-                border: '1px solid var(--color-gold)',
+                background: 'linear-gradient(135deg, #1A382B 0%, #2C4A3E 60%, #15261F 100%)',
+                border: '1.5px solid #D4AF37',
                 color: '#FFFFFF',
-                padding: '7px 18px',
-                borderRadius: 'var(--radius-full)',
-                fontSize: '13.5px',
-                fontWeight: '700',
+                padding: '9px 22px',
+                borderRadius: '9999px',
+                fontSize: '14px',
+                fontWeight: '800',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
-                boxShadow: '0 4px 14px rgba(212, 175, 55, 0.3)'
+                gap: '6px',
+                boxShadow: '0 4px 16px rgba(212, 175, 55, 0.45)',
+                fontFamily: 'var(--font-arabic-body, "Cairo", sans-serif)'
               }}
             >
-              <span>{currentStepIndex === TOUR_STEPS.length - 1 ? 'إنهاء وفهمت' : 'التالي'}</span>
-              {currentStepIndex === TOUR_STEPS.length - 1 ? <Check size={15} /> : <ChevronLeft size={15} />}
+              <span style={{ color: '#FFFFFF', fontWeight: '800' }}>
+                {currentStepIndex === TOUR_STEPS.length - 1 ? 'إنهاء وفهمت' : 'التالي'}
+              </span>
+              {currentStepIndex === TOUR_STEPS.length - 1 ? (
+                <Check size={16} color="#FFFFFF" strokeWidth={2.5} />
+              ) : (
+                <ChevronLeft size={16} color="#FFFFFF" strokeWidth={2.5} />
+              )}
             </button>
           </div>
         </div>

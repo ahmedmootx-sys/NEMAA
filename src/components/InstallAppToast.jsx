@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { X, Smartphone, Check } from 'lucide-react';
 
-export default function InstallAppToast({ deferredPrompt }) {
+export default function InstallAppToast({ deferredPrompt, canShow = false }) {
   const [isVisible, setIsVisible] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
+    if (!canShow) {
+      setIsVisible(false);
+      return;
+    }
+
     // Check if already in standalone / installed PWA mode
     const isStandalone = typeof window !== 'undefined' && (
       window.matchMedia('(display-mode: standalone)').matches ||
@@ -24,13 +29,13 @@ export default function InstallAppToast({ deferredPrompt }) {
       return;
     }
 
-    // Gentle delay after page mount before displaying
+    // Gentle delay after being allowed before displaying
     const timer = setTimeout(() => {
       setIsVisible(true);
-    }, 1800);
+    }, 1500);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [canShow]);
 
   const handleDismiss = () => {
     setIsVisible(false);

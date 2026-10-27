@@ -63,20 +63,68 @@ export default function App() {
     }
   });
 
-  // Automatically start tour for first-time visitors
+  const [hasLanguageChosen, setHasLanguageChosen] = useState(() => {
+    return Boolean(localStorage.getItem('nemaa_lang'));
+  });
+
+  const [tourCompleted, setTourCompleted] = useState(() => {
+    return Boolean(localStorage.getItem('nemaa_tour_seen'));
+  });
+
+  // Automatically start tour for first-time visitors who already have language selected
   useEffect(() => {
+    const hasLang = localStorage.getItem('nemaa_lang');
     const hasSeenTour = localStorage.getItem('nemaa_tour_seen');
-    if (!hasSeenTour) {
+    if (hasLang && !hasSeenTour) {
       const timer = setTimeout(() => {
         setIsTourOpen(true);
-      }, 1400);
+      }, 1000);
       return () => clearTimeout(timer);
     }
+  }, []);
+
+  // Purge legacy dummy test blessings from local storage
+  useEffect(() => {
+    try {
+      const purgeLegacy = (key) => {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const filtered = list.filter(b => b && b.title !== 'نعمة السكينة وحسن الظن بالله');
+            if (filtered.length !== list.length) {
+              localStorage.setItem(key, JSON.stringify(filtered));
+            }
+            return filtered;
+          }
+        }
+        return null;
+      };
+
+      const cleanedCustom = purgeLegacy('nemaa_custom_blessings');
+      if (cleanedCustom) {
+        setCustomBlessings(cleanedCustom);
+      }
+
+      const cleanedShared = purgeLegacy('nemaa_shared_blessings_cache');
+      if (cleanedShared) {
+        setSharedBlessings(cleanedShared);
+      }
+    } catch {}
   }, []);
 
   const handleSelectLanguage = (newLang) => {
     setCurrentLang(newLang);
     localStorage.setItem('nemaa_lang', newLang);
+    setIsLanguageModalOpen(false);
+    setHasLanguageChosen(true);
+
+    // After language selection, if tour not seen yet, start tour gracefully
+    if (!localStorage.getItem('nemaa_tour_seen')) {
+      setTimeout(() => {
+        setIsTourOpen(true);
+      }, 700);
+    }
   };
 
   const handleToggleLanguage = () => {
@@ -792,12 +840,14 @@ export default function App() {
           try {
             localStorage.setItem('nemaa_tour_seen', 'true');
           } catch {}
+          setTourCompleted(true);
         }}
         onComplete={() => {
           setIsTourOpen(false);
           try {
             localStorage.setItem('nemaa_tour_seen', 'true');
           } catch {}
+          setTourCompleted(true);
         }}
       />
 
@@ -832,8 +882,11 @@ export default function App() {
         </div>
       )}
 
-      {/* Subtle PWA Install Notification Toast */}
-      <InstallAppToast deferredPrompt={deferredPrompt} />
+      {/* Subtle PWA Install Notification Toast (Appears strictly after language & onboarding tour) */}
+      <InstallAppToast 
+        deferredPrompt={deferredPrompt} 
+        canShow={hasLanguageChosen && tourCompleted && !isTourOpen && !isLanguageModalOpen} 
+      />
     </div>
   );
 }
