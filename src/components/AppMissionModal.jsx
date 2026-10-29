@@ -1,0 +1,209 @@
+import React from 'react';
+import { X, Sparkles, BookOpen, Heart, Check } from 'lucide-react';
+
+export default function AppMissionModal({ isOpen, onClose, lang = 'ar' }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div 
+        className="modal-content app-mission-modal-content"
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxWidth: '560px',
+          width: '92%',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'var(--surface-card)',
+          borderRadius: '24px',
+          border: '1.5px solid var(--border-gold)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Header with Spiritual Emblem */}
+        <div style={{
+          position: 'relative',
+          padding: '24px 24px 18px',
+          background: 'linear-gradient(135deg, rgba(212,175,55,0.12) 0%, rgba(44,74,62,0.06) 100%)',
+          borderBottom: '1px solid var(--border-subtle)',
+          textAlign: 'center'
+        }}>
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="modal-close-btn" 
+            aria-label="إغلاق"
+            style={{ position: 'absolute', top: '16px', left: lang === 'ar' ? '16px' : 'auto', right: lang === 'ar' ? 'auto' : '16px' }}
+          >
+            <X size={18} />
+          </button>
+
+          <div style={{
+            width: '52px',
+            height: '52px',
+            borderRadius: '50%',
+            background: 'var(--surface-card)',
+            border: '1.5px solid var(--color-gold)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 10px',
+            boxShadow: '0 4px 16px rgba(212,175,55,0.25)'
+          }}>
+            <Sparkles size={24} color="var(--color-gold)" />
+          </div>
+
+          <h3 style={{
+            margin: '0 0 4px',
+            fontSize: '20px',
+            fontWeight: '800',
+            color: 'var(--text-heading)',
+            fontFamily: 'var(--font-arabic-heading)'
+          }}>
+            {lang === 'ar' ? 'رِسَالَةُ وَهَدَفُ مَنَصَّةِ «نِعْمَة»' : 'The Mission & Vision of NEMAA'}
+          </h3>
+
+          <span style={{
+            fontSize: '13px',
+            fontWeight: '600',
+            color: 'var(--color-gold)',
+            display: 'inline-block'
+          }}>
+            « تَذَكَّرْ لِتَشْكُرْ »
+          </span>
+        </div>
+
+        {/* Message Body */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '24px',
+          fontSize: '15.5px',
+          lineHeight: '2.0',
+          color: 'var(--text-main)',
+          fontFamily: 'var(--font-arabic-body)',
+          textAlign: 'justify',
+          textJustify: 'inter-word'
+        }}>
+          {lang === 'ar' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <p style={{ margin: 0, fontWeight: '700', color: 'var(--color-primary)', fontSize: '17px', textAlign: 'center' }}>
+                السَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ،
+              </p>
+
+              <p style={{ margin: 0 }}>
+                نَحْنُ نَعِيشُ فِي كَنَفِ نِعَمٍ سَابِغَةٍ لَا تُحْصَى، لَكِنَّ طُولَ الِاعْتِيَادِ يُورِثُ الْغَفْلَةَ، فَنَنْسَى أَنْ نَسْتَشْعِرَ مَا بَيْنَ أَيْدِينَا، أَوْ نَغْفُلُ عَنِ التَّفَكُّرِ فِي أَلْطَافِ اللَّهِ حَتَّى نَأْلَفَهَا وَلَا نَرَاهَا..
+              </p>
+
+              <div style={{
+                background: 'var(--surface-sunken, rgba(44, 74, 62, 0.04))',
+                borderRight: '3.5px solid var(--color-gold)',
+                padding: '14px 18px',
+                borderRadius: '12px',
+                margin: '4px 0'
+              }}>
+                <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--text-heading)' }}>
+                  وَمِنْ هُنَا، بِفَضْلِ اللَّهِ وَتَوْفِيقِهِ، جَاءَتْ فِكْرَةُ تَطْبِيقِ «نِعْمَة»؛ لِيَكُونَ مَنَارَةً لِلتَّذْكِرَةِ، وَمَسَاحَةً لِتَأَمُّلِ الْقُلُوبِ وَيَقَظَتِهَا. أَوْدَعْنَا بَيْنَ يَدَيْكَ فِي الإِصْدَارِ الأَوَّلِ 200 نِعْمَةٍ مُخْتَارَةٍ لِتَكُونَ مُنْطَلَقاً لِإِيقَاظِ الْوَعْيِ وَتَجْدِيدِ الشُّكْرِ فِي حَيَاتِك..
+                </p>
+              </div>
+
+              <p style={{ margin: 0 }}>
+                وَكُلُّ نِعْمَةٍ إِضَافِيَّةٍ تَجِدُهَا هُنَا مُسْتَقْبَلاً، مَا هِيَ إِلَّا رِسَالَةُ خَيْرٍ وَشَهَادَةُ حَقٍّ كَتَبَهَا الْمُشَارِكُونَ مِنْ تَجَارِبِهِمْ وَتَأَمُّلَاتِهِمْ، لِيَكُونَ التَّطْبِيقُ مِشْكَاةً حَيَّةً نَتَذَكَّرُ فِيهَا جَمِيعاً فَضْلَ اللَّهِ.
+              </p>
+
+              <p style={{ margin: 0, fontWeight: '600', color: 'var(--color-primary)' }}>
+                فَاسْتَشْعِرْ مَا لَدَيْك، وَشَارِكْنَا نِعْمَةً لَمَسْتَ فَضْلَهَا لِتَكُونَ تذكرةً وَنُوراً لإخوانك.
+              </p>
+
+              <div style={{
+                textAlign: 'center',
+                margin: '8px 0 0',
+                padding: '10px',
+                background: 'rgba(212, 175, 55, 0.1)',
+                borderRadius: '14px',
+                border: '1px dashed var(--color-gold)'
+              }}>
+                <span style={{ fontSize: '18px', fontWeight: '800', color: 'var(--color-gold)', letterSpacing: '0.04em' }}>
+                  تَذَكَّرْ لِتَشْكُرْ.. ✨
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', direction: 'ltr', textAlign: 'left' }}>
+              <p style={{ margin: 0, fontWeight: '700', color: 'var(--color-primary)', fontSize: '17px' }}>
+                Peace and blessings be upon you,
+              </p>
+              <p style={{ margin: 0 }}>
+                We live surrounded by endless, boundless blessings, yet constant familiarity breeds heedlessness. We often forget to truly feel what lies within our hands, taking God's subtle graces for granted until we no longer perceive them.
+              </p>
+              <div style={{
+                background: 'var(--surface-sunken, rgba(44, 74, 62, 0.04))',
+                borderLeft: '3.5px solid var(--color-gold)',
+                padding: '14px 18px',
+                borderRadius: '12px'
+              }}>
+                <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--text-heading)' }}>
+                  From this realization, by God's grace and guidance, arose «NEMAA» Platform; a sanctuary for mindfulness and gratitude. In this first release, we offer 200 carefully curated blessings as a gateway to awaken your heart and renew daily thankfulness.
+                </p>
+              </div>
+              <p style={{ margin: 0 }}>
+                Every additional blessing you discover here in the future is a message of goodness and genuine reflection contributed by fellow seekers, making this platform a living beacon where we collectively celebrate divine benevolence.
+              </p>
+              <p style={{ margin: 0, fontWeight: '600', color: 'var(--color-primary)' }}>
+                Feel what you have been bestowed, and share a blessing whose light you have witnessed to inspire and illuminate others.
+              </p>
+              <div style={{
+                textAlign: 'center',
+                margin: '8px 0 0',
+                padding: '10px',
+                background: 'rgba(212, 175, 55, 0.1)',
+                borderRadius: '14px',
+                border: '1px dashed var(--color-gold)'
+              }}>
+                <span style={{ fontSize: '17px', fontWeight: '800', color: 'var(--color-gold)' }}>
+                  Remember to Give Thanks.. ✨
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Action */}
+        <div style={{
+          padding: '16px 24px',
+          borderTop: '1px solid var(--border-subtle)',
+          background: 'var(--surface-card)',
+          display: 'flex',
+          justifyContent: 'center'
+        }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: '100%',
+              maxWidth: '320px',
+              padding: '12px 20px',
+              borderRadius: 'var(--radius-full)',
+              background: 'linear-gradient(135deg, #1A382B 0%, #2C4A3E 60%, #15261F 100%)',
+              color: '#FFFFFF',
+              border: '1.5px solid var(--color-gold)',
+              fontSize: '15px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 16px rgba(212,175,55,0.3)'
+            }}
+          >
+            <Check size={17} />
+            <span>{lang === 'ar' ? 'ابدأ رحلة الشكر والتدبّر' : 'Begin the Journey of Gratitude'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

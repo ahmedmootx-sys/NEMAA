@@ -1,16 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   Heart, 
   PlusCircle, 
   Search, 
-  Moon, 
-  Sun, 
   Flame,
-  Download,
   BookOpen,
-  Bell,
-  Globe,
-  Compass
+  Settings
 } from 'lucide-react';
 import { TRANSLATIONS } from '../i18n/translations';
 
@@ -20,37 +15,10 @@ export default function Header({
   onOpenAddModal, 
   onOpenSearch, 
   onOpenJournal,
-  onOpenNotifications,
-  theme, 
-  onToggleTheme,
-  dailyCount,
   streak,
   currentLang = 'ar',
-  onToggleLanguage,
-  onOpenLanguageModal,
-  onOpenGuide
+  onOpenSettings
 }) {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-
-  useEffect(() => {
-    const handleBeforeInstall = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-    }
-  };
-
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.ar;
 
   return (
@@ -83,51 +51,8 @@ export default function Header({
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls - Clean & Minimal */}
         <div className="header-actions">
-          {/* Language Switcher Button */}
-          <button
-            className="btn-icon btn-lang-toggle"
-            title={t.switchLanguage}
-            onClick={onToggleLanguage}
-            aria-label="Language / اللغة"
-          >
-            <Globe size={14} color="var(--color-gold)" />
-            <span>{currentLang === 'ar' ? 'EN' : 'ع'}</span>
-          </button>
-
-          {/* App Guide & What's New Button */}
-          <button
-            id="btn-app-guide"
-            className="btn-icon btn-guide-toggle"
-            title={currentLang === 'ar' ? 'دليل الأزرار والتحديثات' : 'App Guide & Updates'}
-            onClick={onOpenGuide}
-            aria-label="دليل التطبيق والتحديثات"
-            style={{ color: 'var(--color-gold)' }}
-          >
-            <Compass size={18} />
-          </button>
-
-          {/* Gratitude Journal Button */}
-          <button 
-            className="btn-icon" 
-            title={t.journalBtn}
-            onClick={onOpenJournal}
-            aria-label={t.journalBtn}
-          >
-            <BookOpen size={18} />
-          </button>
-
-          {/* Daily Notifications / Reminders Button */}
-          <button 
-            className="btn-icon" 
-            title={t.notificationsBtn}
-            onClick={onOpenNotifications}
-            aria-label={t.notificationsBtn}
-          >
-            <Bell size={18} />
-          </button>
-
           {/* Search Button */}
           <button 
             className="btn-icon" 
@@ -161,28 +86,27 @@ export default function Header({
             )}
           </button>
 
-          {/* Theme Toggle (Day / Night) */}
+          {/* Gratitude Journal Button */}
           <button 
             className="btn-icon" 
-            title={theme === 'night' ? t.themeDay : t.themeNight}
-            onClick={onToggleTheme}
-            aria-label="تبديل المظهر"
+            title={t.journalBtn}
+            onClick={onOpenJournal}
+            aria-label={t.journalBtn}
           >
-            {theme === 'night' ? <Sun size={18} color="#E5C358" /> : <Moon size={18} />}
+            <BookOpen size={18} />
           </button>
 
-          {/* PWA Install Button */}
-          {deferredPrompt && (
-            <button 
-              className="btn-icon btn-install-pwa" 
-              title={t.installPwa}
-              onClick={handleInstallClick}
-              aria-label={t.installPwa}
-              style={{ color: 'var(--color-primary)', background: 'rgba(44, 74, 62, 0.1)', borderColor: 'var(--color-gold)' }}
-            >
-              <Download size={18} />
-            </button>
-          )}
+          {/* Settings & Preferences Button (الصفحة الموحدة لجميع الإعدادات) */}
+          <button 
+            id="btn-settings-toggle"
+            className="btn-icon btn-settings-toggle" 
+            title={currentLang === 'ar' ? 'الإعدادات والتفضيلات' : 'Settings & Preferences'}
+            onClick={onOpenSettings}
+            aria-label="الإعدادات"
+            style={{ color: 'var(--color-gold)', borderColor: 'rgba(212, 175, 55, 0.4)' }}
+          >
+            <Settings size={18} />
+          </button>
         </div>
       </div>
     </header>

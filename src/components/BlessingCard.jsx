@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, 
   Share2, 
@@ -39,12 +39,66 @@ export default function BlessingCard({
   praisesCount,
   activeCategory,
   animatingKey,
+  onNextBlessing,
+  onPrevBlessing,
   lang = 'ar'
 }) {
   const [copied, setCopied] = useState(false);
   const [duaCopied, setDuaCopied] = useState(false);
   const [hasArabicVoice, setHasArabicVoice] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Swipe Gesture Handling (Touch & Mouse Drag)
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStartRef = useRef({ x: 0, y: 0, isHorizontal: null });
+
+  const handleTouchStart = (e) => {
+    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.card-action-btn')) return;
+    const touch = e.touches ? e.touches[0] : e;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, isHorizontal: null };
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    const touch = e.touches ? e.touches[0] : e;
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+
+    if (touchStartRef.current.isHorizontal === null) {
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) {
+        touchStartRef.current.isHorizontal = true;
+      } else if (Math.abs(dy) > 8) {
+        touchStartRef.current.isHorizontal = false;
+      }
+    }
+
+    if (touchStartRef.current.isHorizontal) {
+      if (e.cancelable && e.touches) {
+        e.preventDefault();
+      }
+      const clamped = Math.max(-140, Math.min(140, dx));
+      setDragOffset(clamped);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging) return;
+    const threshold = 60; // px to trigger navigation
+
+    if (dragOffset < -threshold) {
+      // Swiped Left
+      if (onNextBlessing) onNextBlessing();
+    } else if (dragOffset > threshold) {
+      // Swiped Right
+      if (onPrevBlessing) onPrevBlessing();
+    }
+
+    setDragOffset(0);
+    setIsDragging(false);
+    touchStartRef.current = { x: 0, y: 0, isHorizontal: null };
+  };
 
   // Check if user's device has an authentic Arabic voice
   useEffect(() => {
@@ -175,7 +229,21 @@ export default function BlessingCard({
       <div 
         key={animatingKey}
         id="blessing-card-exportable"
-        className="blessing-card"
+        className={`blessing-card ${isDragging ? 'is-swiping' : ''}`}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleTouchStart}
+        onMouseMove={handleTouchMove}
+        onMouseUp={handleTouchEnd}
+        onMouseLeave={handleTouchEnd}
+        style={{
+          transform: dragOffset ? `translateX(${dragOffset}px) rotate(${dragOffset * 0.035}deg)` : undefined,
+          opacity: dragOffset ? 1 - Math.abs(dragOffset) / 550 : undefined,
+          transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.18, 0.89, 0.32, 1.15), opacity 0.28s ease',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          touchAction: 'pan-y'
+        }}
       >
         {/* Subtle Watermark Emblem */}
         <img 

@@ -15,7 +15,12 @@ import {
   Heart,
   User,
   RefreshCw,
-  Edit3
+  Edit3,
+  MessageSquare,
+  ThumbsUp,
+  ThumbsDown,
+  Lightbulb,
+  AlertCircle
 } from 'lucide-react';
 import { 
   adminLogin, 
@@ -24,7 +29,11 @@ import {
   fetchBlessingReports, 
   dismissBlessingReport,
   deleteSharedBlessing,
-  subscribeToReports
+  subscribeToReports,
+  fetchFeedback,
+  updateFeedbackStatus,
+  deleteFeedback,
+  subscribeToFeedback
 } from '../supabaseClient';
 import EditSharedBlessingModal from './EditSharedBlessingModal';
 
@@ -43,9 +52,18 @@ export default function AdminModal({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Dashboard state
-  const [activeTab, setActiveTab] = useState('reports'); // 'reports' | 'blessings'
+  const [activeTab, setActiveTab] = useState('reports'); // 'reports' | 'feedback' | 'blessings'
+  
+  // Reports
   const [reports, setReports] = useState([]);
   const [isLoadingReports, setIsLoadingReports] = useState(false);
+
+  // Feedback (الشكاوى والمقترحات)
+  const [feedbackList, setFeedbackList] = useState([]);
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
+  const [feedbackFilter, setFeedbackFilter] = useState('all'); // 'all' | 'suggestion' | 'complaint'
+
+  // Blessings Management
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [statusNotice, setStatusNotice] = useState('');
@@ -60,6 +78,7 @@ export default function AdminModal({
       setCurrentUser(user);
       if (user) {
         loadReports();
+        loadFeedbackData();
       }
     }
     checkAuth();
@@ -84,6 +103,28 @@ export default function AdminModal({
     };
   }, [isOpen, currentUser]);
 
+  // Realtime subscription for incoming feedback while admin modal is open
+  useEffect(() => {
+    if (!isOpen || !currentUser) return;
+    const unsub = subscribeToFeedback(
+      (newFb) => {
+        setFeedbackList(prev => {
+          if (prev.some(f => f.id === newFb.id)) return prev;
+          return [newFb, ...prev];
+        });
+      },
+      (deletedFb) => {
+        setFeedbackList(prev => prev.filter(f => f.id !== deletedFb.id));
+      },
+      (updatedFb) => {
+        setFeedbackList(prev => prev.map(f => f.id === updatedFb.id ? { ...f, ...updatedFb } : f));
+      }
+    );
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [isOpen, currentUser]);
+
   const loadReports = async () => {
     setIsLoadingReports(true);
     try {
@@ -93,6 +134,18 @@ export default function AdminModal({
       console.warn('Error loading reports:', err);
     } finally {
       setIsLoadingReports(false);
+    }
+  };
+
+  const loadFeedbackData = async () => {
+    setIsLoadingFeedback(true);
+    try {
+      const data = await fetchFeedback();
+      setFeedbackList(data);
+    } catch (err) {
+      console.warn('Error loading feedback:', err);
+    } finally {
+      setIsLoadingFeedback(false);
     }
   };
 
@@ -107,6 +160,7 @@ export default function AdminModal({
         setCurrentUser(res.user);
         setPassword('');
         loadReports();
+        loadFeedbackData();
       } else {
         setAuthError(res.error || (lang === 'ar' ? 'بيانات الدخول غير صحيحة' : 'Invalid credentials'));
       }
@@ -178,100 +232,147 @@ export default function AdminModal({
       id: rep.blessing_id,
       title: rep.blessing_title || '',
       reflection: '',
-      isShared: true
+      author: '',
+      proof: '',
+      proofSource: ''
     };
-    setEditingBlessing(match);
+
     setAssociatedReportId(rep.id);
+    setEditingBlessing(match);
   };
 
-  // Start editing a blessing directly from the Management list
-  const handleStartEdit = (blessing) => {
-    setEditingBlessing(blessing);
+  // Start editing directly from the Blessings tab
+  const handleStartEdit = (b) => {
     setAssociatedReportId(null);
+    setEditingBlessing(b);
   };
 
-  // Save the edited blessing (updates Supabase & local state, auto-resolves report if from report)
-  const handleSaveBlessingEdit = async (updatedFields) => {
+  // Save edited blessing
+  const handleSaveBlessingEdit = async (newFields) => {
     if (!editingBlessing) return;
     try {
       if (onUpdateBlessing) {
-        await onUpdateBlessing(editingBlessing, updatedFields);
+        await onUpdateBlessing(editingBlessing, newFields);
       }
 
-      // If the edit came from a report, auto-dismiss the resolved report
+      // If this edit resolved an open report, dismiss it automatically
       if (associatedReportId) {
         await dismissBlessingReport(associatedReportId);
         setReports(prev => prev.filter(r => r.id !== associatedReportId));
+        setAssociatedReportId(null);
       }
 
-      setStatusNotice(lang === 'ar' ? 'تم تصحيح وحفظ النعمة بنجاح ✨' : 'Blessing updated successfully ✨');
-      setTimeout(() => setStatusNotice(''), 4000);
       setEditingBlessing(null);
-      setAssociatedReportId(null);
+      setStatusNotice(lang === 'ar' ? 'تم تعديل وتصحيح النعمة بنجاح لجميع المستخدمين' : 'Blessing updated successfully for all users');
+      setTimeout(() => setStatusNotice(''), 4000);
     } catch (err) {
-      console.warn('Admin edit save error:', err);
-      setStatusNotice(lang === 'ar' ? 'حدث خطأ أثناء حفظ التعديلات' : 'Failed to update blessing');
+      console.warn('Error saving blessing edit:', err);
+      setStatusNotice(lang === 'ar' ? 'حدث خطأ أثناء حفظ التعديل' : 'Failed to save changes');
       setTimeout(() => setStatusNotice(''), 4000);
     }
   };
 
-  // Filtered blessings list for Management tab
+  // Feedback Actions
+  const handleAcceptFeedback = async (id) => {
+    await updateFeedbackStatus(id, 'accepted');
+    setFeedbackList(prev => prev.map(f => f.id === id ? { ...f, status: 'accepted' } : f));
+    setStatusNotice(lang === 'ar' ? 'تمت الموافقة على الاقتراح بنجاح' : 'Feedback accepted');
+    setTimeout(() => setStatusNotice(''), 3000);
+  };
+
+  const handleRejectFeedback = async (id) => {
+    await updateFeedbackStatus(id, 'rejected');
+    setFeedbackList(prev => prev.map(f => f.id === id ? { ...f, status: 'rejected' } : f));
+    setStatusNotice(lang === 'ar' ? 'تم رفض الملاحظة' : 'Feedback rejected');
+    setTimeout(() => setStatusNotice(''), 3000);
+  };
+
+  const handleDeleteFeedbackAction = async (id) => {
+    if (!window.confirm(lang === 'ar' ? 'هل أنت متأكد من حذف هذه الرسالة؟' : 'Delete this message?')) return;
+    await deleteFeedback(id);
+    setFeedbackList(prev => prev.filter(f => f.id !== id));
+    setStatusNotice(lang === 'ar' ? 'تم حذف الرسالة بنجاح' : 'Message deleted');
+    setTimeout(() => setStatusNotice(''), 3000);
+  };
+
+  // Filtered blessings list for management tab
   const filteredBlessings = useMemo(() => {
     return allBlessings.filter(b => {
-      const matchesSearch = !searchQuery.trim() || 
-        (b.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (b.reflection || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (b.author || '').toLowerCase().includes(searchQuery.toLowerCase());
+      // Category filter
+      if (filterCategory === 'shared' && !b.isShared) return false;
+      if (filterCategory !== 'all' && filterCategory !== 'shared' && b.category !== filterCategory) return false;
 
-      const matchesCat = filterCategory === 'all' ||
-        (filterCategory === 'shared' && b.isShared) ||
-        (b.category === filterCategory);
-
-      return matchesSearch && matchesCat;
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const inTitle = (b.title || '').toLowerCase().includes(q);
+        const inRef = (b.reflection || '').toLowerCase().includes(q);
+        const inAuthor = (b.author || '').toLowerCase().includes(q);
+        if (!inTitle && !inRef && !inAuthor) return false;
+      }
+      return true;
     });
-  }, [allBlessings, searchQuery, filterCategory]);
+  }, [allBlessings, filterCategory, searchQuery]);
+
+  // Filtered feedback list
+  const filteredFeedback = useMemo(() => {
+    return feedbackList.filter(f => {
+      if (feedbackFilter !== 'all' && f.type !== feedbackFilter) return false;
+      return true;
+    });
+  }, [feedbackList, feedbackFilter]);
 
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div 
-        className="modal-content guide-modal-content"
+        className="modal-content admin-modal-content"
         onClick={e => e.stopPropagation()}
         style={{
-          maxWidth: '820px',
-          maxHeight: '92vh',
+          maxWidth: '840px',
+          width: '94%',
+          height: '88vh',
           display: 'flex',
           flexDirection: 'column',
-          padding: 0,
           background: 'var(--surface-card)',
-          border: '2px solid #D4AF37',
           borderRadius: '24px',
-          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.75), 0 0 35px rgba(212, 175, 55, 0.25)',
+          border: '1.5px solid var(--border-gold)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
           overflow: 'hidden'
         }}
-        dir={lang === 'ar' ? 'rtl' : 'ltr'}
       >
         {/* Header */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(212, 175, 55, 0.15)', border: '1px solid #D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShieldCheck size={22} color="var(--color-gold)" />
+        <div style={{
+          padding: '18px 24px',
+          background: 'linear-gradient(135deg, #1A382B 0%, #2C4A3E 60%, #15261F 100%)',
+          color: '#FFFFFF',
+          borderBottom: '1.5px solid var(--border-gold)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '10px',
+              background: 'rgba(212, 175, 55, 0.2)',
+              border: '1px solid #D4AF37',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <ShieldCheck size={20} color="#D4AF37" />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h3 style={{ margin: 0, fontSize: '19px', fontFamily: 'var(--font-arabic-heading)', color: 'var(--text-title)' }}>
-                  {lang === 'ar' ? 'لوحة تحكم إدارة منصة نِعْمَة' : 'NEMAA Admin Moderation Panel'}
-                </h3>
-                {currentUser && (
-                  <span style={{ fontSize: '11px', background: 'rgba(56, 161, 105, 0.15)', color: '#38A169', border: '1px solid rgba(56, 161, 105, 0.3)', padding: '2px 8px', borderRadius: '9999px', fontWeight: '700' }}>
-                    مشرف نشط
-                  </span>
-                )}
-              </div>
-              <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: 'var(--text-muted)' }}>
-                {lang === 'ar' ? 'إدارة النعم ومراجعة البلاغات والحذف الفوري' : 'Manage blessings, review reports, and moderate content'}
-              </p>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#FFFFFF' }}>
+                لوحة المشرف والتحكم المركزي
+              </h3>
+              <span style={{ fontSize: '12px', color: '#D4AF37' }}>
+                {currentUser ? `مرحباً بك: ${currentUser.email}` : 'تسجيل دخول المشرف المعتمد'}
+              </span>
             </div>
           </div>
 
@@ -280,67 +381,95 @@ export default function AdminModal({
               <button
                 type="button"
                 onClick={handleLogout}
-                title="تسجيل الخروج من لوحة الإدارة"
+                title="تسجيل الخروج"
                 style={{
-                  background: 'transparent',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-muted)',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#FFFFFF',
                   borderRadius: 'var(--radius-full)',
                   padding: '6px 12px',
                   fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '5px',
+                  cursor: 'pointer'
                 }}
               >
-                <LogOut size={13} />
+                <LogOut size={14} />
                 <span>خروج</span>
               </button>
             )}
-
-            <button 
-              type="button" 
-              className="btn-icon" 
+            <button
+              type="button"
               onClick={onClose}
+              className="modal-close-btn"
+              style={{ color: '#FFFFFF', position: 'static' }}
               aria-label="إغلاق"
-              style={{ width: '36px', height: '36px' }}
             >
               <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Status Notice Toast Banner */}
+        {/* Global Notice Toast if present */}
         {statusNotice && (
-          <div style={{ background: 'rgba(56, 161, 105, 0.14)', borderBottom: '1px solid rgba(56, 161, 105, 0.3)', padding: '10px 20px', fontSize: '13px', color: '#276749', fontWeight: '700', textAlign: 'center' }}>
-            {statusNotice}
+          <div style={{
+            background: 'var(--color-gold-light)',
+            color: 'var(--color-primary-dark)',
+            borderBottom: '1px solid var(--color-gold)',
+            padding: '10px 24px',
+            fontSize: '13.5px',
+            fontWeight: '700',
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
+            <Sparkles size={16} color="var(--color-gold)" />
+            <span>{statusNotice}</span>
           </div>
         )}
 
-        {/* View Content: Login Form vs Admin Dashboard */}
+        {/* Content Body: Login screen vs Dashboard */}
         {!currentUser ? (
-          <div style={{ padding: '36px 24px', maxWidth: '420px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(212, 175, 55, 0.12)', border: '1.5px solid var(--border-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                <Lock size={26} color="var(--color-gold)" />
-              </div>
-              <h4 style={{ margin: '0 0 6px', fontSize: '18px', color: 'var(--text-title)' }}>
-                تسجيل دخول المشرف
-              </h4>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-                أدخل بيانات حساب الأدمن المعتمد على Supabase للوصول إلى أدوات الإدارة
-              </p>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '36px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(44, 74, 62, 0.08)',
+              border: '1px solid var(--border-gold)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '16px'
+            }}>
+              <Lock size={28} color="var(--color-primary)" />
             </div>
 
-            {authError && (
-              <div style={{ background: 'rgba(229, 62, 62, 0.12)', border: '1px solid rgba(229, 62, 62, 0.3)', color: '#E53E3E', borderRadius: '12px', padding: '10px 14px', fontSize: '13px', marginBottom: '16px', textAlign: 'center' }}>
-                {authError}
-              </div>
-            )}
+            <h4 style={{ margin: '0 0 6px', fontSize: '20px', color: 'var(--text-heading)' }}>
+              تسجيل الدخول للوحة التحكم
+            </h4>
+            <p style={{ margin: '0 0 24px', fontSize: '13.5px', color: 'var(--text-muted)', textAlign: 'center', maxWidth: '380px' }}>
+              الوصول مقتصر على المشرف المصرح له بمراجعة البلاغات والشكاوى وإدارة محتوى النعم.
+            </p>
 
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleLogin} style={{ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {authError && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  background: 'rgba(229, 62, 62, 0.1)',
+                  border: '1px solid #E53E3E',
+                  color: '#C53030',
+                  fontSize: '13px',
+                  textAlign: 'center'
+                }}>
+                  {authError}
+                </div>
+              )}
+
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)' }}>
                   البريد الإلكتروني للأدمن
@@ -360,8 +489,7 @@ export default function AdminModal({
                     color: 'var(--text-main)',
                     fontSize: '14px',
                     boxSizing: 'border-box',
-                    direction: 'ltr',
-                    textAlign: 'right'
+                    direction: 'ltr'
                   }}
                 />
               </div>
@@ -412,28 +540,29 @@ export default function AdminModal({
           </div>
         ) : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Tabs */}
-            <div style={{ display: 'flex', gap: '8px', padding: '0 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-sunken)' }}>
+            {/* Tabs Bar */}
+            <div style={{ display: 'flex', gap: '8px', padding: '0 20px', borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-sunken)', overflowX: 'auto' }}>
+              
+              {/* Tab 1: Reports */}
               <button
                 type="button"
                 onClick={() => setActiveTab('reports')}
                 style={{
-                  flex: 1,
-                  padding: '13px 10px',
+                  padding: '13px 14px',
                   border: 'none',
                   background: 'transparent',
-                  fontSize: '14px',
+                  fontSize: '13.5px',
                   fontWeight: activeTab === 'reports' ? '700' : '500',
                   color: activeTab === 'reports' ? '#C53030' : 'var(--text-muted)',
                   borderBottom: activeTab === 'reports' ? '2.5px solid #C53030' : '2.5px solid transparent',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
                 }}
               >
-                <Flag size={16} color="#C53030" />
+                <Flag size={15} color="#C53030" />
                 <span>البلاغات الواردة</span>
                 {reports.length > 0 && (
                   <span style={{ background: '#E53E3E', color: '#FFFFFF', fontSize: '11px', fontWeight: '800', padding: '1px 7px', borderRadius: '9999px' }}>
@@ -442,33 +571,63 @@ export default function AdminModal({
                 )}
               </button>
 
+              {/* Tab 2: Feedback & Suggestions (الشكاوى والمقترحات) */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('feedback')}
+                style={{
+                  padding: '13px 14px',
+                  border: 'none',
+                  background: 'transparent',
+                  fontSize: '13.5px',
+                  fontWeight: activeTab === 'feedback' ? '700' : '500',
+                  color: activeTab === 'feedback' ? 'var(--color-primary)' : 'var(--text-muted)',
+                  borderBottom: activeTab === 'feedback' ? '2.5px solid var(--color-gold)' : '2.5px solid transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <MessageSquare size={15} color="var(--color-gold)" />
+                <span>الشكاوى والمقترحات</span>
+                {feedbackList.length > 0 && (
+                  <span style={{ background: 'var(--color-gold)', color: '#FFFFFF', fontSize: '11px', fontWeight: '800', padding: '1px 7px', borderRadius: '9999px' }}>
+                    {feedbackList.length}
+                  </span>
+                )}
+              </button>
+
+              {/* Tab 3: Blessings Management */}
               <button
                 type="button"
                 onClick={() => setActiveTab('blessings')}
                 style={{
-                  flex: 1,
-                  padding: '13px 10px',
+                  padding: '13px 14px',
                   border: 'none',
                   background: 'transparent',
-                  fontSize: '14px',
+                  fontSize: '13.5px',
                   fontWeight: activeTab === 'blessings' ? '700' : '500',
                   color: activeTab === 'blessings' ? 'var(--color-primary)' : 'var(--text-muted)',
                   borderBottom: activeTab === 'blessings' ? '2.5px solid var(--color-gold)' : '2.5px solid transparent',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
                 }}
               >
-                <Layers size={16} />
+                <Layers size={15} />
                 <span>إدارة كافة النعم ({allBlessings.length})</span>
               </button>
             </div>
 
             {/* Tab Body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-              {activeTab === 'reports' ? (
+              
+              {/* TAB 1: REPORTS */}
+              {activeTab === 'reports' && (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                     <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text-title)' }}>
@@ -603,7 +762,229 @@ export default function AdminModal({
                     </div>
                   )}
                 </div>
-              ) : (
+              )}
+
+              {/* TAB 2: FEEDBACK & SUGGESTIONS (الشكاوى والمقترحات) */}
+              {activeTab === 'feedback' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setFeedbackFilter('all')}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-full)',
+                          border: feedbackFilter === 'all' ? '1px solid var(--color-gold)' : '1px solid var(--border-subtle)',
+                          background: feedbackFilter === 'all' ? 'rgba(212,175,55,0.18)' : 'var(--surface-sunken)',
+                          color: feedbackFilter === 'all' ? 'var(--color-primary)' : 'var(--text-muted)',
+                          fontSize: '12.5px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        الكل ({feedbackList.length})
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFeedbackFilter('suggestion')}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-full)',
+                          border: feedbackFilter === 'suggestion' ? '1px solid var(--color-gold)' : '1px solid var(--border-subtle)',
+                          background: feedbackFilter === 'suggestion' ? 'rgba(212,175,55,0.18)' : 'var(--surface-sunken)',
+                          color: feedbackFilter === 'suggestion' ? 'var(--color-primary)' : 'var(--text-muted)',
+                          fontSize: '12.5px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        المقترحات ({feedbackList.filter(f => f.type === 'suggestion').length})
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFeedbackFilter('complaint')}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 'var(--radius-full)',
+                          border: feedbackFilter === 'complaint' ? '1px solid #E53E3E' : '1px solid var(--border-subtle)',
+                          background: feedbackFilter === 'complaint' ? 'rgba(229,62,62,0.14)' : 'var(--surface-sunken)',
+                          color: feedbackFilter === 'complaint' ? '#C53030' : 'var(--text-muted)',
+                          fontSize: '12.5px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        الشكاوى ({feedbackList.filter(f => f.type === 'complaint').length})
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={loadFeedbackData}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '12.5px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <RefreshCw size={13} />
+                      <span>تحديث الرسائل</span>
+                    </button>
+                  </div>
+
+                  {isLoadingFeedback ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                      جاري تحميل الشكاوى والمقترحات...
+                    </div>
+                  ) : filteredFeedback.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '45px 16px', background: 'var(--surface-sunken)', borderRadius: '16px', border: '1px dashed var(--border-subtle)' }}>
+                      <Check size={32} color="#38A169" style={{ margin: '0 auto 10px' }} />
+                      <h4 style={{ margin: '0 0 4px', color: 'var(--color-primary)', fontSize: '16px' }}>
+                        لا توجد رسائل في هذا القسم حالياً
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                        تصل هنا اقتراحات وتطويرات المستخدمين وملاحظاتهم فور إرسالها من صفحة الإعدادات.
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {filteredFeedback.map((fb) => (
+                        <div
+                          key={fb.id}
+                          style={{
+                            background: 'var(--surface-sunken)',
+                            border: fb.status === 'accepted' ? '1.5px solid #38A169' : fb.status === 'rejected' ? '1.5px solid #E53E3E' : '1px solid var(--border-subtle)',
+                            borderRadius: '16px',
+                            padding: '16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <span style={{
+                                  background: fb.type === 'suggestion' ? 'rgba(212,175,55,0.18)' : 'rgba(229,62,62,0.15)',
+                                  color: fb.type === 'suggestion' ? 'var(--color-gold-hover)' : '#C53030',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  {fb.type === 'suggestion' ? <Lightbulb size={11} /> : <AlertCircle size={11} />}
+                                  <span>{fb.type === 'suggestion' ? 'اقتراح وتطوير' : 'شكوى وملاحظة'}</span>
+                                </span>
+
+                                <span style={{
+                                  background: fb.status === 'accepted' ? 'rgba(56,161,105,0.15)' : fb.status === 'rejected' ? 'rgba(229,62,62,0.15)' : 'rgba(212,175,55,0.15)',
+                                  color: fb.status === 'accepted' ? '#2F855A' : fb.status === 'rejected' ? '#C53030' : 'var(--color-gold-hover)',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: '700'
+                                }}>
+                                  {fb.status === 'accepted' ? 'تم القبول ✅' : fb.status === 'rejected' ? 'مرفوض ❌' : 'قيد المراجعة ⏳'}
+                                </span>
+
+                                <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
+                                  {new Date(fb.created_at).toLocaleString('ar-EG')}
+                                </span>
+                              </div>
+
+                              <h4 style={{ margin: '0 0 6px', fontSize: '16px', color: 'var(--text-heading)' }}>
+                                {fb.title}
+                              </h4>
+
+                              <p style={{ margin: '0 0 8px', fontSize: '13.5px', color: 'var(--text-main)', lineHeight: '1.6', background: 'var(--surface-card)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                                {fb.content}
+                              </p>
+
+                              {(fb.user_name || fb.contact) && (
+                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', gap: '14px' }}>
+                                  {fb.user_name && <span>المرسل: <strong>{fb.user_name}</strong></span>}
+                                  {fb.contact && <span>وسيلة التواصل: <strong>{fb.contact}</strong></span>}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Actions: Accept, Reject, Delete */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-start' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleAcceptFeedback(fb.id)}
+                                title="قبول الاقتراح"
+                                style={{
+                                  background: fb.status === 'accepted' ? '#38A169' : 'var(--surface-card)',
+                                  color: fb.status === 'accepted' ? '#FFFFFF' : '#38A169',
+                                  border: '1px solid #38A169',
+                                  borderRadius: 'var(--radius-full)',
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <ThumbsUp size={13} />
+                                <span>قبول</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRejectFeedback(fb.id)}
+                                title="رفض الملاحظة"
+                                style={{
+                                  background: fb.status === 'rejected' ? '#C53030' : 'var(--surface-card)',
+                                  color: fb.status === 'rejected' ? '#FFFFFF' : '#C53030',
+                                  border: '1px solid #C53030',
+                                  borderRadius: 'var(--radius-full)',
+                                  padding: '6px 12px',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <ThumbsDown size={13} />
+                                <span>رفض</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFeedbackAction(fb.id)}
+                                title="حذف الرسالة"
+                                style={{
+                                  background: 'transparent',
+                                  color: '#E53E3E',
+                                  border: '1px solid rgba(229,62,62,0.3)',
+                                  borderRadius: 'var(--radius-full)',
+                                  padding: '6px 10px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: ALL BLESSINGS MANAGEMENT */}
+              {activeTab === 'blessings' && (
                 <div>
                   {/* Search and Filters Bar */}
                   <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -650,113 +1031,122 @@ export default function AdminModal({
                     </select>
                   </div>
 
-                  {/* List of Blessings */}
+                  {/* Blessings List */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {filteredBlessings.map(b => (
-                      <div 
-                        key={b.id}
-                        style={{
-                          background: 'var(--surface-sunken)',
-                          border: '1px solid var(--border-subtle)',
-                          borderRadius: '14px',
-                          padding: '14px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                          flexWrap: 'wrap'
-                        }}
-                      >
-                        <div style={{ flex: 1, minWidth: '240px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '11px', color: 'var(--color-gold)', background: 'rgba(212, 175, 55, 0.12)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700' }}>
-                              {b.categoryName || 'نعمة'}
-                            </span>
-                            {b.isShared && (
-                              <span style={{ fontSize: '11px', color: '#3182CE', background: 'rgba(49, 130, 206, 0.12)', padding: '2px 8px', borderRadius: '6px', fontWeight: '700' }}>
-                                متشاركة
-                              </span>
-                            )}
-                            {b.author && (
-                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                بقلم: {b.author}
-                              </span>
-                            )}
-                          </div>
-                          <h4 style={{ margin: '0 0 3px', fontSize: '15px', color: 'var(--text-title)', fontFamily: 'var(--font-arabic-title)' }}>
-                            «{b.title}»
-                          </h4>
-                          <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                            {b.reflection}
-                          </p>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(b)}
-                            title="تعديل وتصحيح محتوى النعمة"
-                            style={{
-                              background: 'rgba(212, 175, 55, 0.15)',
-                              color: 'var(--color-gold-hover)',
-                              border: '1px solid var(--color-gold)',
-                              borderRadius: 'var(--radius-full)',
-                              padding: '7px 14px',
-                              fontSize: '12.5px',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px'
-                            }}
-                          >
-                            <Edit3 size={13} />
-                            <span>تعديل</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteBlessingAction(b)}
-                            style={{
-                              background: 'rgba(229, 62, 62, 0.12)',
-                              color: '#E53E3E',
-                              border: '1px solid rgba(229, 62, 62, 0.3)',
-                              borderRadius: 'var(--radius-full)',
-                              padding: '7px 14px',
-                              fontSize: '12.5px',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px'
-                            }}
-                          >
-                            <Trash2 size={13} />
-                            <span>حذف نهائي</span>
-                          </button>
-                        </div>
+                    {filteredBlessings.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                        لا توجد نعم مطابقة للبحث أو التصنيف
                       </div>
-                    ))}
+                    ) : (
+                      filteredBlessings.map((b) => (
+                        <div 
+                          key={b.id}
+                          style={{
+                            background: 'var(--surface-sunken)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: '14px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px'
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--color-gold)', fontWeight: '700' }}>
+                                {b.categoryName || 'نعم الله'}
+                              </span>
+                              {b.isShared && (
+                                <span style={{ background: 'rgba(212, 175, 55, 0.15)', color: 'var(--color-gold-hover)', padding: '1px 6px', borderRadius: '4px', fontSize: '10.5px' }}>
+                                  متشارَكة
+                                </span>
+                              )}
+                              {b.author && b.author !== 'محب للخير' && (
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  بقلم: {b.author}
+                                </span>
+                              )}
+                            </div>
+                            <h5 style={{ margin: '0 0 2px', fontSize: '15px', color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {b.title}
+                            </h5>
+                            <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {b.reflection}
+                            </p>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(b)}
+                              title="تعديل وتصحيح هذه النعمة"
+                              style={{
+                                background: 'rgba(212, 175, 55, 0.12)',
+                                border: '1px solid var(--color-gold)',
+                                color: 'var(--color-gold-hover)',
+                                borderRadius: 'var(--radius-full)',
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Edit3 size={13} />
+                              <span>تعديل</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBlessingAction(b)}
+                              title="حذف النعمة نهائياً"
+                              style={{
+                                background: 'rgba(229, 62, 62, 0.1)',
+                                border: '1px solid rgba(229, 62, 62, 0.3)',
+                                color: '#C53030',
+                                borderRadius: 'var(--radius-full)',
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Trash2 size={13} />
+                              <span>حذف</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
+
             </div>
           </div>
         )}
-      </div>
 
-      {/* Sub-Modal: Admin Edit Blessing */}
-      <EditSharedBlessingModal
-        isOpen={Boolean(editingBlessing)}
-        onClose={() => {
-          setEditingBlessing(null);
-          setAssociatedReportId(null);
-        }}
-        blessing={editingBlessing}
-        onSave={handleSaveBlessingEdit}
-        isAdmin={true}
-        lang={lang}
-      />
+        {/* Sub-Modal for Editing Blessing */}
+        {editingBlessing && (
+          <EditSharedBlessingModal
+            isOpen={Boolean(editingBlessing)}
+            onClose={() => {
+              setEditingBlessing(null);
+              setAssociatedReportId(null);
+            }}
+            blessing={editingBlessing}
+            onSave={handleSaveBlessingEdit}
+            isAdmin={true}
+            lang={lang}
+          />
+        )}
+      </div>
     </div>
   );
 }

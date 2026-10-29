@@ -1,7 +1,22 @@
 import React, { useState } from 'react';
-import { X, Sparkles, Send, Loader2, Globe, User, BookOpen, Quote } from 'lucide-react';
+import { 
+  X, 
+  Sparkles, 
+  Send, 
+  Loader2, 
+  Globe, 
+  User, 
+  BookOpen, 
+  Quote, 
+  Lightbulb, 
+  Wand2, 
+  Check, 
+  ChevronDown, 
+  ChevronUp 
+} from 'lucide-react';
 import { publishSharedBlessing } from '../supabaseClient';
 import { validateBlessingContent } from '../utils/contentValidator';
+import { BLESSING_INSPIRATIONS, enhanceReflectionDraft } from '../utils/blessingAssistant';
 
 export default function AddBlessingModal({ 
   isOpen, 
@@ -18,7 +33,51 @@ export default function AddBlessingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // Writing Assistant States
+  const [showInspirations, setShowInspirations] = useState(false);
+  const [activeCategoryIdx, setActiveCategoryIdx] = useState(0);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [assistantNotice, setAssistantNotice] = useState('');
+
   if (!isOpen) return null;
+
+  // Handle selecting an inspired blessing idea
+  const handleSelectInspiration = (item) => {
+    setTitle(item.title);
+    setReflection(item.reflection);
+    if (item.proof) {
+      setProof(item.proof);
+      setProofSource(item.proofSource || '');
+      setShowExtraFields(true);
+    }
+    setShowInspirations(false);
+    setAssistantNotice(lang === 'ar' ? 'تم اختيار النعمة، يمكنك التعديل عليها بحرية!' : 'Inspiration applied, feel free to customize!');
+    setTimeout(() => setAssistantNotice(''), 3500);
+  };
+
+  // Handle smart reflection enhancement
+  const handleEnhanceReflection = () => {
+    if (!title.trim() && !reflection.trim()) {
+      setError(lang === 'ar' ? 'يرجى كتابة عنوان للنعمة أو فكرة أولية ليساعدك المساعد في صياغتها' : 'Please enter a title or draft first for the assistant to enhance');
+      return;
+    }
+
+    setIsEnhancing(true);
+    setError('');
+
+    setTimeout(() => {
+      const enhanced = enhanceReflectionDraft(title, reflection);
+      setReflection(enhanced.reflection);
+      if (enhanced.proof && !proof.trim()) {
+        setProof(enhanced.proof);
+        setProofSource(enhanced.proofSource || '');
+        setShowExtraFields(true);
+      }
+      setIsEnhancing(false);
+      setAssistantNotice(lang === 'ar' ? '✨ تم إثراء وصياغة التدبّر واقتراح الاستدلال بنجاح!' : '✨ Reflection enhanced & quote suggested!');
+      setTimeout(() => setAssistantNotice(''), 3500);
+    }, 450);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -125,11 +184,120 @@ export default function AddBlessingModal({
           </div>
         </div>
 
+        {/* Assistant / Success notice banner */}
+        {assistantNotice && (
+          <div style={{
+            margin: '0 0 14px',
+            padding: '10px 14px',
+            borderRadius: '12px',
+            background: 'rgba(212, 175, 55, 0.14)',
+            border: '1px solid var(--color-gold)',
+            color: 'var(--color-primary)',
+            fontSize: '13px',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Sparkles size={15} color="var(--color-gold)" />
+            <span>{assistantNotice}</span>
+          </div>
+        )}
+
         {error && (
           <div className="publish-modal-alert error">
             {error}
           </div>
         )}
+
+        {/* Assistant Tool 1: Inspiration Ideas Button & Drawer */}
+        <div style={{
+          marginBottom: '16px',
+          background: 'var(--surface-sunken)',
+          borderRadius: '16px',
+          border: '1px solid var(--border-subtle)',
+          overflow: 'hidden'
+        }}>
+          <button
+            type="button"
+            onClick={() => setShowInspirations(!showInspirations)}
+            style={{
+              width: '100%',
+              padding: '11px 16px',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--color-primary)',
+              fontSize: '13.5px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '8px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Lightbulb size={17} color="var(--color-gold)" />
+              <span>{lang === 'ar' ? 'لا يحضرك عنوان نعمة؟ استلهم فكرة الآن' : 'Need inspiration? Pick an idea'}</span>
+            </div>
+            {showInspirations ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+
+          {showInspirations && (
+            <div style={{ padding: '12px 16px 16px', borderTop: '1px solid var(--border-subtle)' }}>
+              {/* Category tabs */}
+              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '10px' }}>
+                {BLESSING_INSPIRATIONS.map((cat, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveCategoryIdx(idx)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 'var(--radius-full)',
+                      border: activeCategoryIdx === idx ? '1px solid var(--color-gold)' : '1px solid var(--border-subtle)',
+                      background: activeCategoryIdx === idx ? 'rgba(212,175,55,0.18)' : 'var(--surface-card)',
+                      color: activeCategoryIdx === idx ? 'var(--color-primary)' : 'var(--text-muted)',
+                      fontSize: '12px',
+                      fontWeight: activeCategoryIdx === idx ? '700' : '500',
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {lang === 'ar' ? cat.category : cat.categoryEn}
+                  </button>
+                ))}
+              </div>
+
+              {/* Items in active category */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+                {BLESSING_INSPIRATIONS[activeCategoryIdx]?.items.map((item, i) => (
+                  <div
+                    key={i}
+                    onClick={() => handleSelectInspiration(item)}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '12px',
+                      background: 'var(--surface-card)',
+                      border: '1px solid var(--border-subtle)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-gold)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-subtle)'}
+                  >
+                    <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-heading)', marginBottom: '3px' }}>
+                      {item.title}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {item.reflection}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit} className="publish-modal-form">
           {/* Title */}
@@ -155,14 +323,40 @@ export default function AddBlessingModal({
 
           {/* Reflection */}
           <div className="form-group">
-            <label className="form-label">
-              <span>{lang === 'ar' ? 'التدبّر واستشعار النعمة' : 'Reflection & Contemplation'}</span>
-              <span className="required-star">*</span>
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <label className="form-label" style={{ margin: 0 }}>
+                <span>{lang === 'ar' ? 'التدبّر واستشعار النعمة' : 'Reflection & Contemplation'}</span>
+                <span className="required-star">*</span>
+              </label>
+
+              {/* Assistant Tool 2: Reflection Enhancer Button */}
+              <button
+                type="button"
+                onClick={handleEnhanceReflection}
+                disabled={isEnhancing || isSubmitting}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(212,175,55,0.18) 0%, rgba(44,74,62,0.1) 100%)',
+                  border: '1px solid var(--color-gold)',
+                  borderRadius: 'var(--radius-full)',
+                  padding: '4px 10px',
+                  color: 'var(--color-primary)',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: isEnhancing ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+              >
+                <Wand2 size={13} color="var(--color-gold)" />
+                <span>{isEnhancing ? (lang === 'ar' ? 'جاري الصياغة...' : 'Enhancing...') : (lang === 'ar' ? '✨ إكمال وصياغة التدبّر' : '✨ Enhance with AI Assistant')}</span>
+              </button>
+            </div>
+
             <textarea
               className="form-textarea"
               style={{ minHeight: '120px' }}
-              placeholder={lang === 'ar' ? 'اكتب تأملك ومشاعرك حول هذه النعمة.. ما أثر وجودها، وكيف تكون الحياة لو فُقدت؟' : 'Share your deep feelings and realization about this divine blessing...'}
+              placeholder={lang === 'ar' ? 'اكتب تأملك ومشاعرك حول هذه النعمة.. أو اضغط على «✨ إكمال وصياغة التدبّر» ليساعدك المساعد في كتابتها.' : 'Share your feelings, or tap Enhance to generate eloquent thoughts.'}
               value={reflection}
               onChange={e => setReflection(e.target.value)}
               disabled={isSubmitting}

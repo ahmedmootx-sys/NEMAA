@@ -653,3 +653,170 @@ export function subscribeToSharedBlessings(onNewBlessing, onDeleteBlessing, onUp
     return () => {};
   }
 }
+
+/**
+ * ========================================================
+ * Feedback, Suggestions & Complaints System (الشكاوى والمقترحات)
+ * ========================================================
+ */
+
+/**
+ * Submit feedback or a suggestion from any user
+ */
+export async function submitFeedback({ type = 'suggestion', title = '', content = '', userName = '', contact = '' }) {
+  const feedbackObj = {
+    id: `fb_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    type: type || 'suggestion', // 'suggestion' | 'complaint' | 'other'
+    title: (title || '').trim(),
+    content: (content || '').trim(),
+    user_name: (userName || '').trim() || null,
+    contact: (contact || '').trim() || null,
+    status: 'pending', // 'pending' | 'accepted' | 'rejected'
+    admin_notes: null,
+    created_at: new Date().toISOString()
+  };
+
+  let remoteSuccess = false;
+  let remoteError = null;
+
+  try {
+    const { data, error } = await supabase
+      .from('feedback')
+      .insert([feedbackObj])
+      .select();
+
+    if (!error) {
+      remoteSuccess = true;
+    } else {
+      remoteError = error;
+      console.warn('Supabase feedback insert error:', error);
+    }
+  } catch (err) {
+    remoteError = err;
+    console.warn('Feedback insert network error:', err);
+  }
+
+  // Local storage cache fallback
+  try {
+    const cached = JSON.parse(localStorage.getItem('nemaa_feedback_cache') || '[]');
+    cached.unshift(feedbackObj);
+    localStorage.setItem('nemaa_feedback_cache', JSON.stringify(cached));
+  } catch {}
+
+  return { success: true, remoteSuccess, error: remoteError, feedback: feedbackObj };
+}
+
+/**
+ * Fetch all feedback items for the admin panel
+ */
+export async function fetchFeedback() {
+  let list = [];
+  try {
+    const { data, error } = await supabase
+      .from('feedback')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      list = data;
+    }
+  } catch (err) {
+    console.warn('Failed to query feedback from Supabase:', err);
+  }
+
+  // Merge with local fallback
+  try {
+    const local = JSON.parse(localStorage.getItem('nemaa_feedback_cache') || '[]');
+    local.forEach(item => {
+      if (!list.some(f => f.id === item.id)) {
+        list.push(item);
+      }
+    });
+  } catch {}
+
+  return list;
+}
+
+/**
+ * Update feedback status (accept or reject) with optional admin notes
+ */
+export async function updateFeedbackStatus(feedbackId, status = 'accepted', adminNotes = '') {
+  try {
+    await supabase
+      .from('feedback')
+      .update({
+        status,
+        admin_notes: adminNotes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', feedbackId);
+  } catch (err) {
+    console.warn('Error updating feedback status in Supabase:', err);
+  }
+
+  // Update local cache
+  try {
+    const cached = JSON.parse(localStorage.getItem('nemaa_feedback_cache') || '[]');
+    const updated = cached.map(f => f.id === feedbackId ? { ...f, status, admin_notes: adminNotes } : f);
+    localStorage.setItem('nemaa_feedback_cache', JSON.stringify(updated));
+  } catch {}
+
+  return { success: true };
+}
+
+/**
+ * Delete feedback item
+ */
+export async function deleteFeedback(feedbackId) {
+  try {
+    await supabase.from('feedback').delete().eq('id', feedbackId);
+  } catch (err) {
+    console.warn('Error deleting feedback from Supabase:', err);
+  }
+
+  try {
+    const cached = JSON.parse(localStorage.getItem('nemaa_feedback_cache') || '[]');
+    const filtered = cached.filter(f => f.id !== feedbackId);
+    localStorage.setItem('nemaa_feedback_cache', JSON.stringify(filtered));
+  } catch {}
+
+  return { success: true };
+}
+
+/**
+ * Realtime subscription for feedback items
+ */
+export function subscribeToFeedback(onNewFeedback, onDeleteFeedback, onUpdateFeedback) {
+  try {
+    const channel = supabase
+      .channel('realtime_feedback_channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'feedback' },
+        (payload) => {
+          if (payload && payload.eventType === 'INSERT' && payload.new) {
+            if (typeof onNewFeedback === 'function') {
+              onNewFeedback(payload.new);
+            }
+          } else if (payload && payload.eventType === 'UPDATE' && payload.new) {
+            if (typeof onUpdateFeedback === 'function') {
+              onUpdateFeedback(payload.new, payload.old);
+            }
+          } else if (payload && payload.eventType === 'DELETE' && payload.old) {
+            if (typeof onDeleteFeedback === 'function') {
+              onDeleteFeedback(payload.old);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  } catch (err) {
+    console.warn('Feedback realtime subscription error:', err);
+    return () => {};
+  }
+}
+

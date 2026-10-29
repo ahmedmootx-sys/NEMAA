@@ -7,8 +7,8 @@
    ======================================================== */
 
 :root {
-  --font-arabic-heading: 'Aref Ruqaa', 'Amiri', serif;
-  --font-arabic-body: 'Amiri', serif;
+  --font-arabic-heading: 'Cairo', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-arabic-body: 'Tajawal', 'Cairo', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-arabic-quran: 'Amiri Quran', 'Amiri', serif;
   --font-arabic-ui: 'Cairo', 'Tajawal', -apple-system, BlinkMacSystemFont, sans-serif;
 
@@ -59,6 +59,12 @@
   --transition-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* User-Selected Font Mode: Classic Calligraphy */
+[data-font="classic"] {
+  --font-arabic-heading: 'Reem Kufi', 'Amiri', serif;
+  --font-arabic-body: 'Amiri', serif;
 }
 
 /* ================= Night Mode (سكينة الليل والتدبر) ================= */

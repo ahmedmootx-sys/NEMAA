@@ -213,11 +213,11 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     const headerTitleY = isSquare ? 72 : 175;
     const headerSloganY = isSquare ? 108 : 225;
 
-    ctx.font = `bold ${isSquare ? '38px' : '54px'} "Aref Ruqaa", "Amiri", serif`;
+    ctx.font = `bold ${isSquare ? '36px' : '52px'} "Cairo", "Reem Kufi", sans-serif`;
     ctx.fillStyle = theme.appTitle;
     ctx.fillText('نِعْمَة', width / 2, headerTitleY);
 
-    ctx.font = `${isSquare ? '18px' : '23px'} "Cairo", "Tajawal", sans-serif`;
+    ctx.font = `600 ${isSquare ? '18px' : '23px'} "Cairo", "Tajawal", sans-serif`;
     ctx.fillStyle = theme.slogan;
     ctx.fillText('« تَذَكَّرْ لِتَشْكُرْ »', width / 2, headerSloganY);
 
@@ -289,10 +289,10 @@ export async function exportBlessingAsImage(blessing, options = {}) {
       proofLineHeight = Math.round(baseProofLH * scale);
       proofSourceFontSize = Math.max(13, Math.round((isSquare ? 14 : 22) * scale));
 
-      ctx.font = `bold ${titleFontSize}px "Aref Ruqaa", "Amiri", serif`;
+      ctx.font = `bold ${titleFontSize}px "Cairo", -apple-system, sans-serif`;
       titleLines = splitTextIntoLines(ctx, titleText, textMaxWidth);
 
-      ctx.font = `bold ${refFontSize}px "Aref Ruqaa", "Amiri", serif`;
+      ctx.font = `500 ${refFontSize}px "Tajawal", "Cairo", sans-serif`;
       refLines = splitTextIntoLines(ctx, refText, textMaxWidth);
 
       proofLines = [];
@@ -321,7 +321,7 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     let currentY = startY;
 
     // Render Title Lines
-    ctx.font = `bold ${titleFontSize}px "Aref Ruqaa", "Amiri", serif`;
+    ctx.font = `bold ${titleFontSize}px "Cairo", -apple-system, sans-serif`;
     ctx.fillStyle = theme.title;
     for (let i = 0; i < titleLines.length; i++) {
       ctx.fillText(titleLines[i], width / 2, currentY);
@@ -332,7 +332,7 @@ export async function exportBlessingAsImage(blessing, options = {}) {
     currentY += gapTitleRef;
 
     // Render Reflection Lines
-    ctx.font = `bold ${refFontSize}px "Aref Ruqaa", "Amiri", serif`;
+    ctx.font = `500 ${refFontSize}px "Tajawal", "Cairo", sans-serif`;
     ctx.fillStyle = theme.reflection;
     for (let i = 0; i < refLines.length; i++) {
       ctx.fillText(refLines[i], width / 2, currentY);

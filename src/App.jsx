@@ -36,6 +36,9 @@ import OnboardingTour from './components/OnboardingTour';
 import AppGuideModal from './components/AppGuideModal';
 import ReportModal from './components/ReportModal';
 import AdminModal from './components/AdminModal';
+import SettingsModal from './components/SettingsModal';
+import AppMissionModal from './components/AppMissionModal';
+import FeedbackModal from './components/FeedbackModal';
 
 export default function App() {
   // 1. Theme State (Day / Night)
@@ -51,6 +54,27 @@ export default function App() {
   const toggleTheme = () => {
     setTheme(prev => prev === 'night' ? 'day' : 'night');
   };
+
+  // Font Mode State (Modern Cairo/Tajawal vs Classic Calligraphy)
+  const [fontMode, setFontMode] = useState(() => {
+    return localStorage.getItem('nemaa_font_mode') || 'modern';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-font', fontMode);
+    try {
+      localStorage.setItem('nemaa_font_mode', fontMode);
+    } catch {}
+  }, [fontMode]);
+
+  const toggleFontMode = () => {
+    setFontMode(prev => prev === 'modern' ? 'classic' : 'modern');
+  };
+
+  // Unified Settings, App Mission & Feedback Modals
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMissionOpen, setIsMissionOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
   // Language & Localization State
   const [currentLang, setCurrentLang] = useState(() => {
@@ -979,17 +1003,11 @@ export default function App() {
         favoritesCount={favorites.length}
         onOpenFavorites={() => setIsFavoritesOpen(true)}
         onOpenJournal={() => setIsJournalOpen(true)}
-        onOpenNotifications={() => setIsNotificationsOpen(true)}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onOpenSearch={() => setIsSearchOpen(true)}
-        onOpenGuide={() => setIsGuideModalOpen(true)}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        dailyCount={dailyStats.count}
         streak={dailyStats.streak}
         currentLang={currentLang}
-        onToggleLanguage={handleToggleLanguage}
-        onOpenLanguageModal={() => setIsLanguageModalOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       <main className="container" style={{ paddingTop: '20px', paddingBottom: '70px' }}>
@@ -1041,6 +1059,8 @@ export default function App() {
           praisesCount={getBlessingPraises(currentBlessing)}
           activeCategory={activeCategory}
           animatingKey={animatingKey}
+          onNextBlessing={handleNext}
+          onPrevBlessing={handlePrev}
           lang={currentLang}
         />
 
@@ -1070,9 +1090,36 @@ export default function App() {
           </p>
           <p style={{ color: 'var(--text-faint)' }}>
             {currentLang === 'ar' 
-              ? 'منصة نِعْمَة — تذكّر لتشكر • اضغط مسافة للتبديل السريع بين النعم'
-              : 'NEMAA Platform — Remember to give thanks • Press Spacebar for a new blessing'}
+              ? 'منصة نِعْمَة — تذكّر لتشكر • اسحب قالب النعمة يمين أو يسار بالأصبع للتبديل'
+              : 'NEMAA Platform — Remember to give thanks • Swipe blessing card left/right'}
           </p>
+        </div>
+
+        {/* Quick Footer Links */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px', marginTop: '16px', flexWrap: 'wrap' }}>
+          <button 
+            type="button" 
+            onClick={() => setIsFeedbackOpen(true)} 
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          >
+            <span>💬 {currentLang === 'ar' ? 'الشكاوى والمقترحات' : 'Feedback & Suggestions'}</span>
+          </button>
+          <span style={{ color: 'var(--border-subtle)' }}>•</span>
+          <button 
+            type="button" 
+            onClick={() => setIsMissionOpen(true)} 
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          >
+            <span>📜 {currentLang === 'ar' ? 'رسالة وهدف المنصة' : 'Platform Mission'}</span>
+          </button>
+          <span style={{ color: 'var(--border-subtle)' }}>•</span>
+          <button 
+            type="button" 
+            onClick={() => setIsSettingsOpen(true)} 
+            style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          >
+            <span>⚙️ {currentLang === 'ar' ? 'الإعدادات' : 'Settings'}</span>
+          </button>
         </div>
       </main>
 
@@ -1161,6 +1208,14 @@ export default function App() {
             localStorage.setItem('nemaa_tour_seen', 'true');
           } catch {}
           setTourCompleted(true);
+          if (!localStorage.getItem('nemaa_mission_seen')) {
+            setTimeout(() => {
+              setIsMissionOpen(true);
+              try {
+                localStorage.setItem('nemaa_mission_seen', 'true');
+              } catch {}
+            }, 350);
+          }
         }}
         onComplete={() => {
           setIsTourOpen(false);
@@ -1168,6 +1223,14 @@ export default function App() {
             localStorage.setItem('nemaa_tour_seen', 'true');
           } catch {}
           setTourCompleted(true);
+          if (!localStorage.getItem('nemaa_mission_seen')) {
+            setTimeout(() => {
+              setIsMissionOpen(true);
+              try {
+                localStorage.setItem('nemaa_mission_seen', 'true');
+              } catch {}
+            }, 350);
+          }
         }}
       />
 
@@ -1197,6 +1260,43 @@ export default function App() {
         allBlessings={allBlessings}
         onDeleteBlessing={handleAdminDeleteBlessing}
         onUpdateBlessing={handleUpdateBlessing}
+        lang={currentLang}
+      />
+
+      {/* Unified Settings Modal (صفحة الإعدادات الشاملة) */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        currentLang={currentLang}
+        onToggleLanguage={handleToggleLanguage}
+        fontMode={fontMode}
+        onToggleFontMode={toggleFontMode}
+        onOpenNotifications={() => setIsNotificationsOpen(true)}
+        onOpenGuide={() => setIsGuideModalOpen(true)}
+        onOpenMission={() => setIsMissionOpen(true)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
+        onOpenShareApp={() => setIsShareAppModalOpen(true)}
+        deferredPrompt={deferredPrompt}
+        onInstallPwa={() => {
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+          }
+        }}
+      />
+
+      {/* App Mission & Purpose Modal (رسالة وهدف منصة نِعْمَة) */}
+      <AppMissionModal
+        isOpen={isMissionOpen}
+        onClose={() => setIsMissionOpen(false)}
+        lang={currentLang}
+      />
+
+      {/* Feedback & Suggestions Modal (الشكاوى والمقترحات) */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
         lang={currentLang}
       />
 
