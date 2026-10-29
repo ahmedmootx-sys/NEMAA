@@ -1513,7 +1513,8 @@ export default function App() {
         onClose={() => setIsGuideModalOpen(false)}
         onStartInteractiveTour={() => {
           setIsGuideModalOpen(false);
-          setTimeout(() => setIsTourOpen(true), 250);
+          setIsSettingsOpen(false);
+          setIsTourOpen(true);
         }}
         lang={currentLang}
       />

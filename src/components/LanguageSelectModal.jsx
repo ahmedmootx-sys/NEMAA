@@ -12,7 +12,7 @@ export default function LanguageSelectModal({ isOpen, onClose, currentLang, onSe
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" style={{ zIndex: 10005 }}>
       <div 
         className="modal-content" 
         style={{ maxWidth: '440px', textAlign: 'center', padding: '32px 24px' }} 

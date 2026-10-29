@@ -5,7 +5,16 @@ export default function AppMissionModal({ isOpen, onClose, lang = 'ar' }) {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+    <div 
+      className="modal-overlay" 
+      onClick={onClose} 
+      role="dialog" 
+      aria-modal="true"
+      style={{
+        zIndex: 10005,
+        animation: 'fadeIn 0.15s ease-out'
+      }}
+    >
       <div 
         className="modal-content app-mission-modal-content"
         onClick={e => e.stopPropagation()}

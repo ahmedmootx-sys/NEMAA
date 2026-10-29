@@ -89,7 +89,7 @@ export const TRANSLATIONS = {
     langModal: {
       title: 'اختر لغة التطبيق',
       subtitle: 'Select your preferred language',
-      desc: 'يمكنك تغيير اللغة في أي وقت من الشريط العلوي للتطبيق.',
+      desc: 'يمكنك تغيير اللغة وتخصيص المظهر في أي وقت من صفحة الإعدادات ⚙️.',
       arOption: 'العربية (اللغة الأصلية)',
       enOption: 'English (Meaning & Translation)',
       confirmBtn: 'متابعة'
@@ -195,7 +195,7 @@ export const TRANSLATIONS = {
     langModal: {
       title: 'Choose Application Language',
       subtitle: 'اختر لغة التطبيق المفضلة',
-      desc: 'You can change the language anytime from the top bar.',
+      desc: 'You can change the language and customize appearance anytime from Settings ⚙️.',
       arOption: 'العربية (Original Arabic)',
       enOption: 'English (Translation of Meaning)',
       confirmBtn: 'Continue'

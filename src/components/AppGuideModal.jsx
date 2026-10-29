@@ -17,7 +17,9 @@ import {
   QrCode,
   CheckCircle2,
   Trash2,
-  BookOpen
+  BookOpen,
+  Settings,
+  MessageSquare
 } from 'lucide-react';
 
 export default function AppGuideModal({ 
@@ -30,95 +32,147 @@ export default function AppGuideModal({
 
   if (!isOpen) return null;
 
+  const isRtl = lang === 'ar';
+
   const buttonGuides = [
     {
       icon: <Sparkles size={22} color="var(--color-gold)" />,
-      title: 'زر «الحمد لله» وهالة السكينة',
-      desc: 'الزر الأساسي في المنصة؛ عند الضغط عليه بعد تدبّر النعمة يفيض نبض نوراني ذهبي دافئ مع نقرة خشبية وقورة لخرزة المسبحة ونفحة سكينة تزيدك خشوعاً دون أي آلات موسيقية.'
+      title: isRtl ? 'زر «الحمد لله» وهالة السكينة والمزامنة اللحظية' : 'Praise Button & Realtime Aura',
+      desc: isRtl 
+        ? 'الزر الأساسي في المنصة؛ عند الضغط عليه بعد تدبّر النعمة يفيض نبض نوراني دافئ مع نقرة خشبية وقورة لخرزة المسبحة، ويتحرك عداد الحامدون للنعمة لحظياً لدى جميع المستخدمين المتصلين في نفس اللحظة.'
+        : 'The core button; triggers a warm golden glow, prayer bead click, and syncs the praise counter in real-time across all users.'
     },
     {
       icon: <RefreshCw size={20} color="var(--color-primary)" />,
-      title: 'زر «نعمة جديدة» والتنقل',
-      desc: 'للتنقل الفوري بين نعم الله؛ يمكنك التنقل بالأسهم أو الضغط على «نعمة جديدة» لعرض نعمة عشوائية ملهمة (كما يمكنك استخدام زر المسافة Spacebar في لوحة المفاتيح).'
+      title: isRtl ? 'زر «نعمة جديدة» والتنقل بالسحب (Swipe)' : 'New Blessing & Swipe Navigation',
+      desc: isRtl 
+        ? 'للتنقل الفوري بين نعم الله؛ يمكنك التنقل بالأسهم، أو بسحب قالب النعمة يميناً ويساراً بأصبعك بسلاسة تامة على الهاتف، أو بالضغط على «نعمة جديدة» لعرض نعمة عشوائية ملهمة (أو زر المسافة Spacebar).'
+        : 'Seamlessly browse blessings using arrows, horizontal finger swipe on mobile, or click "New Blessing" (or Spacebar).'
+    },
+    {
+      icon: <Settings size={20} color="var(--color-gold)" />,
+      title: isRtl ? 'شاشة الإعدادات وتخصيص المنصة' : 'Settings & Full Preferences',
+      desc: isRtl 
+        ? 'شاشة شاملة في أعلى المنصة تتيح لك: اختيار مظهر التطبيق (فاتح دافئ / ليلي هادئ)، نوع الخط (عصري بوضوح فائق / تقليدي أصيل)، لغة التطبيق، إدارة نعمك المنشورة، ورسالة المنصة.'
+        : 'Comprehensive control screen for dark/light theme, modern/classic typography, language toggle, and managing your published blessings.'
+    },
+    {
+      icon: <Sparkles size={20} color="#D4AF37" />,
+      title: isRtl ? 'نشر نعمة ومساعد الكتابة الذكي' : 'Publish Blessing & Writing Assistant',
+      desc: isRtl 
+        ? 'شارك نعمة استشعرت فضلها لتظهر لجميع زوار المنصة صدقةً جارية؛ كما يتوفر مساعد كتابة ذكي يمدك بأفكار وصياغات بلاغية وشواهد قرآنية ونبوية موثقة إن احتجت للمساعدة في الصياغة.'
+        : 'Share a blessing with the community with guidance from the smart writing assistant for phrasing and authentic Quranic/Hadith proofs.'
     },
     {
       icon: <PenTool size={20} color="#319795" />,
-      title: 'صياغة وتعديل النعمة بكلامك',
-      desc: 'أيقونة القلم أعلى البطاقة تتيح لك إعادة صياغة تدبّر النعمة وكتابة تأملاتك ومشاعرك بأسلوبك الشخصي، وتُحفظ صياغتك الخاصة على جهازك بأمان.'
+      title: isRtl ? 'صياغة وتعديل النعمة بكلامك' : 'Personal Reflection Rephrasing',
+      desc: isRtl 
+        ? 'أيقونة القلم أعلى البطاقة تتيح لك كتابة تأملاتك ومشاعرك بأسلوبك وكلماتك الخاصة، وتُحفظ صياغتك بأمان على جهازك.'
+        : 'The pen icon lets you personalize reflections in your own words, stored privately on your device.'
     },
     {
       icon: <Maximize2 size={20} color="var(--color-primary)" />,
-      title: 'وضع الخلوة والتدبّر الصامت (Zen)',
-      desc: 'يُخفي جميع الأزرار وعناصر التحكم ليمنحك شاشة خلوة نقية وساكنة تركز فيها فقط على النعمة والآية الكريمة دون أي مشتتات بصرية.'
+      title: isRtl ? 'وضع الخلوة والتدبّر الصامت (Zen)' : 'Zen Reflection Mode',
+      desc: isRtl 
+        ? 'يُخفي كافة الأزرار والمشتتات ليمنحك واجهة خلوة نقية وساكنة تركز فيها فقط على النعمة والآية الكريمة بخشوع.'
+        : 'Hides all controls for a pure, distraction-free spiritual contemplation space.'
     },
     {
       icon: <Volume2 size={20} color="var(--color-gold)" />,
-      title: 'الاستماع الصوتي للنعمة',
-      desc: 'لقراءة نص النعمة والتدبّر صوتياً بنبرة عربية فصيحة ومريحة تتيح لك الاستماع والتأمل وعيناك مغلقتان (يظهر عند توفر قارئ عربي في جهازك).'
+      title: isRtl ? 'الاستماع الصوتي للنعمة' : 'Audio Narration',
+      desc: isRtl 
+        ? 'قراءة صوتية فصيحة ومريحة لنص النعمة وتدبرها تتيح لك الاستماع والتأمل وعيناك مغلقتان (يظهر عند توفر قارئ عربي في جهازك).'
+        : 'Clear Arabic audio narration to listen and reflect with closed eyes.'
     },
     {
       icon: <Globe size={20} color="#3182CE" />,
-      title: 'النعم المتشارَكة ونشر النعم',
-      desc: 'قسم مجتمعي موصول بقاعدة بيانات عالمية؛ يمكنك نشر نعمة تدبّرتها لتظهر لجميع زوار المنصة وتكون لك صدقة جارية، مع إمكانية حذفها في أي وقت.'
+      title: isRtl ? 'قسم «نِعَمي المنشورة» في الإعدادات' : 'My Published Blessings Section',
+      desc: isRtl 
+        ? 'قسم خاص في الإعدادات يعرض كل ما نشرته؛ لمتابعة عدد الذين حمدوا الله على نعمتك لحظياً، مع إمكانية تعديلها أو تصحيح أي خطأ إملائي أو حذفها في أي وقت.'
+        : 'Dedicated section in Settings to track your contributions, see live praise counts, edit typos, or remove your blessings.'
+    },
+    {
+      icon: <MessageSquare size={20} color="#38A169" />,
+      title: isRtl ? 'الشكاوى والمقترحات' : 'Feedback & Suggestions',
+      desc: isRtl 
+        ? 'نافذة تواصل مباشرة وسريعة في الإعدادات؛ لإرسال أي فكرة تطويرية أو ملاحظة تقنية لتصل فوراً إلى لوحة تحكم المشرفين لمراجعتها والعمل بها.'
+        : 'Direct feedback channel to send suggestions or report issues straight to admin moderation.'
     },
     {
       icon: <Share2 size={20} color="#805AD5" />,
-      title: 'تصدير ومشاركة كروت النعم',
-      desc: 'تصدير بطاقة النعمة كصورة فائقة الجودة بمقاس منشور مربع (1:1) أو ستوري (9:16) بزخارف إسلامية ذهبية فاخرة لنشرها في شبكات التواصل.'
+      title: isRtl ? 'تصدير ومشاركة كروت النعم' : 'Export & Share Cards',
+      desc: isRtl 
+        ? 'تصدير بطاقة النعمة كصورة فائقة الدقة بتنسيق مربع (1:1) للمنشورات أو رأسي (9:16) للقصص (Story) بزخارف إسلامية ذهبية فاخرة لنشر الخير.'
+        : 'Export high-resolution blessing cards formatted for social posts (1:1) or stories (9:16) with elegant Islamic motifs.'
     },
     {
       icon: <QrCode size={20} color="var(--color-gold)" />,
-      title: 'بوستر «شَارِكْ تُؤْجَرْ»',
-      desc: 'توليد بوستر دعوي فخم بالخط العربي المعتمد ورابط المنصة ورمز الباركود؛ لمشاركته في حالات واتساب ونيل أجر الدال على الخير كفاعله.'
+      title: isRtl ? 'بوستر «شَارِكْ تُؤْجَرْ»' : 'Share & Be Rewarded Poster',
+      desc: isRtl 
+        ? 'توليد بوستر دعوي فخم بالخط العربي ورابط المنصة والباركود المباشر لمشاركته في حالات واتساب وشبكات التواصل لنيل أجر الدال على الخير.'
+        : 'Generate an elegant calligraphy poster with direct QR code for status updates and social media.'
     },
     {
       icon: <HeartHandshake size={20} color="#E53E3E" />,
-      title: 'مفكرة الامتنان وقائمة المفضلة',
-      desc: 'مفكرة لتدوين 3 نعم شكرت الله عليها اليوم مع أرشيف أسبوعي، بالإضافة لخاصية حفظ النعم المحببة إلى قلبك في قائمة المفضلة للرجوع إليها.'
+      title: isRtl ? 'مفكرة الامتنان وقائمة المفضلة' : 'Gratitude Journal & Favorites',
+      desc: isRtl 
+        ? 'مفكرة يومية لتدوين 3 نعم شكرت الله عليها مع أرشيف أسبوعي، إلى جانب حفظ النعم المؤثرة في المفضلة للرجوع إليها متى شئت.'
+        : 'Daily journal to record 3 personal blessings plus bookmarks for favorite blessings.'
     }
   ];
 
   const changelog = [
     {
-      version: 'الإصدار 2.5 (الأحدث)',
+      version: 'الإصدار 3.0 (الأحدث)',
       date: 'اليوم',
-      badge: 'ميزات كبرى جديدة',
+      badge: 'تحديث شامل',
       items: [
-        '✨ تكامل Supabase العالمي: إمكانية نشر وتشارك النعم بين جميع زوار المنصة وتحديثها لحظياً (Realtime).',
-        '🗑️ إمكانية حذف النعمة المنشورة: يملك ناشر النعمة خيار حذفها من النشر العام في أي وقت بكل سهولة.',
-        '🕊️ هالة السكينة ونور الحمد: استبدال القصاصات بهالة نور ذهبية ونقر تسبيحة وقورة غير موسيقية تبعث الطمأنينة والخشوع في القلب.',
-        '🛡️ فحص جودة الكلام والأدب: نظام ذكي يمنع الألفاظ البذيئة والنصوص غير المفهومة، مع إتاحة تسمية النعمة بكلمة واحدة مفهومة.',
-        '🎨 تحسين مقاس المنشور المربع (1:1): تكبير خط الرقعة وضبط تباعد النصوص والشاهد لسهولة القراءة التامة بدون أي تداخل.',
-        '🧭 دليل التطبيق التفاعلي: جولة النقطة المضيئة (Spotlight) ودليل الأزرار الشامل عند فتح التطبيق لأول مرة.'
+        '⚙️ شاشة إعدادات متكاملة: تجميع خيارات المظهر، الخط، اللغة، الدليل، والشكاوى والمقترحات في شاشة كاملة موحدة ومريحة للهاتف.',
+        '🤲 تحديث عداد الحامدون لحظياً: تحرك العداد فوراً لدى كافة المستخدمين المتصلين مع إشعارات تدبّر رقيقة عند حمد الآخرين.',
+        '✍️ مساعد كتابة النعمة بالذكاء الاصطناعي: مساعدة المتدبر في صياغة النعمة واقتراح شواهد موثقة من القرآن والسنة.',
+        '📱 التنقل بالسحب (Swipe): إمكانية تقليب كروت النعم بالسحب بالأصبع يميناً ويساراً بسلاسة تامة على الهواتف.',
+        '💎 أيقونات فيكتور عصرية ناعمة: استبدال الرموز التعبيرية بأيقونات هندسية أنيقة متناسقة مع الهوية الذهبية للمنصة.',
+        '📂 قسم «نِعَمي المنشورة»: إمكانية تعديل نعمتك أو حذفها ومتابعة عدد الحامدون عليها من داخل الإعدادات.'
       ]
     },
     {
-      version: 'الإصدار 2.0',
+      version: 'الإصدار 2.5',
       date: 'تحديث سابق',
-      badge: 'أدوات ونشر',
+      badge: 'ميزات مجتمعية',
       items: [
-        '📜 بوستر «شَارِكْ تُؤْجَرْ» بالخط العربي الفاخر والباركود المباشر لنشر التطبيق.',
-        '✍️ إمكانية صياغة وتعديل النعمة بكلامك الخاص مع حفظها على جهازك.',
-        '📱 دعم تثبيت التطبيق PWA خفيف الحجم يعمل بدون إنترنت على جميع الهواتف والحواسيب.',
-        '📖 إضافة 50 نعمة جديدة وتدقيقات لغوية وشرعية لجميع الشواهد.'
+        '✨ نشر وتشارك النعم بين جميع زوار المنصة وتحديثها لحظياً.',
+        '🛡️ لوحة إدارة متطورة لمراجعة البلاغات والشكاوى وتعديل النعم أو حذفها.',
+        '🕊️ هالة السكينة ونور الحمد مع نقر تسبيحة وقورة غير موسيقية.',
+        '🎨 تحسين تصدير المنشورات المربعة والقصص (Stories) بدقة عالية.'
       ]
     }
   ];
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+    <div 
+      className="modal-overlay" 
+      onClick={onClose} 
+      role="dialog" 
+      aria-modal="true"
+      style={{
+        zIndex: 10005,
+        animation: 'fadeIn 0.15s ease-out'
+      }}
+    >
       <div 
         className="modal-content guide-modal-content" 
         onClick={e => e.stopPropagation()}
         style={{ 
           maxWidth: '680px', 
+          width: '94%',
           maxHeight: '90vh', 
           display: 'flex', 
-          flexDirection: 'column',
+          flexDirection: 'column', 
           padding: 0,
           background: 'var(--surface-card)',
           border: '1.5px solid var(--border-gold)',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.65), 0 0 30px rgba(212, 175, 55, 0.15)',
+          borderRadius: '24px',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.45), 0 0 30px rgba(212, 175, 55, 0.15)',
           overflow: 'hidden'
         }}
       >
@@ -129,11 +183,11 @@ export default function AppGuideModal({
               <Compass size={22} color="var(--color-gold)" />
             </div>
             <div>
-              <h2 style={{ fontSize: '20px', fontFamily: 'var(--font-arabic-title)', margin: 0, color: 'var(--text-title)' }}>
-                {lang === 'ar' ? 'دليل منصة نِعْمَة والتحديثات' : 'NEMAA Guide & Updates'}
+              <h2 style={{ fontSize: '19px', fontFamily: 'var(--font-arabic-title)', margin: 0, color: 'var(--text-title)' }}>
+                {lang === 'ar' ? 'دليل منصة نِعْمَة واستكشاف الميزات' : 'NEMAA Guide & Features'}
               </h2>
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '3px 0 0' }}>
-                {lang === 'ar' ? 'تعرّف على كافة أزرار التطبيق وميزاته الجديدة' : 'Explore app buttons and recent updates'}
+              <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: '3px 0 0' }}>
+                {lang === 'ar' ? 'تعرّف على كافة الأزرار والوظائف والتحديثات الجديدة' : 'Explore all buttons, features, and recent updates'}
               </p>
             </div>
           </div>
@@ -143,7 +197,7 @@ export default function AppGuideModal({
             className="btn-icon" 
             onClick={onClose}
             aria-label="إغلاق"
-            style={{ width: '36px', height: '36px' }}
+            style={{ width: '36px', height: '36px', borderRadius: '50%' }}
           >
             <X size={18} />
           </button>
@@ -159,7 +213,7 @@ export default function AppGuideModal({
               padding: '12px 10px',
               border: 'none',
               background: 'transparent',
-              fontSize: '14px',
+              fontSize: '13.5px',
               fontWeight: activeTab === 'buttons' ? '700' : '500',
               color: activeTab === 'buttons' ? 'var(--color-primary)' : 'var(--text-muted)',
               borderBottom: activeTab === 'buttons' ? '2.5px solid var(--color-gold)' : '2.5px solid transparent',
@@ -171,7 +225,7 @@ export default function AppGuideModal({
             }}
           >
             <HelpCircle size={16} />
-            <span>شرح أزرار وخصائص التطبيق</span>
+            <span>شرح الأزرار والوظائف</span>
           </button>
 
           <button
@@ -182,7 +236,7 @@ export default function AppGuideModal({
               padding: '12px 10px',
               border: 'none',
               background: 'transparent',
-              fontSize: '14px',
+              fontSize: '13.5px',
               fontWeight: activeTab === 'changelog' ? '700' : '500',
               color: activeTab === 'changelog' ? 'var(--color-primary)' : 'var(--text-muted)',
               borderBottom: activeTab === 'changelog' ? '2.5px solid var(--color-gold)' : '2.5px solid transparent',
@@ -194,7 +248,7 @@ export default function AppGuideModal({
             }}
           >
             <Sparkles size={16} color="var(--color-gold)" />
-            <span>سجل ما الجديد في التحديثات</span>
+            <span>ما الجديد في التحديثات</span>
           </button>
         </div>
 

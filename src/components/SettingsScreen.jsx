@@ -710,10 +710,7 @@ export default function SettingsScreen({
 
             {/* Guide Tour Row */}
             <div
-              onClick={() => {
-                onClose();
-                setTimeout(() => onOpenGuide && onOpenGuide(), 200);
-              }}
+              onClick={onOpenGuide}
               role="button"
               tabIndex={0}
               style={{
