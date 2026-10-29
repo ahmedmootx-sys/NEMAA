@@ -367,32 +367,6 @@ export default function BlessingCard({
               <Share2 size={16} />
             </button>
 
-            {/* Edit Published Blessing (shown only for user's own published blessings) */}
-            {isMyPublished && (
-              <button
-                className="card-action-btn btn-edit-published"
-                onClick={() => onEditPublished && onEditPublished(blessing)}
-                title={lang === 'ar' ? 'تعديل وتصحيح هذه النعمة المنشورة' : 'Edit published blessing'}
-                aria-label="تعديل النعمة المنشورة"
-                style={{ color: 'var(--color-gold)' }}
-              >
-                <Edit3 size={15} />
-              </button>
-            )}
-
-            {/* Delete Published Blessing (shown only for user's own published blessings) */}
-            {isMyPublished && (
-              <button
-                className="card-action-btn btn-delete-published"
-                onClick={() => onDeletePublished && onDeletePublished(blessing)}
-                title={lang === 'ar' ? 'حذف هذه النعمة من النشر للجميع' : 'Delete this blessing from publication'}
-                aria-label="حذف النعمة من النشر"
-                style={{ color: '#E53E3E' }}
-              >
-                <Trash2 size={15} />
-              </button>
-            )}
-
             {/* Report Button (للنعم المشاركة ونعم التطبيق) */}
             <button
               className="card-action-btn btn-report-blessing"

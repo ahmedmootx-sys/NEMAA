@@ -31,7 +31,8 @@ export function formatSharedBlessing(raw, index = 0) {
   const reflection = (raw.reflection || '').trim();
   const rawAuthor = (raw.author || '').trim();
   const author = (rawAuthor && rawAuthor !== 'محب للخير') ? rawAuthor : '';
-  const id = raw.id ? String(raw.id) : `sb_${simpleHash(title + reflection)}_${index}`;
+  const stableKey = raw.created_at ? (title + '_' + raw.created_at) : (title + '_' + reflection);
+  const id = raw.id ? String(raw.id) : (raw.client_id || `sb_${simpleHash(stableKey)}`);
 
   return {
     id,
@@ -301,10 +302,12 @@ export async function updateSharedBlessing(oldBlessing, newFields) {
       }
     }
 
-    const formattedUpdated = formatSharedBlessing(
-      updatedRow || { ...(isObj ? oldBlessing : {}), ...updatePayload },
-      blessingId || Date.now()
-    );
+    const baseObj = updatedRow || { ...(isObj ? oldBlessing : {}), ...updatePayload };
+    const preserveId = (isObj && oldBlessing.id) ? String(oldBlessing.id) : (blessingId ? String(blessingId) : null);
+    const formattedUpdated = {
+      ...formatSharedBlessing(baseObj, 0),
+      id: preserveId || baseObj.id || `sb_${simpleHash(cleanTitle)}`
+    };
 
     return {
       success: true,
@@ -526,7 +529,13 @@ export async function fetchBlessingReports() {
     });
   } catch {}
 
-  return reports;
+  // Filter OUT suggestions and complaints (which belong to the feedback tab)
+  return reports.filter(r => {
+    if (!r) return false;
+    const isFeedback = (r.reason === 'اقتراح وتطوير' || r.reason === 'شكوى أو مشكلة' ||
+      (r.blessing_title && (r.blessing_title.startsWith('[اقتراح]') || r.blessing_title.startsWith('[شكوى]'))));
+    return !isFeedback;
+  });
 }
 
 /**
@@ -661,16 +670,22 @@ export function subscribeToSharedBlessings(onNewBlessing, onDeleteBlessing, onUp
  */
 
 /**
- * Submit feedback or a suggestion from any user
+ * Submit feedback or a suggestion from any user (Dual Smart Routing)
+ * Attempts to save to 'feedback' table; if missing/unreachable, gracefully falls back to 'reports' table.
  */
 export async function submitFeedback({ type = 'suggestion', title = '', content = '', userName = '', contact = '' }) {
+  const cleanTitle = (title || '').trim();
+  const cleanContent = (content || '').trim();
+  const cleanUserName = (userName || '').trim();
+  const cleanContact = (contact || '').trim();
+
   const feedbackObj = {
     id: `fb_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     type: type || 'suggestion', // 'suggestion' | 'complaint' | 'other'
-    title: (title || '').trim(),
-    content: (content || '').trim(),
-    user_name: (userName || '').trim() || null,
-    contact: (contact || '').trim() || null,
+    title: cleanTitle,
+    content: cleanContent,
+    user_name: cleanUserName || null,
+    contact: cleanContact || null,
     status: 'pending', // 'pending' | 'accepted' | 'rejected'
     admin_notes: null,
     created_at: new Date().toISOString()
@@ -679,24 +694,55 @@ export async function submitFeedback({ type = 'suggestion', title = '', content 
   let remoteSuccess = false;
   let remoteError = null;
 
+  // 1. Try 'feedback' table first
   try {
     const { data, error } = await supabase
       .from('feedback')
       .insert([feedbackObj])
       .select();
 
-    if (!error) {
+    if (!error && Array.isArray(data) && data.length > 0) {
       remoteSuccess = true;
-    } else {
+    } else if (error) {
       remoteError = error;
-      console.warn('Supabase feedback insert error:', error);
     }
   } catch (err) {
     remoteError = err;
-    console.warn('Feedback insert network error:', err);
   }
 
-  // Local storage cache fallback
+  // 2. If 'feedback' table not found or errored, use resilient fallback into 'reports'
+  if (!remoteSuccess) {
+    try {
+      const typeLabel = feedbackObj.type === 'complaint' ? 'شكوى' : 'اقتراح';
+      const reasonLabel = feedbackObj.type === 'complaint' ? 'شكوى أو مشكلة' : 'اقتراح وتطوير';
+      const contactInfo = `[بيانات التواصل: ${cleanUserName || 'فاعل خير'} | ${cleanContact || 'بدون'}]`;
+      const combinedNotes = `${cleanContent}\n\n${contactInfo}`;
+
+      const reportPayload = {
+        id: feedbackObj.id,
+        blessing_id: 'feedback_entry',
+        blessing_title: `[${typeLabel}] ${cleanTitle}`,
+        reason: reasonLabel,
+        notes: combinedNotes,
+        status: 'pending',
+        created_at: feedbackObj.created_at
+      };
+
+      const res = await supabase
+        .from('reports')
+        .insert([reportPayload])
+        .select();
+
+      if (!res.error) {
+        remoteSuccess = true;
+        remoteError = null;
+      }
+    } catch (fallbackErr) {
+      console.warn('Fallback insert to reports error:', fallbackErr);
+    }
+  }
+
+  // 3. Local storage cache fallback
   try {
     const cached = JSON.parse(localStorage.getItem('nemaa_feedback_cache') || '[]');
     cached.unshift(feedbackObj);
@@ -707,10 +753,44 @@ export async function submitFeedback({ type = 'suggestion', title = '', content 
 }
 
 /**
- * Fetch all feedback items for the admin panel
+ * Helper to convert a report row into standard feedback item
+ */
+function parseReportToFeedback(rep) {
+  const isComplaint = (rep.reason || '').includes('شكوى') || (rep.blessing_title || '').includes('[شكوى]');
+  let cleanTitle = (rep.blessing_title || '').replace(/^\[(شكوى|اقتراح)\]\s*/, '').trim();
+  let content = rep.notes || '';
+  let userName = '';
+  let contact = '';
+
+  const match = content.match(/\[بيانات التواصل:\s*(.*?)\s*\|\s*(.*?)\]$/);
+  if (match) {
+    userName = match[1] === 'فاعل خير' ? '' : match[1];
+    contact = match[2] === 'بدون' ? '' : match[2];
+    content = content.replace(/\n\n\[بيانات التواصل:.*?\]$/, '').trim();
+  }
+
+  return {
+    id: rep.id,
+    type: isComplaint ? 'complaint' : 'suggestion',
+    title: cleanTitle || 'بدون عنوان',
+    content: content,
+    user_name: userName || null,
+    contact: contact || null,
+    status: rep.status || 'pending',
+    admin_notes: null,
+    created_at: rep.created_at,
+    sourceTable: 'reports'
+  };
+}
+
+/**
+ * Fetch all feedback items for the admin panel (from feedback table + reports fallback)
  */
 export async function fetchFeedback() {
-  let list = [];
+  const list = [];
+  const seenIds = new Set();
+
+  // 1. Fetch from 'feedback' table
   try {
     const { data, error } = await supabase
       .from('feedback')
@@ -718,22 +798,51 @@ export async function fetchFeedback() {
       .order('created_at', { ascending: false });
 
     if (!error && Array.isArray(data)) {
-      list = data;
+      data.forEach(item => {
+        if (item && item.id && !seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          list.push(item);
+        }
+      });
     }
   } catch (err) {
-    console.warn('Failed to query feedback from Supabase:', err);
+    console.warn('Failed to query feedback table:', err);
   }
 
-  // Merge with local fallback
+  // 2. Fetch feedback items routed through 'reports' table
+  try {
+    const { data: repData, error: repError } = await supabase
+      .from('reports')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!repError && Array.isArray(repData)) {
+      repData.forEach(rep => {
+        const isFeedbackType = (rep.reason === 'اقتراح وتطوير' || rep.reason === 'شكوى أو مشكلة' || 
+          (rep.blessing_title && (rep.blessing_title.startsWith('[اقتراح]') || rep.blessing_title.startsWith('[شكوى]'))));
+        if (isFeedbackType && rep.id && !seenIds.has(rep.id)) {
+          seenIds.add(rep.id);
+          list.push(parseReportToFeedback(rep));
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Failed to query reports for feedback:', err);
+  }
+
+  // 3. Merge with local fallback
   try {
     const local = JSON.parse(localStorage.getItem('nemaa_feedback_cache') || '[]');
     local.forEach(item => {
-      if (!list.some(f => f.id === item.id)) {
+      if (item && item.id && !seenIds.has(item.id)) {
+        seenIds.add(item.id);
         list.push(item);
       }
     });
   } catch {}
 
+  // Sort newest first
+  list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   return list;
 }
 
@@ -741,6 +850,7 @@ export async function fetchFeedback() {
  * Update feedback status (accept or reject) with optional admin notes
  */
 export async function updateFeedbackStatus(feedbackId, status = 'accepted', adminNotes = '') {
+  // Update in 'feedback' table
   try {
     await supabase
       .from('feedback')
@@ -750,9 +860,18 @@ export async function updateFeedbackStatus(feedbackId, status = 'accepted', admi
         updated_at: new Date().toISOString()
       })
       .eq('id', feedbackId);
-  } catch (err) {
-    console.warn('Error updating feedback status in Supabase:', err);
-  }
+  } catch {}
+
+  // Also update in 'reports' table if it was stored there
+  try {
+    await supabase
+      .from('reports')
+      .update({
+        status,
+        notes: adminNotes ? `[ملاحظة الأدمن: ${adminNotes}]` : undefined
+      })
+      .eq('id', feedbackId);
+  } catch {}
 
   // Update local cache
   try {
@@ -768,11 +887,15 @@ export async function updateFeedbackStatus(feedbackId, status = 'accepted', admi
  * Delete feedback item
  */
 export async function deleteFeedback(feedbackId) {
+  // Delete from 'feedback'
   try {
     await supabase.from('feedback').delete().eq('id', feedbackId);
-  } catch (err) {
-    console.warn('Error deleting feedback from Supabase:', err);
-  }
+  } catch {}
+
+  // Delete from 'reports'
+  try {
+    await supabase.from('reports').delete().eq('id', feedbackId);
+  } catch {}
 
   try {
     const cached = JSON.parse(localStorage.getItem('nemaa_feedback_cache') || '[]');
@@ -784,35 +907,57 @@ export async function deleteFeedback(feedbackId) {
 }
 
 /**
- * Realtime subscription for feedback items
+ * Realtime subscription for feedback items (subscribes to feedback and reports fallback)
  */
 export function subscribeToFeedback(onNewFeedback, onDeleteFeedback, onUpdateFeedback) {
+  const channels = [];
+
   try {
-    const channel = supabase
+    const channel1 = supabase
       .channel('realtime_feedback_channel')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'feedback' },
         (payload) => {
           if (payload && payload.eventType === 'INSERT' && payload.new) {
-            if (typeof onNewFeedback === 'function') {
-              onNewFeedback(payload.new);
-            }
+            if (typeof onNewFeedback === 'function') onNewFeedback(payload.new);
           } else if (payload && payload.eventType === 'UPDATE' && payload.new) {
-            if (typeof onUpdateFeedback === 'function') {
-              onUpdateFeedback(payload.new, payload.old);
-            }
+            if (typeof onUpdateFeedback === 'function') onUpdateFeedback(payload.new, payload.old);
           } else if (payload && payload.eventType === 'DELETE' && payload.old) {
-            if (typeof onDeleteFeedback === 'function') {
-              onDeleteFeedback(payload.old);
-            }
+            if (typeof onDeleteFeedback === 'function') onDeleteFeedback(payload.old);
           }
         }
       )
       .subscribe();
+    channels.push(channel1);
+
+    const channel2 = supabase
+      .channel('realtime_reports_feedback_channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reports' },
+        (payload) => {
+          if (payload && payload.new) {
+            const isFeedback = (payload.new.reason === 'اقتراح وتطوير' || payload.new.reason === 'شكوى أو مشكلة' ||
+              (payload.new.blessing_title && (payload.new.blessing_title.startsWith('[اقتراح]') || payload.new.blessing_title.startsWith('[شكوى]'))));
+            if (isFeedback) {
+              const formatted = parseReportToFeedback(payload.new);
+              if (payload.eventType === 'INSERT' && typeof onNewFeedback === 'function') {
+                onNewFeedback(formatted);
+              } else if (payload.eventType === 'UPDATE' && typeof onUpdateFeedback === 'function') {
+                onUpdateFeedback(formatted, payload.old);
+              }
+            }
+          } else if (payload && payload.eventType === 'DELETE' && payload.old) {
+            if (typeof onDeleteFeedback === 'function') onDeleteFeedback(payload.old);
+          }
+        }
+      )
+      .subscribe();
+    channels.push(channel2);
 
     return () => {
-      supabase.removeChannel(channel);
+      channels.forEach(ch => supabase.removeChannel(ch));
     };
   } catch (err) {
     console.warn('Feedback realtime subscription error:', err);

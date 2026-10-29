@@ -18,7 +18,7 @@ import InstallAppToast from './components/InstallAppToast';
 import { INITIAL_BLESSINGS, CATEGORIES } from './data/blessings';
 import { exportBlessingAsImage } from './utils/cardExporter';
 import { TRANSLATIONS } from './i18n/translations';
-import { Award, Sparkles, X } from 'lucide-react';
+import { Award, Sparkles, X, MessageSquare, Scroll, Settings } from 'lucide-react';
 import { 
   fetchSharedBlessings, 
   subscribeToSharedBlessings, 
@@ -36,7 +36,7 @@ import OnboardingTour from './components/OnboardingTour';
 import AppGuideModal from './components/AppGuideModal';
 import ReportModal from './components/ReportModal';
 import AdminModal from './components/AdminModal';
-import SettingsModal from './components/SettingsModal';
+import SettingsScreen from './components/SettingsScreen';
 import AppMissionModal from './components/AppMissionModal';
 import FeedbackModal from './components/FeedbackModal';
 
@@ -391,6 +391,31 @@ export default function App() {
     }
   });
 
+  // Persistent User's Own Published Blessings (Preserves full ownership, praise counts & edits)
+  const [myPublishedBlessings, setMyPublishedBlessings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_my_published_blessings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const custom = localStorage.getItem('nemaa_custom_blessings');
+      if (custom) {
+        const parsed = JSON.parse(custom);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(myPublishedBlessings));
+    } catch {}
+  }, [myPublishedBlessings]);
+
   // User-Customized / Rephrased Blessings State (Edits to existing blessings)
   const [customizedBlessings, setCustomizedBlessings] = useState(() => {
     try {
@@ -417,36 +442,75 @@ export default function App() {
     localStorage.setItem('nemaa_customized_blessings', JSON.stringify(updated));
   };
 
-  // Combined Blessings Pool: Shared Supabase blessings first (newest first), then custom, then INITIAL_BLESSINGS
-  // Filter out any blessing permanently deleted by the admin
+  // Combined Blessings Pool with Strict Deduplication (Prevents duplicate cards)
   const allBlessings = useMemo(() => {
-    const pool = [...sharedBlessings, ...customBlessings, ...INITIAL_BLESSINGS];
-    return pool
-      .filter(b => b && (b.title || '').trim() && (b.reflection || '').trim())
-      .filter(b => !adminDeletedIds.includes(String(b.id)) && !adminDeletedIds.includes(b.title))
-      .map(b => {
-        if (customizedBlessings[b.id]) {
-          return {
-            ...b,
-            ...customizedBlessings[b.id],
-            isCustomized: true
-          };
-        }
-        return b;
-      });
-  }, [sharedBlessings, customBlessings, customizedBlessings, adminDeletedIds]);
+    const pool = [];
+    const seenTitles = new Set();
+    const seenIds = new Set();
+
+    const addUnique = (b) => {
+      if (!b) return;
+      const cleanTitle = (b.title || '').trim();
+      const cleanReflection = (b.reflection || '').trim();
+      if (!cleanTitle || !cleanReflection) return;
+      const strId = String(b.id || '');
+
+      // Check admin deleted
+      if (adminDeletedIds.includes(strId) || adminDeletedIds.includes(cleanTitle)) {
+        return;
+      }
+
+      // Check uniqueness: deduplicate by id OR by (title + initial reflection preview)
+      const sig = cleanTitle.toLowerCase();
+      if (seenIds.has(strId) || seenTitles.has(sig)) {
+        return;
+      }
+
+      seenIds.add(strId);
+      seenTitles.add(sig);
+
+      // Check if user has personal local customizations
+      if (customizedBlessings[strId]) {
+        pool.push({
+          ...b,
+          ...customizedBlessings[strId],
+          isCustomized: true
+        });
+      } else {
+        pool.push(b);
+      }
+    };
+
+    // 1. First shared blessings (from Supabase, newest first)
+    sharedBlessings.forEach(addUnique);
+
+    // 2. User's own published blessings (offline resilient)
+    myPublishedBlessings.forEach(addUnique);
+
+    // 3. Custom blessings
+    customBlessings.forEach(addUnique);
+
+    // 4. Initial platform catalog
+    INITIAL_BLESSINGS.forEach(addUnique);
+
+    return pool;
+  }, [sharedBlessings, myPublishedBlessings, customBlessings, customizedBlessings, adminDeletedIds]);
 
   // Compute live praise count for any blessing (offline durable + remote sync)
   const getBlessingPraises = useCallback((blessing) => {
-    if (!blessing) return 1;
+    if (!blessing) return 0;
     const strId = String(blessing.id);
     if (blessingPraises[strId] !== undefined) {
       return blessingPraises[strId];
     }
-    if (blessing.praisesCount) {
+    if (typeof blessing.praisesCount === 'number') {
       return blessing.praisesCount;
     }
-    // Authentic deterministic baseline for built-in blessings based on content hash
+    // Newly published / shared blessings strictly start at 0 (never 38!)
+    if (blessing.isShared || blessing.isCustom || strId.startsWith('sb_') || strId.startsWith('custom_') || strId.startsWith('pb_')) {
+      return 0;
+    }
+    // Authentic deterministic baseline ONLY for initial built-in blessings
     const hashNum = parseInt(simpleHash(blessing.title || strId), 36) || 42;
     return (hashNum % 140) + 18;
   }, [blessingPraises]);
@@ -653,39 +717,54 @@ export default function App() {
     }
   };
 
-  // 7. Publish Shared Blessing to Supabase & Local State
+  // 7. Publish Shared Blessing to Supabase & Local State (Ensures unique ID & zero praise baseline)
   const handleBlessingPublished = (newBlessing, meta = {}) => {
+    const stableId = newBlessing.id || `pb_${Date.now()}_${simpleHash(newBlessing.title || '').slice(0, 6)}`;
+    const fullBlessing = {
+      ...newBlessing,
+      id: stableId,
+      isShared: true,
+      praisesCount: 0
+    };
+
     // Prepend to shared blessings
     setSharedBlessings(prev => {
-      const filtered = prev.filter(b => b.id !== newBlessing.id);
-      const updated = [newBlessing, ...filtered];
+      const filtered = prev.filter(b => b.id !== stableId && b.title !== fullBlessing.title);
+      const updated = [fullBlessing, ...filtered];
       try {
         localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
       } catch {}
       return updated;
     });
 
+    // Prepend to user's myPublishedBlessings list (Keeps persistent ownership)
+    setMyPublishedBlessings(prev => {
+      const filtered = prev.filter(b => b.id !== stableId && b.title !== fullBlessing.title);
+      const updated = [fullBlessing, ...filtered];
+      try {
+        localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
     // Also persist in customBlessings for offline durability
     setCustomBlessings(prev => {
-      const filtered = prev.filter(b => b.id !== newBlessing.id);
-      const updated = [newBlessing, ...filtered];
+      const filtered = prev.filter(b => b.id !== stableId && b.title !== fullBlessing.title);
+      const updated = [fullBlessing, ...filtered];
       try {
         localStorage.setItem('nemaa_custom_blessings', JSON.stringify(updated));
       } catch {}
       return updated;
     });
 
-    // Also register in user's own published IDs list so they can manage/delete it
-    if (newBlessing && newBlessing.id) {
-      const strId = String(newBlessing.id);
-      setMyPublishedIds(prev => {
-        const updated = [strId, ...prev.filter(id => id !== strId)];
-        try {
-          localStorage.setItem('nemaa_my_published_ids', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-    }
+    // Register in myPublishedIds
+    setMyPublishedIds(prev => {
+      const updated = [stableId, ...prev.filter(id => id !== stableId)];
+      try {
+        localStorage.setItem('nemaa_my_published_ids', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
 
     // Immediately display the newly added blessing
     setActiveCategory('all');
@@ -709,6 +788,53 @@ export default function App() {
         colors: ['#D4AF37', '#2C4A3E', '#F5D77F', '#528974', '#FFFFFF']
       });
     } catch {}
+  };
+
+  // Delete a user's own published blessing from Settings -> My Published Blessings
+  const handleDeletePublishedBlessing = async (blessing) => {
+    if (!blessing) return;
+    const confirmPrompt = currentLang === 'ar' 
+      ? `هل أنت متأكد من رغبتك في حذف نعمة «${blessing.title}»؟` 
+      : `Are you sure you want to remove "${blessing.title}"?`;
+    if (!window.confirm(confirmPrompt)) return;
+
+    const strId = String(blessing.id);
+    const title = (blessing.title || '').trim();
+
+    // 1. Remove from myPublishedBlessings
+    setMyPublishedBlessings(prev => {
+      const updated = prev.filter(b => String(b.id) !== strId && b.title !== title);
+      try {
+        localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 2. Remove from shared blessings
+    setSharedBlessings(prev => {
+      const updated = prev.filter(b => String(b.id) !== strId && b.title !== title);
+      try {
+        localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 3. Remove from custom blessings
+    setCustomBlessings(prev => {
+      const updated = prev.filter(b => String(b.id) !== strId && b.title !== title);
+      try {
+        localStorage.setItem('nemaa_custom_blessings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 4. Remote delete from Supabase
+    try {
+      await deleteSharedBlessing(blessing);
+    } catch {}
+
+    setToastMessage(currentLang === 'ar' ? 'تم حذف النعمة بنجاح' : 'Blessing deleted successfully');
+    setTimeout(() => setToastMessage(''), 3500);
   };
 
   // Delete a user's own published blessing
@@ -847,14 +973,30 @@ export default function App() {
       console.warn('Error updating blessing in Supabase:', err);
     }
 
-    const mergedUpdated = updatedRemote || {
+    const mergedUpdated = {
       ...oldBlessing,
       ...newFields,
+      ...(updatedRemote || {}),
+      id: oldId, // ALWAYS PRESERVE ID SO OWNERSHIP IS NEVER LOST
       title: newFields.title || oldTitle,
       reflection: newFields.reflection || oldBlessing.reflection
     };
 
-    // 2. Update in sharedBlessings state & cache
+    // 2. Update in myPublishedBlessings (Preserves user's ownership permanently)
+    setMyPublishedBlessings(prev => {
+      const updated = prev.map(b => {
+        if ((oldId && String(b.id) === oldId) || (oldTitle && b.title === oldTitle)) {
+          return { ...b, ...mergedUpdated };
+        }
+        return b;
+      });
+      try {
+        localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 3. Update in sharedBlessings state & cache
     setSharedBlessings(prev => {
       const updated = prev.map(b => {
         if ((oldId && String(b.id) === oldId) || (oldTitle && b.title === oldTitle)) {
@@ -1095,30 +1237,69 @@ export default function App() {
           </p>
         </div>
 
-        {/* Quick Footer Links */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px', marginTop: '16px', flexWrap: 'wrap' }}>
+        {/* Quick Footer Links - Vector Icons only (no emojis) */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '16px', flexWrap: 'wrap' }}>
           <button 
             type="button" 
             onClick={() => setIsFeedbackOpen(true)} 
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              color: 'var(--color-primary)', 
+              fontSize: '13px', 
+              fontWeight: '700', 
+              cursor: 'pointer', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '6px 10px',
+              borderRadius: '8px'
+            }}
           >
-            <span>💬 {currentLang === 'ar' ? 'الشكاوى والمقترحات' : 'Feedback & Suggestions'}</span>
+            <MessageSquare size={14} color="var(--color-gold)" />
+            <span>{currentLang === 'ar' ? 'الشكاوى والمقترحات' : 'Feedback & Suggestions'}</span>
           </button>
           <span style={{ color: 'var(--border-subtle)' }}>•</span>
           <button 
             type="button" 
             onClick={() => setIsMissionOpen(true)} 
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              color: 'var(--color-primary)', 
+              fontSize: '13px', 
+              fontWeight: '700', 
+              cursor: 'pointer', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '6px 10px',
+              borderRadius: '8px'
+            }}
           >
-            <span>📜 {currentLang === 'ar' ? 'رسالة وهدف المنصة' : 'Platform Mission'}</span>
+            <Scroll size={14} color="var(--color-gold)" />
+            <span>{currentLang === 'ar' ? 'رسالة وهدف المنصة' : 'Platform Mission'}</span>
           </button>
           <span style={{ color: 'var(--border-subtle)' }}>•</span>
           <button 
             type="button" 
             onClick={() => setIsSettingsOpen(true)} 
-            style={{ background: 'transparent', border: 'none', color: 'var(--color-primary)', fontSize: '13px', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              color: 'var(--color-primary)', 
+              fontSize: '13px', 
+              fontWeight: '700', 
+              cursor: 'pointer', 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '6px 10px',
+              borderRadius: '8px'
+            }}
           >
-            <span>⚙️ {currentLang === 'ar' ? 'الإعدادات' : 'Settings'}</span>
+            <Settings size={14} color="var(--color-gold)" />
+            <span>{currentLang === 'ar' ? 'الإعدادات' : 'Settings'}</span>
           </button>
         </div>
       </main>
@@ -1263,8 +1444,8 @@ export default function App() {
         lang={currentLang}
       />
 
-      {/* Unified Settings Modal (صفحة الإعدادات الشاملة) */}
-      <SettingsModal
+      {/* Full-Screen Dedicated Settings View (صفحة الإعدادات الشاملة المستقلة) */}
+      <SettingsScreen
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         theme={theme}
@@ -1273,7 +1454,13 @@ export default function App() {
         onToggleLanguage={handleToggleLanguage}
         fontMode={fontMode}
         onToggleFontMode={toggleFontMode}
-        onOpenNotifications={() => setIsNotificationsOpen(true)}
+        myPublishedBlessings={myPublishedBlessings}
+        onEditBlessing={(blessing) => {
+          setBlessingToEditPublished(blessing);
+          setIsEditPublishedOpen(true);
+        }}
+        onDeleteBlessing={handleDeletePublishedBlessing}
+        onOpenPublish={() => setIsAddModalOpen(true)}
         onOpenGuide={() => setIsGuideModalOpen(true)}
         onOpenMission={() => setIsMissionOpen(true)}
         onOpenFeedback={() => setIsFeedbackOpen(true)}
@@ -1284,6 +1471,7 @@ export default function App() {
             deferredPrompt.prompt();
           }
         }}
+        getBlessingPraises={getBlessingPraises}
       />
 
       {/* App Mission & Purpose Modal (رسالة وهدف منصة نِعْمَة) */}

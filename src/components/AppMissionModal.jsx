@@ -33,9 +33,25 @@ export default function AppMissionModal({ isOpen, onClose, lang = 'ar' }) {
           <button 
             type="button" 
             onClick={onClose} 
-            className="modal-close-btn" 
             aria-label="إغلاق"
-            style={{ position: 'absolute', top: '16px', left: lang === 'ar' ? '16px' : 'auto', right: lang === 'ar' ? 'auto' : '16px' }}
+            style={{ 
+              position: 'absolute', 
+              top: '16px', 
+              left: lang === 'ar' ? '16px' : 'auto', 
+              right: lang === 'ar' ? 'auto' : '16px',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              background: 'var(--surface-card)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-muted)',
+              transition: 'all 0.2s ease',
+              padding: 0
+            }}
           >
             <X size={18} />
           </button>
@@ -207,3 +223,4 @@ export default function AppMissionModal({ isOpen, onClose, lang = 'ar' }) {
     </div>
   );
 }
+

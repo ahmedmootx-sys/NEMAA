@@ -2791,3 +2791,57 @@ html, body {
 
 
 
+
+/* ========================================================
+   Modern Circular Modal Close Buttons & Mobile Form Polish
+   ======================================================== */
+.modal-close-btn,
+.modal-close-btn-circle {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  background: var(--surface-sunken) !important;
+  color: var(--text-muted) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
+}
+
+.modal-close-btn:hover,
+.modal-close-btn-circle:hover {
+  background: var(--surface-card-subtle) !important;
+  color: var(--text-main) !important;
+  transform: scale(1.06) !important;
+}
+
+/* Ensure mobile form elements never clip or overflow edges */
+.modal-content input,
+.modal-content textarea,
+.modal-content select {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+}
+
+/* Settings Screen Animations */
+.settings-screen-overlay {
+  animation: settingsFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes settingsFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
