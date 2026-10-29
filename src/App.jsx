@@ -85,8 +85,15 @@ export default function App() {
   });
 
   const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(() => {
-    // If first time visit, prompt for language
     return !localStorage.getItem('nemaa_lang');
+  });
+
+  const [hasLanguageChosen, setHasLanguageChosen] = useState(() => {
+    return Boolean(localStorage.getItem('nemaa_lang'));
+  });
+
+  const [tourCompleted, setTourCompleted] = useState(() => {
+    return Boolean(localStorage.getItem('nemaa_tour_seen'));
   });
 
   const [isShareAppModalOpen, setIsShareAppModalOpen] = useState(false);
@@ -120,8 +127,95 @@ export default function App() {
     }
   });
 
-  // In-App Spiritual Notification for live praises across the app
+  // User's own published blessings IDs (to allow deletion of what they shared)
+  const [myPublishedIds, setMyPublishedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_my_published_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // 2. Shared Blessings from Supabase
+  const [sharedBlessings, setSharedBlessings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_shared_blessings_cache');
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      const valid = parsed.filter(b => b && (b.title || '').trim() && (b.reflection || '').trim());
+      if (valid.length !== parsed.length) {
+        localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(valid));
+      }
+      return valid;
+    } catch {
+      return [];
+    }
+  });
+
+  // 3. Custom Blessings State (New blessings created by user)
+  const [customBlessings, setCustomBlessings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_custom_blessings');
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      const valid = parsed.filter(b => b && (b.title || '').trim() && (b.reflection || '').trim());
+      if (valid.length !== parsed.length) {
+        localStorage.setItem('nemaa_custom_blessings', JSON.stringify(valid));
+      }
+      return valid;
+    } catch {
+      return [];
+    }
+  });
+
+  // Persistent User's Own Published Blessings (Preserves full ownership, praise counts & edits)
+  const [myPublishedBlessings, setMyPublishedBlessings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_my_published_blessings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const custom = localStorage.getItem('nemaa_custom_blessings');
+      if (custom) {
+        const parsed = JSON.parse(custom);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(myPublishedBlessings));
+    } catch {}
+  }, [myPublishedBlessings]);
+
+  // User-Customized / Rephrased Blessings State (Edits to existing blessings)
+  const [customizedBlessings, setCustomizedBlessings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_customized_blessings');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // PWA Install Deferred Prompt
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [toastMessage, setToastMessage] = useState('');
   const [livePraiseToast, setLivePraiseToast] = useState('');
+
+  // Stable references for async callbacks and listeners
+  const currentLangRef = useRef(currentLang);
+  currentLangRef.current = currentLang;
+  const myPublishedBlessingsRef = useRef(myPublishedBlessings);
+  myPublishedBlessingsRef.current = myPublishedBlessings;
   const lastPraiseNotificationRef = useRef(0);
 
   // Load persisted praises on mount and subscribe to live broadcasts
@@ -138,7 +232,7 @@ export default function App() {
       const title = (payload.blessingTitle || '').trim();
       const count = Number(payload.newCount) || 1;
 
-      // 1. Immediately update praises in state so the heart counter moves live!
+      // 1. Immediately update praises in state so the counter moves live
       setBlessingPraises(prev => {
         const next = { ...prev };
         if (strId) next[strId] = count;
@@ -146,8 +240,8 @@ export default function App() {
         return next;
       });
 
-      // 2. Check if this blessing belongs to current user
-      const isMyBlessing = myPublishedBlessings.some(
+      // 2. Check if this blessing belongs to current user via ref (always up to date)
+      const isMyBlessing = myPublishedBlessingsRef.current.some(
         b => (strId && String(b.id) === strId) || (title && b.title === title)
       );
 
@@ -157,10 +251,10 @@ export default function App() {
         lastPraiseNotificationRef.current = now;
         const authorMention = payload.author && payload.author !== 'محب للخير' ? ` (بقلم: ${payload.author})` : '';
         const msg = isMyBlessing
-          ? (currentLang === 'ar' 
+          ? (currentLangRef.current === 'ar' 
               ? `❤️ بشرى: حَمَدَ شخصٌ الله للتو على نعمتك «${title}»!` 
               : `❤️ Someone gave thanks for your blessing "${title}"!`)
-          : (currentLang === 'ar'
+          : (currentLangRef.current === 'ar'
               ? `🤲 رَطَّبَ أحدهم لسانه بالحمد الآن على «${title}»${authorMention}`
               : `🤲 Someone gave thanks for "${title}"`);
 
@@ -172,25 +266,7 @@ export default function App() {
     return () => {
       if (typeof unsubPraises === 'function') unsubPraises();
     };
-  }, [myPublishedBlessings, currentLang]);
-
-  // User's own published blessings IDs (to allow deletion of what they shared)
-  const [myPublishedIds, setMyPublishedIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_my_published_ids');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [hasLanguageChosen, setHasLanguageChosen] = useState(() => {
-    return Boolean(localStorage.getItem('nemaa_lang'));
-  });
-
-  const [tourCompleted, setTourCompleted] = useState(() => {
-    return Boolean(localStorage.getItem('nemaa_tour_seen'));
-  });
+  }, []);
 
   // Automatically start tour for first-time visitors who already have language selected
   useEffect(() => {
@@ -240,7 +316,6 @@ export default function App() {
     setIsLanguageModalOpen(false);
     setHasLanguageChosen(true);
 
-    // After language selection, if tour not seen yet, start tour gracefully
     if (!localStorage.getItem('nemaa_tour_seen')) {
       setTimeout(() => {
         setIsTourOpen(true);
@@ -260,9 +335,6 @@ export default function App() {
 
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.ar;
 
-  // PWA Install Deferred Prompt
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-
   useEffect(() => {
     const handleBeforeInstall = (e) => {
       e.preventDefault();
@@ -272,27 +344,6 @@ export default function App() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
-
-  // 2. Shared Blessings from Supabase
-  const [sharedBlessings, setSharedBlessings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_shared_blessings_cache');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return [];
-      const valid = parsed.filter(b => b && (b.title || '').trim() && (b.reflection || '').trim());
-      if (valid.length !== parsed.length) {
-        localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(valid));
-      }
-      return valid;
-    } catch {
-      return [];
-    }
-  });
-
-  const [toastMessage, setToastMessage] = useState('');
-  const currentLangRef = useRef(currentLang);
-  currentLangRef.current = currentLang;
 
   // Fetch from Supabase and subscribe to realtime updates
   useEffect(() => {
@@ -338,7 +389,6 @@ export default function App() {
       (newBlessing) => {
         if (!isMounted) return;
         setSharedBlessings(prev => {
-          // Prevent duplicate
           if (prev.some(b => String(b.id) === String(newBlessing.id) || (b.title === newBlessing.title && b.reflection === newBlessing.reflection))) {
             return prev;
           }
@@ -347,7 +397,6 @@ export default function App() {
             localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
           } catch {}
 
-          // Show gentle realtime notification toast
           setToastMessage(currentLangRef.current === 'ar' ? 'نعمة جديدة أضيفت للتو من أحد المتدبرين ✨' : 'A new blessing was just shared by the community ✨');
           setTimeout(() => setToastMessage(''), 5000);
 
@@ -430,58 +479,6 @@ export default function App() {
       if (typeof unsubscribeAdminDeleted === 'function') unsubscribeAdminDeleted();
     };
   }, []);
-
-  // 3. Custom Blessings State (New blessings created by user)
-  const [customBlessings, setCustomBlessings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_custom_blessings');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return [];
-      const valid = parsed.filter(b => b && (b.title || '').trim() && (b.reflection || '').trim());
-      if (valid.length !== parsed.length) {
-        localStorage.setItem('nemaa_custom_blessings', JSON.stringify(valid));
-      }
-      return valid;
-    } catch {
-      return [];
-    }
-  });
-
-  // Persistent User's Own Published Blessings (Preserves full ownership, praise counts & edits)
-  const [myPublishedBlessings, setMyPublishedBlessings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_my_published_blessings');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      const custom = localStorage.getItem('nemaa_custom_blessings');
-      if (custom) {
-        const parsed = JSON.parse(custom);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(myPublishedBlessings));
-    } catch {}
-  }, [myPublishedBlessings]);
-
-  // User-Customized / Rephrased Blessings State (Edits to existing blessings)
-  const [customizedBlessings, setCustomizedBlessings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_customized_blessings');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
 
   const handleSaveCustomization = (blessingId, customizedData) => {
     const updated = {

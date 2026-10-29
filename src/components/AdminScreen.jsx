@@ -75,6 +75,30 @@ export default function AdminScreen({
   const isRtl = lang === 'ar';
   const BackArrow = isRtl ? ArrowRight : ArrowLeft;
 
+  async function loadReports() {
+    setIsLoadingReports(true);
+    try {
+      const list = await fetchBlessingReports();
+      setReports(list);
+    } catch (err) {
+      console.warn('Failed to load reports:', err);
+    } finally {
+      setIsLoadingReports(false);
+    }
+  }
+
+  async function loadFeedbackData() {
+    setIsLoadingFeedback(true);
+    try {
+      const list = await fetchFeedback();
+      setFeedbackList(list);
+    } catch (err) {
+      console.warn('Failed to load feedback:', err);
+    } finally {
+      setIsLoadingFeedback(false);
+    }
+  }
+
   // Check admin session on mount / open
   useEffect(() => {
     if (!isOpen) return;
@@ -129,30 +153,6 @@ export default function AdminScreen({
       if (typeof unsub === 'function') unsub();
     };
   }, [isOpen, currentUser]);
-
-  const loadReports = async () => {
-    setIsLoadingReports(true);
-    try {
-      const list = await fetchBlessingReports();
-      setReports(list);
-    } catch (err) {
-      console.warn('Failed to load reports:', err);
-    } finally {
-      setIsLoadingReports(false);
-    }
-  };
-
-  const loadFeedbackData = async () => {
-    setIsLoadingFeedback(true);
-    try {
-      const list = await fetchFeedback();
-      setFeedbackList(list);
-    } catch (err) {
-      console.warn('Failed to load feedback:', err);
-    } finally {
-      setIsLoadingFeedback(false);
-    }
-  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
