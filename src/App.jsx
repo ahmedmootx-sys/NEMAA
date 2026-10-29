@@ -20,6 +20,9 @@ import { exportBlessingAsImage } from './utils/cardExporter';
 import { TRANSLATIONS } from './i18n/translations';
 import { Award, Sparkles, X, MessageSquare, Scroll, Settings } from 'lucide-react';
 import { 
+  subscribeToLivePraises,
+  fetchAllPersistedPraises,
+  recordBlessingPraise,
   fetchSharedBlessings, 
   subscribeToSharedBlessings, 
   deleteSharedBlessing, 
@@ -35,7 +38,7 @@ import { audioEngine } from './utils/audioEngine';
 import OnboardingTour from './components/OnboardingTour';
 import AppGuideModal from './components/AppGuideModal';
 import ReportModal from './components/ReportModal';
-import AdminModal from './components/AdminModal';
+import AdminScreen from './components/AdminScreen';
 import SettingsScreen from './components/SettingsScreen';
 import AppMissionModal from './components/AppMissionModal';
 import FeedbackModal from './components/FeedbackModal';
@@ -116,6 +119,60 @@ export default function App() {
       return {};
     }
   });
+
+  // In-App Spiritual Notification for live praises across the app
+  const [livePraiseToast, setLivePraiseToast] = useState('');
+  const lastPraiseNotificationRef = useRef(0);
+
+  // Load persisted praises on mount and subscribe to live broadcasts
+  useEffect(() => {
+    fetchAllPersistedPraises().then(remoteMap => {
+      if (remoteMap && Object.keys(remoteMap).length > 0) {
+        setBlessingPraises(prev => ({ ...prev, ...remoteMap }));
+      }
+    }).catch(() => {});
+
+    const unsubPraises = subscribeToLivePraises((payload) => {
+      if (!payload) return;
+      const strId = String(payload.blessingId || '');
+      const title = (payload.blessingTitle || '').trim();
+      const count = Number(payload.newCount) || 1;
+
+      // 1. Immediately update praises in state so the heart counter moves live!
+      setBlessingPraises(prev => {
+        const next = { ...prev };
+        if (strId) next[strId] = count;
+        if (title) next[title] = count;
+        return next;
+      });
+
+      // 2. Check if this blessing belongs to current user
+      const isMyBlessing = myPublishedBlessings.some(
+        b => (strId && String(b.id) === strId) || (title && b.title === title)
+      );
+
+      // 3. Gentle Throttled Toast (min 12s gap to prevent screen spam, author always alerted)
+      const now = Date.now();
+      if (isMyBlessing || now - lastPraiseNotificationRef.current >= 12000) {
+        lastPraiseNotificationRef.current = now;
+        const authorMention = payload.author && payload.author !== 'محب للخير' ? ` (بقلم: ${payload.author})` : '';
+        const msg = isMyBlessing
+          ? (currentLang === 'ar' 
+              ? `❤️ بشرى: حَمَدَ شخصٌ الله للتو على نعمتك «${title}»!` 
+              : `❤️ Someone gave thanks for your blessing "${title}"!`)
+          : (currentLang === 'ar'
+              ? `🤲 رَطَّبَ أحدهم لسانه بالحمد الآن على «${title}»${authorMention}`
+              : `🤲 Someone gave thanks for "${title}"`);
+
+        setLivePraiseToast(msg);
+        setTimeout(() => setLivePraiseToast(''), 4500);
+      }
+    });
+
+    return () => {
+      if (typeof unsubPraises === 'function') unsubPraises();
+    };
+  }, [myPublishedBlessings, currentLang]);
 
   // User's own published blessings IDs (to allow deletion of what they shared)
   const [myPublishedIds, setMyPublishedIds] = useState(() => {
@@ -699,21 +756,31 @@ export default function App() {
       return updated;
     });
 
-    // Increment praise counter for the current blessing (both shared and app blessings)
-    if (currentBlessing?.id) {
-      const strId = String(currentBlessing.id);
+    // Increment praise counter live for current blessing (both shared and built-in)
+    if (currentBlessing) {
+      const strId = String(currentBlessing.id || '');
+      const title = (currentBlessing.title || '').trim();
       const currentCount = getBlessingPraises(currentBlessing);
       const newCount = currentCount + 1;
+
+      // 1. Optimistic instant local update
       setBlessingPraises(prev => {
-        const updated = { ...prev, [strId]: newCount };
+        const updated = { ...prev };
+        if (strId) updated[strId] = newCount;
+        if (title) updated[title] = newCount;
         try {
           localStorage.setItem('nemaa_blessing_praises', JSON.stringify(updated));
         } catch {}
         return updated;
       });
-      if (currentBlessing.isShared) {
-        incrementBlessingPraises(currentBlessing.id).catch(() => {});
-      }
+
+      // 2. Broadcast & persist live to Supabase for all users without delay!
+      recordBlessingPraise(
+        strId,
+        title,
+        newCount,
+        currentBlessing.author || ''
+      ).catch(() => {});
     }
   };
 
@@ -1237,6 +1304,34 @@ export default function App() {
           </p>
         </div>
 
+        {/* In-App Live Spiritual Praise Alert Banner */}
+        {livePraiseToast && (
+          <div 
+            style={{
+              margin: '12px auto 0',
+              maxWidth: '480px',
+              width: '90%',
+              padding: '9px 16px',
+              borderRadius: 'var(--radius-full)',
+              background: 'linear-gradient(135deg, rgba(212,175,55,0.18) 0%, rgba(44,74,62,0.12) 100%)',
+              border: '1.2px solid var(--color-gold)',
+              boxShadow: '0 4px 16px rgba(212,175,55,0.2)',
+              fontSize: '12.5px',
+              fontWeight: '700',
+              color: 'var(--color-primary)',
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              animation: 'fadeIn 0.25s ease-out'
+            }}
+            role="status"
+          >
+            <span>{livePraiseToast}</span>
+          </div>
+        )}
+
         {/* Quick Footer Links - Vector Icons only (no emojis) */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '16px', flexWrap: 'wrap' }}>
           <button 
@@ -1435,7 +1530,7 @@ export default function App() {
       />
 
       {/* Hidden Admin Management Modal */}
-      <AdminModal
+      <AdminScreen
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
         allBlessings={allBlessings}

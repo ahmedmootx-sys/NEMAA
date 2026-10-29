@@ -47,6 +47,24 @@ export default function BlessingCard({
   const [duaCopied, setDuaCopied] = useState(false);
   const [hasArabicVoice, setHasArabicVoice] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPraiseBumping, setIsPraiseBumping] = useState(false);
+  const [showPlusOne, setShowPlusOne] = useState(false);
+  const prevPraisesRef = useRef(praisesCount);
+
+  useEffect(() => {
+    if (prevPraisesRef.current !== undefined && praisesCount > prevPraisesRef.current) {
+      setIsPraiseBumping(true);
+      setShowPlusOne(true);
+      const t1 = setTimeout(() => setIsPraiseBumping(false), 650);
+      const t2 = setTimeout(() => setShowPlusOne(false), 1100);
+      prevPraisesRef.current = praisesCount;
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+    prevPraisesRef.current = praisesCount;
+  }, [praisesCount]);
 
   // Swipe Gesture Handling (Touch & Mouse Drag)
   const [dragOffset, setDragOffset] = useState(0);
@@ -269,11 +287,32 @@ export default function BlessingCard({
               </span>
             )}
 
-            {/* Praise Counter Badge */}
-            <span className="card-praises-badge" title={lang === 'ar' ? 'عدد الذين تدبّروا وحمدوا الله بسبب هذه النعمة' : 'Number of people who praised Allah for this blessing'}>
-              <Heart size={11} fill="var(--color-gold)" color="var(--color-gold)" />
-              <span className="praises-num">{praisesCount || blessing.praisesCount || 1}</span>
+            {/* Praise Counter Badge with Live Animation */}
+            <span 
+              className={`card-praises-badge ${isPraiseBumping ? 'praises-badge-bump' : ''}`} 
+              title={lang === 'ar' ? 'عدد الذين تدبّروا وحمدوا الله بسبب هذه النعمة' : 'Number of people who praised Allah for this blessing'}
+              style={{ position: 'relative' }}
+            >
+              <Heart 
+                size={12} 
+                fill="var(--color-gold)" 
+                color="var(--color-gold)" 
+                style={{ 
+                  transform: isPraiseBumping ? 'scale(1.35)' : 'scale(1)', 
+                  transition: 'transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)' 
+                }} 
+              />
+              <span className="praises-num" style={{ fontWeight: '800' }}>
+                {praisesCount !== undefined ? praisesCount : (blessing.praisesCount ?? 0)}
+              </span>
               <span className="praises-text">{lang === 'ar' ? 'حمدوا الله عليها' : 'praised'}</span>
+
+              {/* Floating +1 Indicator */}
+              {showPlusOne && (
+                <span className="floating-plus-one" aria-hidden="true">
+                  +1
+                </span>
+              )}
             </span>
 
             {blessing.isCustom && (

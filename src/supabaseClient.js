@@ -324,29 +324,115 @@ export async function updateSharedBlessing(oldBlessing, newFields) {
   }
 }
 
+// Live Realtime Praise Broadcast Channel
+let praisesBroadcastChannel = null;
+
+export function getPraisesBroadcastChannel() {
+  if (!praisesBroadcastChannel) {
+    praisesBroadcastChannel = supabase.channel('nemaa_praises_live', {
+      config: { broadcast: { self: false } }
+    });
+    praisesBroadcastChannel.subscribe();
+  }
+  return praisesBroadcastChannel;
+}
+
+/**
+ * Broadcast praise event to all connected users in real time
+ */
+export async function broadcastPraiseEvent({ blessingId, blessingTitle, author = '', newCount = 1 }) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    await channel.send({
+      type: 'broadcast',
+      event: 'praise_given',
+      payload: {
+        blessingId: String(blessingId || ''),
+        blessingTitle: (blessingTitle || '').trim(),
+        author: (author || '').trim(),
+        newCount: Number(newCount) || 1,
+        timestamp: Date.now()
+      }
+    });
+  } catch (err) {
+    console.warn('Broadcast praise error:', err);
+  }
+}
+
+/**
+ * Subscribe to live praise events from other users
+ */
+export function subscribeToLivePraises(onPraiseReceived) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    channel.on('broadcast', { event: 'praise_given' }, (event) => {
+      if (event && event.payload && typeof onPraiseReceived === 'function') {
+        onPraiseReceived(event.payload);
+      }
+    });
+    return () => {};
+  } catch (err) {
+    console.warn('Subscribe to live praises error:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Persist praise count to Supabase (via reports table praise_sync)
+ */
+export async function recordBlessingPraise(blessingId, blessingTitle, newCount, author = '') {
+  const cleanTitle = (blessingTitle || '').trim();
+  const recordId = `praise_${simpleHash(cleanTitle || blessingId)}`;
+
+  try {
+    await supabase.from('reports').upsert({
+      id: recordId,
+      blessing_title: cleanTitle,
+      reason: 'praise_sync',
+      notes: String(newCount),
+      status: 'praise'
+    });
+  } catch (err) {
+    console.warn('Error recording praise in Supabase:', err);
+  }
+
+  // Broadcast instantly to all users
+  broadcastPraiseEvent({ blessingId, blessingTitle: cleanTitle, author, newCount });
+}
+
+/**
+ * Fetch all persisted praise counts from Supabase
+ */
+export async function fetchAllPersistedPraises() {
+  const praisesMap = {};
+  try {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('blessing_title, notes')
+      .eq('reason', 'praise_sync');
+
+    if (!error && Array.isArray(data)) {
+      data.forEach(row => {
+        const title = (row.blessing_title || '').trim();
+        const count = parseInt(row.notes, 10);
+        if (title && !isNaN(count)) {
+          praisesMap[title] = count;
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Error fetching persisted praises:', err);
+  }
+  return praisesMap;
+}
+
 /**
  * Increment praises count for a blessing
  */
-export async function incrementBlessingPraises(blessingId) {
-  try {
-    const { data: current } = await supabase
-      .from('blessings')
-      .select('praises_count')
-      .eq('id', blessingId)
-      .single();
-
-    if (current) {
-      const nextCount = (current.praises_count || 0) + 1;
-      await supabase
-        .from('blessings')
-        .update({ praises_count: nextCount })
-        .eq('id', blessingId);
-      return nextCount;
-    }
-  } catch (err) {
-    // Non-critical: column might not exist or network unavailable
-  }
-  return null;
+export async function incrementBlessingPraises(blessingId, blessingTitle = '', currentCount = 0, author = '') {
+  const nextCount = (Number(currentCount) || 0) + 1;
+  await recordBlessingPraise(blessingId, blessingTitle, nextCount, author);
+  return nextCount;
 }
 
 /**
@@ -529,9 +615,10 @@ export async function fetchBlessingReports() {
     });
   } catch {}
 
-  // Filter OUT suggestions and complaints (which belong to the feedback tab)
+  // Filter OUT suggestions, complaints, and praise sync records
   return reports.filter(r => {
     if (!r) return false;
+    if (r.reason === 'praise_sync') return false;
     const isFeedback = (r.reason === 'اقتراح وتطوير' || r.reason === 'شكوى أو مشكلة' ||
       (r.blessing_title && (r.blessing_title.startsWith('[اقتراح]') || r.blessing_title.startsWith('[شكوى]'))));
     return !isFeedback;

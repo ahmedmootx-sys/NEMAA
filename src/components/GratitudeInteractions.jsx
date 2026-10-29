@@ -32,6 +32,7 @@ export default function GratitudeInteractions({
   const [isSparkling, setIsSparkling] = useState(false);
   const [noorParticles, setNoorParticles] = useState([]);
   const [showAura, setShowAura] = useState(false);
+  const [isThanked, setIsThanked] = useState(false);
 
   const handleAlhamdulillahClick = () => {
     // 1. Play deep, warm spiritual chime
@@ -46,6 +47,8 @@ export default function GratitudeInteractions({
 
     // 4. Trigger serene Noor Aura & floating light particles (بديل الكونفيتي الروحي)
     setIsSparkling(true);
+    setIsThanked(true);
+    setTimeout(() => setIsThanked(false), 2800);
     setShowAura(true);
     setTimeout(() => setIsSparkling(false), 800);
     setTimeout(() => setShowAura(false), 1200);
