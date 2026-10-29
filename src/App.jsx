@@ -31,7 +31,12 @@ import {
   simpleHash,
   recordAdminDeletedBlessing,
   fetchAdminDeletedBlessings,
-  subscribeToAdminDeletedBlessings
+  subscribeToAdminDeletedBlessings,
+  broadcastBlessingUpdate,
+  subscribeToLiveBlessingUpdates,
+  fetchAuthorNotifications,
+  dismissAuthorNotification,
+  subscribeToAuthorNotifications
 } from './supabaseClient';
 import confetti from 'canvas-confetti';
 import { audioEngine } from './utils/audioEngine';
@@ -42,6 +47,7 @@ import AdminScreen from './components/AdminScreen';
 import SettingsScreen from './components/SettingsScreen';
 import AppMissionModal from './components/AppMissionModal';
 import FeedbackModal from './components/FeedbackModal';
+import UserNotificationsDrawer from './components/UserNotificationsDrawer';
 
 export default function App() {
   // 1. Theme State (Day / Night)
@@ -78,6 +84,21 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMissionOpen, setIsMissionOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
+  // User Notifications Inbox State (بريد الإشعارات وتنبيهات الإدارة)
+  const [isNotificationsDrawerOpen, setIsNotificationsDrawerOpen] = useState(false);
+  const [userNotifications, setUserNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nemaa_user_notifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const unreadNotificationsCount = useMemo(() => {
+    return userNotifications.filter(n => n.status !== 'read').length;
+  }, [userNotifications]);
 
   // Language & Localization State
   const [currentLang, setCurrentLang] = useState(() => {
@@ -479,6 +500,145 @@ export default function App() {
       if (typeof unsubscribeAdminDeleted === 'function') unsubscribeAdminDeleted();
     };
   }, []);
+
+  // Realtime subscription for instant blessing updates (including built-in & cleared proofs across all devices)
+  useEffect(() => {
+    const unsub = subscribeToLiveBlessingUpdates((updatedBlessing, oldBlessing) => {
+      if (!updatedBlessing) return;
+      const id = String(updatedBlessing.id || '');
+      const title = (updatedBlessing.title || '').trim();
+      const oldTitle = (oldBlessing?.title || '').trim();
+
+      // 1. Update customizedBlessings (affects built-in & shared)
+      if (id) {
+        setCustomizedBlessings(prev => {
+          const next = { ...prev, [id]: { ...(prev[id] || {}), ...updatedBlessing } };
+          try {
+            localStorage.setItem('nemaa_customized_blessings', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      }
+
+      // 2. Update sharedBlessings
+      setSharedBlessings(prev => {
+        const next = prev.map(b => {
+          if ((id && String(b.id) === id) || (title && b.title === title) || (oldTitle && b.title === oldTitle)) {
+            return { ...b, ...updatedBlessing };
+          }
+          return b;
+        });
+        try {
+          localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // 3. Update myPublishedBlessings
+      setMyPublishedBlessings(prev => {
+        const next = prev.map(b => {
+          if ((id && String(b.id) === id) || (title && b.title === title) || (oldTitle && b.title === oldTitle)) {
+            return { ...b, ...updatedBlessing };
+          }
+          return b;
+        });
+        try {
+          localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // 4. If current blessing is this one, update it in view
+      setCurrentBlessing(curr => {
+        if (!curr) return curr;
+        if ((id && String(curr.id) === id) || (title && curr.title === title) || (oldTitle && curr.title === oldTitle)) {
+          return { ...curr, ...updatedBlessing };
+        }
+        return curr;
+      });
+    });
+
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
+
+  // Notifications fetching & real-time listening
+  useEffect(() => {
+    let isMounted = true;
+    async function loadNotifications() {
+      try {
+        const notifs = await fetchAuthorNotifications(myPublishedBlessings);
+        if (!isMounted || !Array.isArray(notifs)) return;
+        setUserNotifications(prev => {
+          const merged = [...prev];
+          for (const n of notifs) {
+            if (!merged.some(m => m.id === n.id)) {
+              merged.unshift(n);
+            }
+          }
+          try {
+            localStorage.setItem('nemaa_user_notifications', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      } catch (err) {
+        console.warn('Failed to load author notifications:', err);
+      }
+    }
+
+    loadNotifications();
+
+    const unsub = subscribeToAuthorNotifications((payload) => {
+      if (!isMounted || !payload) return;
+      const myTitles = new Set((myPublishedBlessingsRef.current || []).map(b => (b.title || '').trim().toLowerCase()));
+      const myIds = new Set((myPublishedBlessingsRef.current || []).map(b => String(b.id || '')));
+
+      const notifTitle = (payload.blessingTitle || '').trim().toLowerCase();
+      const notifId = String(payload.blessingId || '');
+
+      const isMatch = (notifTitle && myTitles.has(notifTitle)) || (notifId && myIds.has(notifId));
+      if (isMatch) {
+        setUserNotifications(prev => {
+          if (prev.some(n => n.id === payload.id)) return prev;
+          const next = [payload, ...prev];
+          try {
+            localStorage.setItem('nemaa_user_notifications', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+        setToastMessage(currentLangRef.current === 'ar' ? 'وصلتك رسالة جديدة من إدارة المنصة في بريد الإشعارات 🔔' : 'New notification from Admin in your inbox 🔔');
+        setTimeout(() => setToastMessage(''), 5000);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
+
+  const handleDismissNotification = async (notifId) => {
+    setUserNotifications(prev => {
+      const next = prev.filter(n => n.id !== notifId);
+      try {
+        localStorage.setItem('nemaa_user_notifications', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    await dismissAuthorNotification(notifId);
+  };
+
+  const handleClearAllNotifications = async () => {
+    const ids = userNotifications.map(n => n.id);
+    setUserNotifications([]);
+    try {
+      localStorage.removeItem('nemaa_user_notifications');
+    } catch {}
+    for (const id of ids) {
+      await dismissAuthorNotification(id);
+    }
+  };
 
   const handleSaveCustomization = (blessingId, customizedData) => {
     const updated = {
@@ -1037,14 +1197,26 @@ export default function App() {
       console.warn('Error updating blessing in Supabase:', err);
     }
 
+    const cleanProof = newFields.proof !== undefined 
+      ? newFields.proof 
+      : (updatedRemote?.proof !== undefined ? updatedRemote.proof : (oldBlessing.proof || ''));
+    const cleanProofSource = newFields.proofSource !== undefined 
+      ? newFields.proofSource 
+      : (updatedRemote?.proofSource !== undefined ? updatedRemote.proofSource : (oldBlessing.proofSource || ''));
+
     const mergedUpdated = {
       ...oldBlessing,
-      ...newFields,
       ...(updatedRemote || {}),
+      ...newFields,
       id: oldId, // ALWAYS PRESERVE ID SO OWNERSHIP IS NEVER LOST
       title: newFields.title || oldTitle,
-      reflection: newFields.reflection || oldBlessing.reflection
+      reflection: newFields.reflection || oldBlessing.reflection,
+      proof: cleanProof,
+      proofSource: cleanProofSource
     };
+
+    // Broadcast instant update event to all connected devices in real time
+    broadcastBlessingUpdate({ updated: mergedUpdated, old: oldBlessing }).catch(() => {});
 
     // 2. Update in myPublishedBlessings (Preserves user's ownership permanently)
     setMyPublishedBlessings(prev => {
@@ -1088,13 +1260,20 @@ export default function App() {
       return updated;
     });
 
-    // 4. If this blessing was customized locally, sync customization
-    if (customizedBlessings[oldBlessing.id]) {
-      handleSaveCustomization(oldBlessing.id, {
-        ...customizedBlessings[oldBlessing.id],
-        ...newFields
-      });
-    }
+    // 4. Record customization so built-in blessings and local overrides reflect this
+    handleSaveCustomization(oldBlessing.id, {
+      ...(customizedBlessings[oldBlessing.id] || {}),
+      ...mergedUpdated
+    });
+
+    // 5. Update current blessing if currently viewed
+    setCurrentBlessing(curr => {
+      if (!curr) return curr;
+      if ((oldId && String(curr.id) === oldId) || (oldTitle && curr.title === oldTitle)) {
+        return { ...curr, ...mergedUpdated };
+      }
+      return curr;
+    });
 
     setToastMessage(currentLang === 'ar' ? 'تم حفظ التعديلات وتحديث النعمة بنجاح ✨' : 'Blessing updated successfully ✨');
     setTimeout(() => setToastMessage(''), 4500);
@@ -1214,6 +1393,8 @@ export default function App() {
         streak={dailyStats.streak}
         currentLang={currentLang}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenNotifications={() => setIsNotificationsDrawerOpen(true)}
+        unreadNotificationsCount={unreadNotificationsCount}
       />
 
       <main className="container" style={{ paddingTop: '20px', paddingBottom: '70px' }}>
@@ -1411,6 +1592,16 @@ export default function App() {
         onClose={() => setIsJournalOpen(false)}
       />
 
+      {/* User Notifications Drawer (بريد الإشعارات وتنبيهات الإدارة) */}
+      <UserNotificationsDrawer
+        isOpen={isNotificationsDrawerOpen}
+        onClose={() => setIsNotificationsDrawerOpen(false)}
+        notifications={userNotifications}
+        onDismissNotification={handleDismissNotification}
+        onClearAll={handleClearAllNotifications}
+        lang={currentLang}
+      />
+
       <NotificationModal
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
@@ -1557,6 +1748,8 @@ export default function App() {
         onOpenGuide={() => setIsGuideModalOpen(true)}
         onOpenMission={() => setIsMissionOpen(true)}
         onOpenFeedback={() => setIsFeedbackOpen(true)}
+        onOpenNotifications={() => setIsNotificationsDrawerOpen(true)}
+        unreadNotificationsCount={unreadNotificationsCount}
         onOpenShareApp={() => setIsShareAppModalOpen(true)}
         deferredPrompt={deferredPrompt}
         onInstallPwa={() => {

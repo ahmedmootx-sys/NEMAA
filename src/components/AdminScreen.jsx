@@ -21,7 +21,9 @@ import {
   ThumbsDown,
   Lightbulb,
   AlertCircle,
-  X
+  X,
+  Send,
+  Mail
 } from 'lucide-react';
 import { 
   adminLogin, 
@@ -35,7 +37,8 @@ import {
   updateFeedbackStatus,
   deleteFeedback,
   subscribeToFeedback,
-  recordAdminDeletedBlessing
+  recordAdminDeletedBlessing,
+  adminSendAuthorNotification
 } from '../supabaseClient';
 import EditSharedBlessingModal from './EditSharedBlessingModal';
 
@@ -71,6 +74,12 @@ export default function AdminScreen({
   const [statusNotice, setStatusNotice] = useState('');
   const [editingBlessing, setEditingBlessing] = useState(null);
   const [associatedReportId, setAssociatedReportId] = useState(null);
+
+  // Author direct messaging state (إشعار للمؤلف في بريد الإشعارات)
+  const [messageRecipientBlessing, setMessageRecipientBlessing] = useState(null);
+  const [authorMessageText, setAuthorMessageText] = useState('');
+  const [authorMessageAction, setAuthorMessageAction] = useState('message'); // 'message' | 'edit' | 'delete'
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   const isRtl = lang === 'ar';
   const BackArrow = isRtl ? ArrowRight : ArrowLeft;
@@ -271,6 +280,51 @@ export default function AdminScreen({
       console.warn('Error saving blessing edit:', err);
       setStatusNotice(isRtl ? 'حدث خطأ أثناء حفظ التعديل' : 'Failed to save changes');
       setTimeout(() => setStatusNotice(''), 4000);
+    }
+  };
+
+  // Open author messaging modal
+  const handleOpenAuthorMessage = (item, defaultAction = 'message') => {
+    setMessageRecipientBlessing({
+      id: item.blessing_id || item.id || '',
+      title: item.blessing_title || item.title || '',
+      author: item.author || ''
+    });
+    setAuthorMessageAction(defaultAction);
+    setAuthorMessageText('');
+  };
+
+  // Send direct message / notification to author
+  const handleSendAuthorMessage = async (e) => {
+    if (e) e.preventDefault();
+    if (!messageRecipientBlessing || !authorMessageText.trim()) return;
+
+    setIsSendingMessage(true);
+    try {
+      const res = await adminSendAuthorNotification({
+        blessingId: messageRecipientBlessing.id,
+        blessingTitle: messageRecipientBlessing.title,
+        author: messageRecipientBlessing.author,
+        message: authorMessageText.trim(),
+        actionType: authorMessageAction,
+        adminEmail: currentUser?.email || 'admin@nemaa.com'
+      });
+
+      if (res && res.success) {
+        setStatusNotice(isRtl ? 'تم إرسال الإشعار إلى بريد صاحب النعمة بنجاح ✨' : 'Notification sent to author inbox ✨');
+        setTimeout(() => setStatusNotice(''), 4000);
+        setMessageRecipientBlessing(null);
+        setAuthorMessageText('');
+      } else {
+        setStatusNotice(isRtl ? 'تعذر إرسال الإشعار، يرجى المحاولة ثانية' : 'Failed to send notification');
+        setTimeout(() => setStatusNotice(''), 4000);
+      }
+    } catch (err) {
+      console.warn('Error sending author notification:', err);
+      setStatusNotice(isRtl ? 'حدث خطأ أثناء إرسال الإشعار' : 'Error sending notification');
+      setTimeout(() => setStatusNotice(''), 4000);
+    } finally {
+      setIsSendingMessage(false);
     }
   };
 
@@ -870,6 +924,30 @@ export default function AdminScreen({
                         <span>{isRtl ? 'تعديل وتصحيح' : 'Edit & Fix'}</span>
                       </button>
 
+                      {/* Button 2.5: Direct Message / Notice to Author */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAuthorMessage(rep, 'edit')}
+                        title={isRtl ? 'إرسال إشعار أو رسالة توضيحية لصاحب النعمة' : 'Send notification to author'}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          background: 'rgba(44, 74, 62, 0.08)',
+                          border: '1px solid rgba(44, 74, 62, 0.25)',
+                          color: 'var(--color-primary)',
+                          fontSize: '12.5px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <Send size={13} color="var(--color-gold)" />
+                        <span>{isRtl ? 'مراسلة المؤلف' : 'Message Author'}</span>
+                      </button>
+
                       {/* Button 3: Delete Blessing Permanently */}
                       <button
                         type="button"
@@ -1256,6 +1334,28 @@ export default function AdminScreen({
 
                     <button
                       type="button"
+                      onClick={() => handleOpenAuthorMessage(b, 'message')}
+                      title={isRtl ? 'إرسال رسالة أو توضيح في بريد المؤلف' : 'Send message to author inbox'}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        background: 'rgba(212, 175, 55, 0.1)',
+                        border: '1px solid rgba(212, 175, 55, 0.35)',
+                        color: 'var(--color-primary)',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <Send size={12} color="var(--color-gold)" />
+                      <span>{isRtl ? 'مراسلة المؤلف' : 'Message'}</span>
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => handleDeleteBlessingAction(b)}
                       style={{
                         padding: '6px 10px',
@@ -1295,6 +1395,269 @@ export default function AdminScreen({
           isAdmin={true}
           lang={lang}
         />
+      )}
+
+      {/* Send Author Message Modal (بريد الإشعارات للمؤلف) */}
+      {messageRecipientBlessing && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setMessageRecipientBlessing(null)} 
+          role="dialog" 
+          aria-modal="true" 
+          style={{ zIndex: 10010 }}
+        >
+          <div 
+            className="modal-content"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '560px',
+              width: '92%',
+              background: 'var(--surface-card)',
+              borderRadius: '24px',
+              border: '1.5px solid var(--border-gold)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.18s ease-out'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '18px 22px',
+              background: 'linear-gradient(135deg, rgba(212,175,55,0.14) 0%, rgba(44,74,62,0.08) 100%)',
+              borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: 'var(--surface-card)',
+                  border: '1px solid var(--border-gold)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-gold)'
+                }}>
+                  <Send size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                    {isRtl ? 'إرسال إشعار إلى بريد صاحب النعمة' : 'Send Notification to Author Inbox'}
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {isRtl ? 'سيصل التنبيه مباشرة في بريد إشعارات المستخدم داخل التطبيق' : 'Delivered directly to user in-app notifications inbox'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMessageRecipientBlessing(null)}
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  background: 'var(--surface-card)',
+                  border: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-muted)'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSendAuthorMessage} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Target Blessing Summary */}
+              <div style={{
+                background: 'var(--surface-sunken)',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                border: '1px solid var(--border-subtle)',
+                fontSize: '13px'
+              }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '11.5px', marginBottom: '2px' }}>
+                  {isRtl ? 'النعمة المستهدفة:' : 'Target Blessing:'}
+                </div>
+                <div style={{ fontWeight: '800', color: 'var(--color-primary-dark)' }}>
+                  «{messageRecipientBlessing.title || (isRtl ? 'نعمة منشورة' : 'Blessing')}»
+                </div>
+              </div>
+
+              {/* Action Type Selector */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)' }}>
+                  {isRtl ? 'نوع الإشعار والتصنيف:' : 'Notification Category:'}
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAuthorMessageAction('message')}
+                    style={{
+                      padding: '8px 6px',
+                      borderRadius: '10px',
+                      border: authorMessageAction === 'message' ? '1.5px solid var(--color-primary)' : '1px solid var(--border-subtle)',
+                      background: authorMessageAction === 'message' ? 'rgba(44, 74, 62, 0.12)' : 'var(--surface-sunken)',
+                      color: authorMessageAction === 'message' ? 'var(--color-primary)' : 'var(--text-muted)',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isRtl ? 'رسالة توضيحية' : 'General Notice'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthorMessageAction('edit')}
+                    style={{
+                      padding: '8px 6px',
+                      borderRadius: '10px',
+                      border: authorMessageAction === 'edit' ? '1.5px solid var(--color-gold)' : '1px solid var(--border-subtle)',
+                      background: authorMessageAction === 'edit' ? 'rgba(212, 175, 55, 0.15)' : 'var(--surface-sunken)',
+                      color: authorMessageAction === 'edit' ? 'var(--color-gold)' : 'var(--text-muted)',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isRtl ? 'تنبيه بتعديل' : 'Edit Notice'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthorMessageAction('delete')}
+                    style={{
+                      padding: '8px 6px',
+                      borderRadius: '10px',
+                      border: authorMessageAction === 'delete' ? '1.5px solid #E53E3E' : '1px solid var(--border-subtle)',
+                      background: authorMessageAction === 'delete' ? 'rgba(229, 62, 62, 0.12)' : 'var(--surface-sunken)',
+                      color: authorMessageAction === 'delete' ? '#E53E3E' : 'var(--text-muted)',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isRtl ? 'تنبيه بحذف' : 'Removal Notice'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Template Chips */}
+              <div>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  {isRtl ? 'قوالب سريعة مقترحة (اضغط للتعبئة):' : 'Quick templates (click to apply):'}
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {[
+                    isRtl ? 'تم تعديل صياغة النعمة لضبط المعنى والاستدلال المباشر بما يتوافق مع معايير المنصة.' : 'Blessing text was refined to match our verified standards.',
+                    isRtl ? 'تم حذف النعمة بناءً على مراجعة ضوابط النشر، نشكر تفهمكم وحرصكم الدائم.' : 'Blessing was removed per publishing guidelines. Thank you for understanding.',
+                    isRtl ? 'تم تصحيح بعض الأخطاء الإملائية مع تثبيت النعمة للجميع، جزاكم الله خيراً.' : 'Typographical corrections made while keeping your blessing published.',
+                    isRtl ? 'جزاك الله خيراً وبارك فيك على مساهمتك الطيبة في إيقاظ وعي الشكر.' : 'Thank you for your blessed contribution to NEMAA community.'
+                  ].map((tpl, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setAuthorMessageText(tpl)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                        background: 'var(--surface-sunken)',
+                        border: '1px dashed var(--border-subtle)',
+                        fontSize: '11.5px',
+                        textAlign: isRtl ? 'right' : 'left',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        lineHeight: '1.4',
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-gold)'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-subtle)'}
+                    >
+                      «{tpl}»
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Textarea */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)' }}>
+                  {isRtl ? 'نص الرسالة للمؤلف:' : 'Message to Author:'}
+                </label>
+                <textarea
+                  value={authorMessageText}
+                  onChange={e => setAuthorMessageText(e.target.value)}
+                  placeholder={isRtl ? 'اكتب سبب التعديل أو الحذف، أو رسالة التقدير والتوجيه للمؤلف...' : 'Type message explaining the edit, removal or feedback...'}
+                  rows={4}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-subtle)',
+                    background: 'var(--surface-card)',
+                    color: 'var(--text-main)',
+                    fontSize: '13.5px',
+                    lineHeight: '1.5',
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              {/* Submit / Cancel Buttons */}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setMessageRecipientBlessing(null)}
+                  disabled={isSendingMessage}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '12px',
+                    background: 'var(--surface-sunken)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-muted)',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSendingMessage || !authorMessageText.trim()}
+                  style={{
+                    flex: 2,
+                    padding: '10px',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #1b4535 0%, #0f2b21 100%)',
+                    border: '1.5px solid var(--color-gold)',
+                    color: '#FFFFFF',
+                    fontSize: '13.5px',
+                    fontWeight: '700',
+                    cursor: (isSendingMessage || !authorMessageText.trim()) ? 'not-allowed' : 'pointer',
+                    opacity: (isSendingMessage || !authorMessageText.trim()) ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Send size={15} color="var(--color-gold)" />
+                  <span>{isSendingMessage ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : (isRtl ? 'إرسال الإشعار فوراً' : 'Send Notification')}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

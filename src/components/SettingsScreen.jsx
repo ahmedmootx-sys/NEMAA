@@ -18,7 +18,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   PlusCircle,
-  Check
+  Check,
+  Bell
 } from 'lucide-react';
 
 export default function SettingsScreen({
@@ -37,6 +38,8 @@ export default function SettingsScreen({
   onOpenGuide,
   onOpenMission,
   onOpenFeedback,
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
   onOpenShareApp,
   deferredPrompt,
   onInstallPwa,
@@ -772,6 +775,86 @@ export default function SettingsScreen({
             boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
             overflow: 'hidden'
           }}>
+            {/* User Notifications Inbox Row */}
+            <div
+              onClick={() => {
+                onClose();
+                setTimeout(() => onOpenNotifications && onOpenNotifications(), 200);
+              }}
+              role="button"
+              tabIndex={0}
+              style={{
+                padding: '16px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                borderBottom: '1px solid var(--border-subtle)',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-sunken)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1 }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '12px',
+                  background: 'rgba(212,175,55,0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-gold)',
+                  position: 'relative'
+                }}>
+                  <Bell size={19} />
+                  {unreadNotificationsCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-2px',
+                      right: '-2px',
+                      background: '#E53E3E',
+                      color: '#FFFFFF',
+                      borderRadius: '9999px',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      minWidth: '16px',
+                      height: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 3px'
+                    }}>
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-heading)' }}>
+                      {isRtl ? 'بريد الإشعارات وتنبيهات الإدارة' : 'Notifications & Notices'}
+                    </span>
+                    {unreadNotificationsCount > 0 && (
+                      <span style={{
+                        background: 'rgba(229,62,62,0.15)',
+                        color: '#E53E3E',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        padding: '1px 7px',
+                        borderRadius: '6px'
+                      }}>
+                        {isRtl ? `${unreadNotificationsCount} جديدة` : `${unreadNotificationsCount} new`}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                    {isRtl ? 'رسائل المشرفين وتوضيحات تعديل أو مراجعة نعمك' : 'Updates from admin regarding your blessings'}
+                  </div>
+                </div>
+              </div>
+              <NextChevron size={18} color="var(--text-muted)" />
+            </div>
+
             {/* Feedback & Suggestions Row */}
             <div
               onClick={() => {

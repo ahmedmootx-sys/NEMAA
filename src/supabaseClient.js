@@ -306,8 +306,13 @@ export async function updateSharedBlessing(oldBlessing, newFields) {
     const preserveId = (isObj && oldBlessing.id) ? String(oldBlessing.id) : (blessingId ? String(blessingId) : null);
     const formattedUpdated = {
       ...formatSharedBlessing(baseObj, 0),
-      id: preserveId || baseObj.id || `sb_${simpleHash(cleanTitle)}`
+      id: preserveId || baseObj.id || `sb_${simpleHash(cleanTitle)}`,
+      proof: cleanProof,
+      proofSource: cleanProofSource
     };
+
+    // Broadcast instant update event to all connected devices
+    broadcastBlessingUpdate({ updated: formattedUpdated, old: isObj ? oldBlessing : null }).catch(() => {});
 
     return {
       success: true,
@@ -374,6 +379,197 @@ export function subscribeToLivePraises(onPraiseReceived) {
   } catch (err) {
     console.warn('Subscribe to live praises error:', err);
     return () => {};
+  }
+}
+
+/**
+ * Broadcast blessing update event to all connected users in real time
+ */
+export async function broadcastBlessingUpdate({ updated, old = null }) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    await channel.send({
+      type: 'broadcast',
+      event: 'blessing_updated',
+      payload: {
+        updated,
+        old,
+        timestamp: Date.now()
+      }
+    });
+  } catch (err) {
+    console.warn('Broadcast blessing update error:', err);
+  }
+}
+
+/**
+ * Subscribe to live blessing updates across all connected devices
+ */
+export function subscribeToLiveBlessingUpdates(onBlessingUpdated) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    channel.on('broadcast', { event: 'blessing_updated' }, (event) => {
+      if (event && event.payload && typeof onBlessingUpdated === 'function') {
+        onBlessingUpdated(event.payload.updated, event.payload.old);
+      }
+    });
+    return () => {};
+  } catch (err) {
+    console.warn('Subscribe to live blessing updates error:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Send an administrative notification/message to a blessing author
+ */
+export async function adminSendAuthorNotification({ 
+  blessingId = '', 
+  blessingTitle = '', 
+  author = '', 
+  message = '', 
+  actionType = 'message', 
+  adminEmail = '' 
+}) {
+  try {
+    const cleanTitle = (blessingTitle || '').trim();
+    const cleanMsg = (message || '').trim();
+    if (!cleanMsg) throw new Error('الرجاء كتابة نص الرسالة للمؤلف');
+
+    const notifId = `notif_${Date.now()}_${simpleHash(cleanMsg + cleanTitle)}`;
+    const notifData = {
+      message: cleanMsg,
+      actionType,
+      adminEmail: adminEmail || 'إدارة منصة نِعْمَة',
+      authorName: (author || '').trim(),
+      blessingTitle: cleanTitle,
+      blessingId: String(blessingId || ''),
+      timestamp: Date.now()
+    };
+
+    const payload = {
+      id: notifId,
+      blessing_id: blessingId || null,
+      blessing_title: cleanTitle,
+      reason: 'admin_author_notification',
+      notes: JSON.stringify(notifData),
+      status: 'unread',
+      created_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase.from('reports').insert([payload]).select();
+    if (error) {
+      console.warn('Error saving admin notification in Supabase:', error);
+      return { success: false, error };
+    }
+
+    // Broadcast in real-time
+    try {
+      const channel = getPraisesBroadcastChannel();
+      await channel.send({
+        type: 'broadcast',
+        event: 'admin_author_notification',
+        payload: {
+          id: notifId,
+          ...notifData
+        }
+      });
+    } catch {}
+
+    return { success: true, data: data[0] };
+  } catch (err) {
+    console.warn('adminSendAuthorNotification error:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Fetch notifications sent to this user (filtered by their published blessings or author name)
+ */
+export async function fetchAuthorNotifications(userBlessingsList = [], authorName = '') {
+  try {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .eq('reason', 'admin_author_notification')
+      .order('created_at', { ascending: false });
+
+    if (error || !Array.isArray(data)) {
+      return [];
+    }
+
+    const myTitles = new Set((userBlessingsList || []).map(b => (b.title || '').trim().toLowerCase()));
+    const myIds = new Set((userBlessingsList || []).map(b => String(b.id || '')));
+    const cleanAuthor = (authorName || '').trim().toLowerCase();
+
+    const notifications = [];
+    for (const r of data) {
+      let parsed = {};
+      try {
+        parsed = JSON.parse(r.notes || '{}');
+      } catch {
+        parsed = { message: r.notes || '' };
+      }
+
+      const notifTitle = (r.blessing_title || parsed.blessingTitle || '').trim().toLowerCase();
+      const notifId = String(r.blessing_id || parsed.blessingId || '');
+      const notifAuthor = (parsed.authorName || '').trim().toLowerCase();
+
+      const isMatch = (notifTitle && myTitles.has(notifTitle)) ||
+                      (notifId && myIds.has(notifId)) ||
+                      (cleanAuthor && notifAuthor && cleanAuthor === notifAuthor);
+
+      if (isMatch) {
+        notifications.push({
+          id: r.id,
+          blessingTitle: r.blessing_title || parsed.blessingTitle || 'نعمة منشورة',
+          blessingId: r.blessing_id || parsed.blessingId || '',
+          message: parsed.message || '',
+          actionType: parsed.actionType || 'message',
+          adminEmail: parsed.adminEmail || 'إدارة منصة نِعْمَة',
+          authorName: parsed.authorName || '',
+          timestamp: parsed.timestamp || new Date(r.created_at).getTime(),
+          status: r.status || 'unread'
+        });
+      }
+    }
+
+    return notifications;
+  } catch (err) {
+    console.warn('fetchAuthorNotifications error:', err);
+    return [];
+  }
+}
+
+/**
+ * Subscribe to realtime admin notifications addressed to authors
+ */
+export function subscribeToAuthorNotifications(onNotificationReceived) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    channel.on('broadcast', { event: 'admin_author_notification' }, (event) => {
+      if (event && event.payload && typeof onNotificationReceived === 'function') {
+        onNotificationReceived(event.payload);
+      }
+    });
+    return () => {};
+  } catch (err) {
+    console.warn('subscribeToAuthorNotifications error:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Dismiss / delete a user notification
+ */
+export async function dismissAuthorNotification(notificationId) {
+  try {
+    if (!notificationId) return;
+    await supabase.from('reports').delete().eq('id', notificationId);
+    return true;
+  } catch (err) {
+    console.warn('dismissAuthorNotification error:', err);
+    return false;
   }
 }
 

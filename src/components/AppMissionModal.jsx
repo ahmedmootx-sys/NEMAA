@@ -130,7 +130,7 @@ export default function AppMissionModal({ isOpen, onClose, lang = 'ar' }) {
                 margin: '4px 0'
               }}>
                 <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--text-heading)' }}>
-                  وَمِنْ هُنَا، بِفَضْلِ اللَّهِ وَتَوْفِيقِهِ، جَاءَتْ فِكْرَةُ تَطْبِيقِ «نِعْمَة»؛ لِيَكُونَ مَنَارَةً لِلتَّذْكِرَةِ، وَمَسَاحَةً لِتَأَمُّلِ الْقُلُوبِ وَيَقَظَتِهَا. أَوْدَعْنَا بَيْنَ يَدَيْكَ فِي الإِصْدَارِ الأَوَّلِ 200 نِعْمَةٍ مُخْتَارَةٍ لِتَكُونَ مُنْطَلَقاً لِإِيقَاظِ الْوَعْيِ وَتَجْدِيدِ الشُّكْرِ فِي حَيَاتِك..
+                  وَمِنْ هُنَا، بِفَضْلِ اللَّهِ وَتَوْفِيقِهِ، جَاءَتْ فِكْرَةُ تَطْبِيقِ «نِعْمَة»؛ لِيَكُونَ مَنَارَةً لِلتَّذْكِرَةِ، وَمَسَاحَةً لِتَأَمُّلِ الْقُلُوبِ وَيَقَظَتِهَا. أَوْدَعْنَا بَيْنَ يَدَيْكَ فِي الإِصْدَارِ الأَوَّلِ 100 نِعْمَةٍ مُخْتَارَةٍ وَمُحَرَّرَةٍ لِتَكُونَ مُنْطَلَقاً لِإِيقَاظِ الْوَعْيِ وَتَجْدِيدِ الشُّكْرِ فِي حَيَاتِك..
                 </p>
               </div>
 
@@ -170,7 +170,7 @@ export default function AppMissionModal({ isOpen, onClose, lang = 'ar' }) {
                 borderRadius: '12px'
               }}>
                 <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--text-heading)' }}>
-                  From this realization, by God's grace and guidance, arose «NEMAA» Platform; a sanctuary for mindfulness and gratitude. In this first release, we offer 200 carefully curated blessings as a gateway to awaken your heart and renew daily thankfulness.
+                  From this realization, by God's grace and guidance, arose «NEMAA» Platform; a sanctuary for mindfulness and gratitude. In this first release, we offer 100 carefully curated blessings as a gateway to awaken your heart and renew daily thankfulness.
                 </p>
               </div>
               <p style={{ margin: 0 }}>

@@ -5,7 +5,8 @@ import {
   Search, 
   Flame,
   BookOpen,
-  Settings
+  Settings,
+  Bell
 } from 'lucide-react';
 import { TRANSLATIONS } from '../i18n/translations';
 
@@ -17,42 +18,48 @@ export default function Header({
   onOpenJournal,
   streak,
   currentLang = 'ar',
-  onOpenSettings
+  onOpenSettings,
+  onOpenNotifications,
+  unreadNotificationsCount = 0
 }) {
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.ar;
 
   return (
     <header className="app-header">
       <div className="container header-inner">
-        {/* Brand Logo & Title */}
-        <div className="brand-wrapper" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <img 
-            src={`${import.meta.env.BASE_URL}brand/logo-wordmark.png`} 
-            alt="شعار نِعْمَة" 
-            className="brand-logo-img"
-            onError={(e) => {
-              e.target.style.display = 'none';
-            }}
-          />
+        {/* Brand Logo & Name */}
+        <div className="header-brand">
+          <div className="brand-icon-wrapper" style={{ overflow: 'hidden' }}>
+            <img 
+              src="./logo.png" 
+              alt="نِعْمَة" 
+              className="brand-logo-img"
+              onError={(e) => {
+                // Graceful fallback to typography emblem if image unavailable
+                e.target.style.display = 'none';
+                if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+            <span className="brand-logo-fallback" style={{ display: 'none' }}>
+              نِعْمَة
+            </span>
+          </div>
           <div className="brand-text">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span className="brand-title">{t.brandTitle}</span>
-              {streak > 0 && (
-                <div 
-                  className="daily-streak-badge mobile-compact-streak" 
-                  title={t.streakTooltip.replace('{streak}', streak)}
-                >
-                  <Flame size={13} color="#D4AF37" />
-                  <span>{t.streakBadge.replace('{streak}', streak)}</span>
-                </div>
-              )}
-            </div>
-            <span className="brand-slogan">{t.brandSlogan}</span>
+            <h1 className="brand-title">نِعْمَة</h1>
+            <span className="brand-subtitle">«تَذَكَّرْ لِتَشْكُرْ»</span>
           </div>
         </div>
 
-        {/* Action Controls - Clean & Minimal */}
+        {/* Action Controls */}
         <div className="header-actions">
+          {/* Daily Streak Indicator */}
+          {streak > 0 && (
+            <div className="streak-badge" title={t.streakTooltip}>
+              <Flame size={15} color="#D4AF37" />
+              <span>{streak} {t.daysSuffix}</span>
+            </div>
+          )}
+
           {/* Search Button */}
           <button 
             className="btn-icon" 
@@ -63,9 +70,10 @@ export default function Header({
             <Search size={18} />
           </button>
 
-          {/* Add Custom Blessing Button */}
+          {/* Add Blessing Button */}
           <button 
-            className="btn-icon" 
+            id="btn-publish-blessing-trigger"
+            className="btn-icon btn-add-blessing" 
             title={t.addBlessingBtn}
             onClick={onOpenAddModal}
             aria-label={t.addBlessingBtn}
@@ -73,14 +81,14 @@ export default function Header({
             <PlusCircle size={18} />
           </button>
 
-          {/* Favorites Button with Badge */}
+          {/* Favorites Button */}
           <button 
             className="btn-icon" 
             title={t.favoritesBtn}
             onClick={onOpenFavorites}
             aria-label={t.favoritesBtn}
           >
-            <Heart size={18} fill={favoritesCount > 0 ? "var(--color-gold)" : "none"} color={favoritesCount > 0 ? "var(--color-gold)" : "currentColor"} />
+            <Heart size={18} />
             {favoritesCount > 0 && (
               <span className="btn-badge">{favoritesCount}</span>
             )}
@@ -94,6 +102,40 @@ export default function Header({
             aria-label={t.journalBtn}
           >
             <BookOpen size={18} />
+          </button>
+
+          {/* Notification Inbox Button */}
+          <button 
+            id="btn-notifications-toggle"
+            className="btn-icon btn-notifications-toggle" 
+            title={currentLang === 'ar' ? 'بريد الإشعارات وتنبيهات الإدارة' : 'Notifications Inbox'}
+            onClick={onOpenNotifications}
+            aria-label={currentLang === 'ar' ? 'الإشعارات' : 'Notifications'}
+            style={{ position: 'relative' }}
+          >
+            <Bell size={18} />
+            {unreadNotificationsCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-3px',
+                right: '-3px',
+                background: '#E53E3E',
+                color: '#FFFFFF',
+                borderRadius: '9999px',
+                fontSize: '10px',
+                fontWeight: '800',
+                minWidth: '17px',
+                height: '17px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 6px rgba(229,62,62,0.4)',
+                padding: '0 3px',
+                border: '1.5px solid var(--surface-card)'
+              }}>
+                {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+              </span>
+            )}
           </button>
 
           {/* Settings & Preferences Button (الصفحة الموحدة لجميع الإعدادات) */}
