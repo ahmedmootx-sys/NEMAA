@@ -337,10 +337,27 @@ export default function App() {
     setIsLanguageModalOpen(false);
     setHasLanguageChosen(true);
 
+    // Sequence: First Language -> Second App Mission -> Third Onboarding Tour
+    if (!localStorage.getItem('nemaa_mission_seen')) {
+      setTimeout(() => {
+        setIsMissionOpen(true);
+      }, 400);
+    } else if (!localStorage.getItem('nemaa_tour_seen')) {
+      setTimeout(() => {
+        setIsTourOpen(true);
+      }, 500);
+    }
+  };
+
+  const handleCloseMissionModal = () => {
+    setIsMissionOpen(false);
+    try {
+      localStorage.setItem('nemaa_mission_seen', 'true');
+    } catch {}
     if (!localStorage.getItem('nemaa_tour_seen')) {
       setTimeout(() => {
         setIsTourOpen(true);
-      }, 700);
+      }, 350);
     }
   };
 
@@ -546,15 +563,6 @@ export default function App() {
           localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next));
         } catch {}
         return next;
-      });
-
-      // 4. If current blessing is this one, update it in view
-      setCurrentBlessing(curr => {
-        if (!curr) return curr;
-        if ((id && String(curr.id) === id) || (title && curr.title === title) || (oldTitle && curr.title === oldTitle)) {
-          return { ...curr, ...updatedBlessing };
-        }
-        return curr;
       });
     });
 
@@ -1260,20 +1268,23 @@ export default function App() {
       return updated;
     });
 
-    // 4. Record customization so built-in blessings and local overrides reflect this
-    handleSaveCustomization(oldBlessing.id, {
-      ...(customizedBlessings[oldBlessing.id] || {}),
-      ...mergedUpdated
-    });
+    // 4. Handle customization vs shared blessing:
+    // If it's a shared community blessing, clear any local customization key so it never displays "صياغتي الخاصة"
+    const isSharedBlessing = oldBlessing.isShared || 
+                             myPublishedIds.includes(oldId) || 
+                             String(oldId).startsWith('sb_') || 
+                             String(oldId).startsWith('pb_') ||
+                             String(oldId).startsWith('custom_');
 
-    // 5. Update current blessing if currently viewed
-    setCurrentBlessing(curr => {
-      if (!curr) return curr;
-      if ((oldId && String(curr.id) === oldId) || (oldTitle && curr.title === oldTitle)) {
-        return { ...curr, ...mergedUpdated };
-      }
-      return curr;
-    });
+    if (isSharedBlessing) {
+      handleResetCustomization(oldBlessing.id);
+    } else {
+      // Record customization strictly for built-in catalog blessings
+      handleSaveCustomization(oldBlessing.id, {
+        ...(customizedBlessings[oldBlessing.id] || {}),
+        ...mergedUpdated
+      });
+    }
 
     setToastMessage(currentLang === 'ar' ? 'تم حفظ التعديلات وتحديث النعمة بنجاح ✨' : 'Blessing updated successfully ✨');
     setTimeout(() => setToastMessage(''), 4500);
@@ -1672,14 +1683,6 @@ export default function App() {
             localStorage.setItem('nemaa_tour_seen', 'true');
           } catch {}
           setTourCompleted(true);
-          if (!localStorage.getItem('nemaa_mission_seen')) {
-            setTimeout(() => {
-              setIsMissionOpen(true);
-              try {
-                localStorage.setItem('nemaa_mission_seen', 'true');
-              } catch {}
-            }, 350);
-          }
         }}
         onComplete={() => {
           setIsTourOpen(false);
@@ -1687,14 +1690,6 @@ export default function App() {
             localStorage.setItem('nemaa_tour_seen', 'true');
           } catch {}
           setTourCompleted(true);
-          if (!localStorage.getItem('nemaa_mission_seen')) {
-            setTimeout(() => {
-              setIsMissionOpen(true);
-              try {
-                localStorage.setItem('nemaa_mission_seen', 'true');
-              } catch {}
-            }, 350);
-          }
         }}
       />
 
@@ -1763,7 +1758,7 @@ export default function App() {
       {/* App Mission & Purpose Modal (رسالة وهدف منصة نِعْمَة) */}
       <AppMissionModal
         isOpen={isMissionOpen}
-        onClose={() => setIsMissionOpen(false)}
+        onClose={handleCloseMissionModal}
         lang={currentLang}
       />
 
@@ -1809,7 +1804,7 @@ export default function App() {
       {/* Subtle PWA Install Notification Toast (Appears strictly after language & onboarding tour) */}
       <InstallAppToast 
         deferredPrompt={deferredPrompt} 
-        canShow={hasLanguageChosen && tourCompleted && !isTourOpen && !isLanguageModalOpen} 
+        canShow={hasLanguageChosen && tourCompleted && !isTourOpen && !isLanguageModalOpen && !isMissionOpen} 
       />
     </div>
   );

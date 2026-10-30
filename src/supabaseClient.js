@@ -157,8 +157,8 @@ export async function publishSharedBlessing({ title, reflection, author, proof, 
 export async function deleteSharedBlessing(blessingOrId) {
   try {
     const isObj = typeof blessingOrId === 'object' && blessingOrId !== null;
-    const blessingId = isObj ? blessingOrId.id : blessingOrId;
-    const title = isObj ? (blessingOrId.title || '').trim() : '';
+    const blessingId = isObj ? blessingOrId.id : (!String(blessingOrId).includes(' ') ? blessingOrId : null);
+    const title = isObj ? (blessingOrId.title || '').trim() : (typeof blessingOrId === 'string' ? blessingOrId.trim() : '');
     const reflection = isObj ? (blessingOrId.reflection || '').trim() : '';
 
     let success = false;

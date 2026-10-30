@@ -146,7 +146,14 @@ export default function AddBlessingModal({
         setShowExtraFields(false);
         onClose();
       } else {
-        setError(result.error?.message || (lang === 'ar' ? 'تعذر النشر، يرجى المحاولة مرة أخرى' : 'Failed to publish, please try again'));
+        const rawErr = result.error?.message || '';
+        if (rawErr.includes('blessings_pkey') || rawErr.includes('duplicate key')) {
+          setError(lang === 'ar' 
+            ? 'هذه النعمة منشورة بالفعل بهذا العنوان في المنصة، يُرجى تمييز العنوان أو إضافة لمستك الخاصة'
+            : 'A blessing with this title already exists. Please choose a distinctive title.');
+        } else {
+          setError(rawErr || (lang === 'ar' ? 'تعذر النشر، يرجى المحاولة مرة أخرى' : 'Failed to publish, please try again'));
+        }
       }
     } catch (err) {
       setError(err.message || (lang === 'ar' ? 'حدث خطأ غير متوقع أثناء النشر' : 'An unexpected error occurred'));

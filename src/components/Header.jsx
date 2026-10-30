@@ -28,25 +28,24 @@ export default function Header({
     <header className="app-header">
       <div className="container header-inner">
         {/* Brand Logo & Name */}
-        <div className="header-brand">
-          <div className="brand-icon-wrapper" style={{ overflow: 'hidden' }}>
-            <img 
-              src="./logo.png" 
-              alt="نِعْمَة" 
-              className="brand-logo-img"
-              onError={(e) => {
-                // Graceful fallback to typography emblem if image unavailable
-                e.target.style.display = 'none';
-                if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-              }}
-            />
-            <span className="brand-logo-fallback" style={{ display: 'none' }}>
-              نِعْمَة
-            </span>
-          </div>
+        <div 
+          className="brand-wrapper" 
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          role="button"
+          tabIndex={0}
+          title="منصة نِعْمَة — تَذَكَّرْ لِتَشْكُرْ"
+        >
+          <img 
+            src={`${import.meta.env.BASE_URL}brand/emblem-arabic.png`} 
+            alt="شعار نِعْمَة" 
+            className="brand-logo-img"
+            onError={(e) => {
+              e.target.src = `${import.meta.env.BASE_URL}brand/logo-wordmark.png`;
+            }}
+          />
           <div className="brand-text">
-            <h1 className="brand-title">نِعْمَة</h1>
-            <span className="brand-subtitle">«تَذَكَّرْ لِتَشْكُرْ»</span>
+            <span className="brand-title">{t.brandTitle || 'نِعْمَة'}</span>
+            <span className="brand-slogan">{t.brandSlogan || '«تَذَكَّرْ لِتَشْكُرْ»'}</span>
           </div>
         </div>
 

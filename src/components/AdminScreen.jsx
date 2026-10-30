@@ -1404,14 +1404,17 @@ export default function AdminScreen({
           onClick={() => setMessageRecipientBlessing(null)} 
           role="dialog" 
           aria-modal="true" 
-          style={{ zIndex: 10010 }}
+          style={{ zIndex: 10010, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}
         >
           <div 
             className="modal-content"
             onClick={e => e.stopPropagation()}
             style={{
-              maxWidth: '560px',
-              width: '92%',
+              maxWidth: '540px',
+              width: '100%',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
               background: 'var(--surface-card)',
               borderRadius: '24px',
               border: '1.5px solid var(--border-gold)',
@@ -1422,12 +1425,13 @@ export default function AdminScreen({
           >
             {/* Modal Header */}
             <div style={{
-              padding: '18px 22px',
+              padding: '16px 20px',
               background: 'linear-gradient(135deg, rgba(212,175,55,0.14) 0%, rgba(44,74,62,0.08) 100%)',
               borderBottom: '1px solid var(--border-subtle)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              flexShrink: 0
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
@@ -1439,15 +1443,16 @@ export default function AdminScreen({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: 'var(--color-gold)'
+                  color: 'var(--color-gold)',
+                  flexShrink: 0
                 }}>
                   <Send size={18} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                  <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: '800', color: 'var(--text-heading)' }}>
                     {isRtl ? 'إرسال إشعار إلى بريد صاحب النعمة' : 'Send Notification to Author Inbox'}
                   </h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  <p style={{ margin: '2px 0 0', fontSize: '11.5px', color: 'var(--text-muted)' }}>
                     {isRtl ? 'سيصل التنبيه مباشرة في بريد إشعارات المستخدم داخل التطبيق' : 'Delivered directly to user in-app notifications inbox'}
                   </p>
                 </div>
@@ -1456,8 +1461,8 @@ export default function AdminScreen({
                 type="button"
                 onClick={() => setMessageRecipientBlessing(null)}
                 style={{
-                  width: '34px',
-                  height: '34px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '50%',
                   background: 'var(--surface-card)',
                   border: '1px solid var(--border-subtle)',
@@ -1472,27 +1477,37 @@ export default function AdminScreen({
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSendAuthorMessage} style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Modal Form with Scrollable Body */}
+            <form 
+              onSubmit={handleSendAuthorMessage} 
+              style={{ 
+                padding: '16px 20px 20px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px',
+                overflowY: 'auto',
+                flex: 1
+              }}
+            >
               {/* Target Blessing Summary */}
               <div style={{
                 background: 'var(--surface-sunken)',
                 padding: '10px 14px',
                 borderRadius: '12px',
                 border: '1px solid var(--border-subtle)',
-                fontSize: '13px'
+                fontSize: '12.5px'
               }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: '11.5px', marginBottom: '2px' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginBottom: '2px' }}>
                   {isRtl ? 'النعمة المستهدفة:' : 'Target Blessing:'}
                 </div>
-                <div style={{ fontWeight: '800', color: 'var(--color-primary-dark)' }}>
+                <div style={{ fontWeight: '800', color: 'var(--color-primary-dark)', fontSize: '13.5px' }}>
                   «{messageRecipientBlessing.title || (isRtl ? 'نعمة منشورة' : 'Blessing')}»
                 </div>
               </div>
 
               {/* Action Type Selector */}
               <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)' }}>
                   {isRtl ? 'نوع الإشعار والتصنيف:' : 'Notification Category:'}
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
@@ -1500,28 +1515,28 @@ export default function AdminScreen({
                     type="button"
                     onClick={() => setAuthorMessageAction('message')}
                     style={{
-                      padding: '8px 6px',
+                      padding: '7px 4px',
                       borderRadius: '10px',
                       border: authorMessageAction === 'message' ? '1.5px solid var(--color-primary)' : '1px solid var(--border-subtle)',
                       background: authorMessageAction === 'message' ? 'rgba(44, 74, 62, 0.12)' : 'var(--surface-sunken)',
                       color: authorMessageAction === 'message' ? 'var(--color-primary)' : 'var(--text-muted)',
-                      fontSize: '12px',
+                      fontSize: '11.5px',
                       fontWeight: '700',
                       cursor: 'pointer'
                     }}
                   >
-                    {isRtl ? 'رسالة توضيحية' : 'General Notice'}
+                    {isRtl ? 'رسالة توضيحية' : 'Notice'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setAuthorMessageAction('edit')}
                     style={{
-                      padding: '8px 6px',
+                      padding: '7px 4px',
                       borderRadius: '10px',
                       border: authorMessageAction === 'edit' ? '1.5px solid var(--color-gold)' : '1px solid var(--border-subtle)',
                       background: authorMessageAction === 'edit' ? 'rgba(212, 175, 55, 0.15)' : 'var(--surface-sunken)',
                       color: authorMessageAction === 'edit' ? 'var(--color-gold)' : 'var(--text-muted)',
-                      fontSize: '12px',
+                      fontSize: '11.5px',
                       fontWeight: '700',
                       cursor: 'pointer'
                     }}
@@ -1532,27 +1547,27 @@ export default function AdminScreen({
                     type="button"
                     onClick={() => setAuthorMessageAction('delete')}
                     style={{
-                      padding: '8px 6px',
+                      padding: '7px 4px',
                       borderRadius: '10px',
                       border: authorMessageAction === 'delete' ? '1.5px solid #E53E3E' : '1px solid var(--border-subtle)',
                       background: authorMessageAction === 'delete' ? 'rgba(229, 62, 62, 0.12)' : 'var(--surface-sunken)',
                       color: authorMessageAction === 'delete' ? '#E53E3E' : 'var(--text-muted)',
-                      fontSize: '12px',
+                      fontSize: '11.5px',
                       fontWeight: '700',
                       cursor: 'pointer'
                     }}
                   >
-                    {isRtl ? 'تنبيه بحذف' : 'Removal Notice'}
+                    {isRtl ? 'تنبيه بحذف' : 'Removal'}
                   </button>
                 </div>
               </div>
 
               {/* Quick Template Chips */}
               <div>
-                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '5px' }}>
                   {isRtl ? 'قوالب سريعة مقترحة (اضغط للتعبئة):' : 'Quick templates (click to apply):'}
                 </span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {[
                     isRtl ? 'تم تعديل صياغة النعمة لضبط المعنى والاستدلال المباشر بما يتوافق مع معايير المنصة.' : 'Blessing text was refined to match our verified standards.',
                     isRtl ? 'تم حذف النعمة بناءً على مراجعة ضوابط النشر، نشكر تفهمكم وحرصكم الدائم.' : 'Blessing was removed per publishing guidelines. Thank you for understanding.',
@@ -1564,11 +1579,11 @@ export default function AdminScreen({
                       type="button"
                       onClick={() => setAuthorMessageText(tpl)}
                       style={{
-                        padding: '6px 10px',
+                        padding: '6px 9px',
                         borderRadius: '8px',
                         background: 'var(--surface-sunken)',
                         border: '1px dashed var(--border-subtle)',
-                        fontSize: '11.5px',
+                        fontSize: '11px',
                         textAlign: isRtl ? 'right' : 'left',
                         color: 'var(--text-muted)',
                         cursor: 'pointer',
@@ -1586,23 +1601,23 @@ export default function AdminScreen({
 
               {/* Textarea */}
               <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)' }}>
                   {isRtl ? 'نص الرسالة للمؤلف:' : 'Message to Author:'}
                 </label>
                 <textarea
                   value={authorMessageText}
                   onChange={e => setAuthorMessageText(e.target.value)}
                   placeholder={isRtl ? 'اكتب سبب التعديل أو الحذف، أو رسالة التقدير والتوجيه للمؤلف...' : 'Type message explaining the edit, removal or feedback...'}
-                  rows={4}
+                  rows={3}
                   required
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
+                    padding: '9px 12px',
                     borderRadius: '12px',
                     border: '1px solid var(--border-subtle)',
                     background: 'var(--surface-card)',
                     color: 'var(--text-main)',
-                    fontSize: '13.5px',
+                    fontSize: '13px',
                     lineHeight: '1.5',
                     boxSizing: 'border-box',
                     resize: 'vertical',
@@ -1612,7 +1627,7 @@ export default function AdminScreen({
               </div>
 
               {/* Submit / Cancel Buttons */}
-              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexShrink: 0 }}>
                 <button
                   type="button"
                   onClick={() => setMessageRecipientBlessing(null)}
@@ -1624,7 +1639,7 @@ export default function AdminScreen({
                     background: 'var(--surface-sunken)',
                     border: '1px solid var(--border-subtle)',
                     color: 'var(--text-muted)',
-                    fontSize: '13px',
+                    fontSize: '12.5px',
                     fontWeight: '700',
                     cursor: 'pointer'
                   }}
@@ -1641,7 +1656,7 @@ export default function AdminScreen({
                     background: 'linear-gradient(135deg, #1b4535 0%, #0f2b21 100%)',
                     border: '1.5px solid var(--color-gold)',
                     color: '#FFFFFF',
-                    fontSize: '13.5px',
+                    fontSize: '13px',
                     fontWeight: '700',
                     cursor: (isSendingMessage || !authorMessageText.trim()) ? 'not-allowed' : 'pointer',
                     opacity: (isSendingMessage || !authorMessageText.trim()) ? 0.6 : 1,
@@ -1651,7 +1666,7 @@ export default function AdminScreen({
                     gap: '6px'
                   }}
                 >
-                  <Send size={15} color="var(--color-gold)" />
+                  <Send size={14} color="var(--color-gold)" />
                   <span>{isSendingMessage ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : (isRtl ? 'إرسال الإشعار فوراً' : 'Send Notification')}</span>
                 </button>
               </div>

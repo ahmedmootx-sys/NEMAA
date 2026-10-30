@@ -1,8 +1,46 @@
-import React from 'react';
-import { X, Sparkles, BookOpen, Heart, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Sparkles, BookOpen, Heart, Check, Download, Share2, Loader2 } from 'lucide-react';
+import { downloadMissionPoster, shareMissionPoster } from '../utils/missionPoster';
 
 export default function AppMissionModal({ isOpen, onClose, lang = 'ar' }) {
+  const [isGeneratingPoster, setIsGeneratingPoster] = useState(false);
+  const [posterFeedback, setPosterFeedback] = useState('');
+
   if (!isOpen) return null;
+
+  const handleDownload = async () => {
+    setIsGeneratingPoster(true);
+    setPosterFeedback('');
+    try {
+      await downloadMissionPoster({ lang });
+      setPosterFeedback(lang === 'ar' ? 'تم تنزيل بوستر رسالة المنصة بنجاح ✨' : 'Poster downloaded successfully ✨');
+      setTimeout(() => setPosterFeedback(''), 4000);
+    } catch (err) {
+      console.warn('Error downloading mission poster:', err);
+      setPosterFeedback(lang === 'ar' ? 'حدث خطأ أثناء تنزيل البوستر' : 'Failed to download poster');
+      setTimeout(() => setPosterFeedback(''), 3000);
+    } finally {
+      setIsGeneratingPoster(false);
+    }
+  };
+
+  const handleShare = async () => {
+    setIsGeneratingPoster(true);
+    setPosterFeedback('');
+    try {
+      const shared = await shareMissionPoster({ lang });
+      if (shared) {
+        setPosterFeedback(lang === 'ar' ? 'تمت المشاركة بنجاح ✨' : 'Shared successfully ✨');
+      } else {
+        setPosterFeedback(lang === 'ar' ? 'تم تنزيل البوستر ونسخ الرابط لمشاركته كحالة ✨' : 'Poster downloaded & link copied ✨');
+      }
+      setTimeout(() => setPosterFeedback(''), 4000);
+    } catch (err) {
+      console.warn('Error sharing mission poster:', err);
+    } finally {
+      setIsGeneratingPoster(false);
+    }
+  };
 
   return (
     <div 
@@ -191,6 +229,87 @@ export default function AppMissionModal({ isOpen, onClose, lang = 'ar' }) {
                   Remember to Give Thanks.. ✨
                 </span>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Poster Actions Section */}
+        <div style={{
+          padding: '12px 22px',
+          background: 'var(--surface-sunken)',
+          borderTop: '1px solid var(--border-subtle)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>
+              {lang === 'ar' ? 'مشاركة رسالة المنصة كبوستر فاخر:' : 'Share platform mission poster:'}
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--color-gold)', fontWeight: '700' }}>
+              9:16 Story / Status
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <button
+              type="button"
+              disabled={isGeneratingPoster}
+              onClick={handleDownload}
+              style={{
+                padding: '9px 12px',
+                borderRadius: '12px',
+                background: 'var(--surface-card)',
+                border: '1px solid var(--border-gold, #D4AF37)',
+                color: 'var(--color-primary)',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: isGeneratingPoster ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.2s'
+              }}
+            >
+              {isGeneratingPoster ? <Loader2 size={15} className="spin-animate" /> : <Download size={15} color="var(--color-gold)" />}
+              <span>{lang === 'ar' ? 'تنزيل البوستر' : 'Download Poster'}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isGeneratingPoster}
+              onClick={handleShare}
+              style={{
+                padding: '9px 12px',
+                borderRadius: '12px',
+                background: 'rgba(212, 175, 55, 0.14)',
+                border: '1px solid var(--color-gold)',
+                color: 'var(--color-primary)',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: isGeneratingPoster ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.2s'
+              }}
+            >
+              {isGeneratingPoster ? <Loader2 size={15} className="spin-animate" /> : <Share2 size={15} color="var(--color-gold)" />}
+              <span>{lang === 'ar' ? 'مشاركة كحالة' : 'Share Status'}</span>
+            </button>
+          </div>
+
+          {posterFeedback && (
+            <div style={{
+              fontSize: '11.5px',
+              color: 'var(--color-primary)',
+              textAlign: 'center',
+              fontWeight: '700',
+              marginTop: '2px'
+            }}>
+              {posterFeedback}
             </div>
           )}
         </div>

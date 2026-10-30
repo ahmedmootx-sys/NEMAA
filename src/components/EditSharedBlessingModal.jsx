@@ -55,7 +55,14 @@ export default function EditSharedBlessingModal({
       setIsSubmitting(false);
       onClose();
     } catch (err) {
-      setError(err.message || (lang === 'ar' ? 'تعذر حفظ التعديلات، يرجى المحاولة ثانية' : 'Failed to save edits'));
+      const msg = err.message || '';
+      if (msg.includes('blessings_pkey') || msg.includes('duplicate key')) {
+        setError(lang === 'ar' 
+          ? 'يوجد بالفعل نعمة أخرى منشورة بهذا العنوان، يرجى اختيار عنوان مميز' 
+          : 'A blessing with this title already exists. Please choose a different title.');
+      } else {
+        setError(msg || (lang === 'ar' ? 'تعذر حفظ التعديلات، يرجى المحاولة ثانية' : 'Failed to save edits'));
+      }
       setIsSubmitting(false);
     }
   };
