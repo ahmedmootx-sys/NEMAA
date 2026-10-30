@@ -34,6 +34,8 @@ import {
   subscribeToAdminDeletedBlessings,
   broadcastBlessingUpdate,
   subscribeToLiveBlessingUpdates,
+  broadcastBlessingDeletion,
+  subscribeToLiveBlessingDeletions,
   fetchAuthorNotifications,
   dismissAuthorNotification,
   subscribeToAuthorNotifications
@@ -301,15 +303,24 @@ export default function App() {
     }
   }, []);
 
-  // Purge legacy dummy test blessings from local storage
+  // Purge legacy test blessings & orphan community blessings from local storage on mount
   useEffect(() => {
     try {
+      const isOrphan = (b) => {
+        if (!b) return true;
+        const t = (b.title || '').trim().toLowerCase();
+        const id = String(b.id || '').trim().toLowerCase();
+        if (t.includes('نعم الله تترا ولا يمكن حصرها') || id === 'sb_vrgco8') return true;
+        if (t === 'نعمة السكينة وحسن الظن بالله') return true;
+        return false;
+      };
+
       const purgeLegacy = (key) => {
         const raw = localStorage.getItem(key);
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list)) {
-            const filtered = list.filter(b => b && b.title !== 'نعمة السكينة وحسن الظن بالله');
+            const filtered = list.filter(b => !isOrphan(b));
             if (filtered.length !== list.length) {
               localStorage.setItem(key, JSON.stringify(filtered));
             }
@@ -319,6 +330,11 @@ export default function App() {
         return null;
       };
 
+      const cleanedPublished = purgeLegacy('nemaa_my_published_blessings');
+      if (cleanedPublished) {
+        setMyPublishedBlessings(cleanedPublished);
+      }
+
       const cleanedCustom = purgeLegacy('nemaa_custom_blessings');
       if (cleanedCustom) {
         setCustomBlessings(cleanedCustom);
@@ -327,6 +343,38 @@ export default function App() {
       const cleanedShared = purgeLegacy('nemaa_shared_blessings_cache');
       if (cleanedShared) {
         setSharedBlessings(cleanedShared);
+      }
+
+      // Purge orphan entries from customizedBlessings (fixes badge "صياغتي الخاصة" on deleted blessings)
+      const rawCustomized = localStorage.getItem('nemaa_customized_blessings');
+      if (rawCustomized) {
+        const custObj = JSON.parse(rawCustomized);
+        if (custObj && typeof custObj === 'object') {
+          let dirty = false;
+          for (const k of Object.keys(custObj)) {
+            if (k.toLowerCase() === 'sb_vrgco8' || (custObj[k]?.title || '').includes('نعم الله تترا ولا يمكن حصرها')) {
+              delete custObj[k];
+              dirty = true;
+            }
+          }
+          if (dirty) {
+            localStorage.setItem('nemaa_customized_blessings', JSON.stringify(custObj));
+            setCustomizedBlessings(custObj);
+          }
+        }
+      }
+
+      // Purge orphan IDs from myPublishedIds
+      const rawIds = localStorage.getItem('nemaa_my_published_ids');
+      if (rawIds) {
+        const ids = JSON.parse(rawIds);
+        if (Array.isArray(ids)) {
+          const filtered = ids.filter(id => String(id).toLowerCase() !== 'sb_vrgco8');
+          if (filtered.length !== ids.length) {
+            localStorage.setItem('nemaa_my_published_ids', JSON.stringify(filtered));
+            setMyPublishedIds(filtered);
+          }
+        }
       }
     } catch {}
   }, []);
@@ -395,6 +443,60 @@ export default function App() {
           try {
             localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(remote));
           } catch {}
+
+          // Single Source of Truth reconciliation:
+          // Purge any community blessing from local states and localStorage if it no longer exists on Supabase!
+          const remoteIds = new Set(remote.map(r => String(r.id || '').toLowerCase()));
+          const remoteTitles = new Set(remote.map(r => (r.title || '').trim().toLowerCase()));
+
+          const isCommunityActive = (b) => {
+            if (!b) return false;
+            const bId = String(b.id || '').toLowerCase();
+            const bTitle = (b.title || '').trim().toLowerCase();
+            const isCommunity = b.isShared || bId.startsWith('sb_') || bId.startsWith('pb_') || bId.startsWith('custom_');
+            if (isCommunity) {
+              return remoteIds.has(bId) || remoteTitles.has(bTitle);
+            }
+            return true;
+          };
+
+          setMyPublishedBlessings(prev => {
+            const next = prev.filter(isCommunityActive);
+            try { localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next)); } catch {}
+            return next;
+          });
+
+          setCustomBlessings(prev => {
+            const next = prev.filter(isCommunityActive);
+            try { localStorage.setItem('nemaa_custom_blessings', JSON.stringify(next)); } catch {}
+            return next;
+          });
+
+          setMyPublishedIds(prev => {
+            const next = prev.filter(id => remoteIds.has(String(id).toLowerCase()));
+            try { localStorage.setItem('nemaa_my_published_ids', JSON.stringify(next)); } catch {}
+            return next;
+          });
+
+          setCustomizedBlessings(prev => {
+            const next = { ...prev };
+            let changed = false;
+            for (const key of Object.keys(next)) {
+              const item = next[key];
+              const isCommunity = key.startsWith('sb_') || key.startsWith('pb_') || key.startsWith('custom_') || item?.isShared;
+              if (isCommunity) {
+                const title = (item?.title || '').trim().toLowerCase();
+                if (!remoteIds.has(String(key).toLowerCase()) && !remoteTitles.has(title)) {
+                  delete next[key];
+                  changed = true;
+                }
+              }
+            }
+            if (changed) {
+              try { localStorage.setItem('nemaa_customized_blessings', JSON.stringify(next)); } catch {}
+            }
+            return next;
+          });
         }
       } catch (err) {
         console.warn('Failed to load shared blessings from Supabase:', err);
@@ -405,13 +507,62 @@ export default function App() {
       try {
         const remoteDeleted = await fetchAdminDeletedBlessings();
         if (isMounted && Array.isArray(remoteDeleted) && remoteDeleted.length > 0) {
+          const identifiers = remoteDeleted.flatMap(d => [d.blessing_title, d.id]).filter(Boolean).map(s => String(s).trim());
+          const idSet = new Set(identifiers.map(s => s.toLowerCase()));
+
           setAdminDeletedIds(prev => {
-            const identifiers = remoteDeleted.map(d => d.blessing_title || d.id).filter(Boolean);
             const combined = [...new Set([...prev, ...identifiers])];
             try {
               localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(combined));
             } catch {}
             return combined;
+          });
+
+          const isNotDeleted = (b) => {
+            if (!b) return false;
+            const bId = String(b.id || '').toLowerCase();
+            const bTitle = (b.title || '').trim().toLowerCase();
+            return !idSet.has(bId) && !idSet.has(bTitle);
+          };
+
+          setSharedBlessings(prev => {
+            const next = prev.filter(isNotDeleted);
+            try { localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(next)); } catch {}
+            return next;
+          });
+
+          setMyPublishedBlessings(prev => {
+            const next = prev.filter(isNotDeleted);
+            try { localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next)); } catch {}
+            return next;
+          });
+
+          setCustomBlessings(prev => {
+            const next = prev.filter(isNotDeleted);
+            try { localStorage.setItem('nemaa_custom_blessings', JSON.stringify(next)); } catch {}
+            return next;
+          });
+
+          setCustomizedBlessings(prev => {
+            const next = { ...prev };
+            let changed = false;
+            for (const key of Object.keys(next)) {
+              const title = (next[key]?.title || '').trim().toLowerCase();
+              if (idSet.has(String(key).toLowerCase()) || idSet.has(title)) {
+                delete next[key];
+                changed = true;
+              }
+            }
+            if (changed) {
+              try { localStorage.setItem('nemaa_customized_blessings', JSON.stringify(next)); } catch {}
+            }
+            return next;
+          });
+
+          setMyPublishedIds(prev => {
+            const next = prev.filter(id => !idSet.has(String(id).toLowerCase()));
+            try { localStorage.setItem('nemaa_my_published_ids', JSON.stringify(next)); } catch {}
+            return next;
           });
         }
       } catch (err) {
@@ -443,16 +594,31 @@ export default function App() {
       },
       (deletedRow) => {
         if (!isMounted || !deletedRow) return;
+        const delId = String(deletedRow.id || '').toLowerCase();
+        const delTitle = (deletedRow.title || '').trim().toLowerCase();
+
+        const matchDelete = (b) => {
+          if (!b) return true;
+          const bId = String(b.id || '').toLowerCase();
+          const bTitle = (b.title || '').trim().toLowerCase();
+          return (delId && bId === delId) || (delTitle && bTitle === delTitle);
+        };
+
         setSharedBlessings(prev => {
-          const updated = prev.filter(b => {
-            if (deletedRow.id && String(b.id) === String(deletedRow.id)) return false;
-            if (deletedRow.title && deletedRow.reflection && b.title === deletedRow.title && b.reflection === deletedRow.reflection) return false;
-            if (deletedRow.title && b.title === deletedRow.title) return false;
-            return true;
-          });
-          try {
-            localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated));
-          } catch {}
+          const updated = prev.filter(b => !matchDelete(b));
+          try { localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
+
+        setMyPublishedBlessings(prev => {
+          const updated = prev.filter(b => !matchDelete(b));
+          try { localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
+
+        setCustomBlessings(prev => {
+          const updated = prev.filter(b => !matchDelete(b));
+          try { localStorage.setItem('nemaa_custom_blessings', JSON.stringify(updated)); } catch {}
           return updated;
         });
       },
@@ -483,6 +649,7 @@ export default function App() {
         if (!isMounted || !newDeleted) return;
         const identifier = (newDeleted.blessing_title || newDeleted.id || '').trim();
         if (!identifier) return;
+        const idLower = identifier.toLowerCase();
 
         setAdminDeletedIds(prev => {
           if (prev.includes(identifier)) return prev;
@@ -493,8 +660,44 @@ export default function App() {
           return updated;
         });
 
-        // Also remove from shared blessings immediately if present
-        setSharedBlessings(prev => prev.filter(b => b.title !== identifier && String(b.id) !== identifier));
+        const isTarget = (b) => {
+          if (!b) return false;
+          return String(b.id || '').toLowerCase() === idLower || (b.title || '').trim().toLowerCase() === idLower;
+        };
+
+        // Remove from shared blessings immediately
+        setSharedBlessings(prev => {
+          const next = prev.filter(b => !isTarget(b));
+          try { localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(next)); } catch {}
+          return next;
+        });
+
+        // Remove from author's published blessings immediately
+        setMyPublishedBlessings(prev => {
+          const next = prev.filter(b => !isTarget(b));
+          try { localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next)); } catch {}
+          return next;
+        });
+
+        // Remove from custom blessings
+        setCustomBlessings(prev => {
+          const next = prev.filter(b => !isTarget(b));
+          try { localStorage.setItem('nemaa_custom_blessings', JSON.stringify(next)); } catch {}
+          return next;
+        });
+
+        // Clear local customization so badge "صياغتي الخاصة" vanishes
+        setCustomizedBlessings(prev => {
+          const next = { ...prev };
+          if (next[identifier]) delete next[identifier];
+          for (const k of Object.keys(next)) {
+            if ((next[k]?.title || '').trim().toLowerCase() === idLower) {
+              delete next[k];
+            }
+          }
+          try { localStorage.setItem('nemaa_customized_blessings', JSON.stringify(next)); } catch {}
+          return next;
+        });
       },
       (restored) => {
         if (!isMounted || !restored) return;
@@ -511,10 +714,81 @@ export default function App() {
       }
     );
 
+    // Realtime broadcast listener for instant multi-device blessing deletion
+    const unsubscribeLiveDeletions = subscribeToLiveBlessingDeletions((payload) => {
+      if (!isMounted || !payload) return;
+      const delId = String(payload.id || '').trim().toLowerCase();
+      const delTitle = (payload.title || '').trim().toLowerCase();
+
+      // Record in adminDeletedIds
+      setAdminDeletedIds(prev => {
+        const identifiers = [];
+        if (payload.id) identifiers.push(payload.id);
+        if (payload.title) identifiers.push(payload.title);
+        const next = [...new Set([...prev, ...identifiers])];
+        try { localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      const isMatch = (b) => {
+        if (!b) return false;
+        const bId = String(b.id || '').trim().toLowerCase();
+        const bTitle = (b.title || '').trim().toLowerCase();
+        return (delId && bId === delId) || (delTitle && bTitle === delTitle);
+      };
+
+      setSharedBlessings(prev => {
+        const next = prev.filter(b => !isMatch(b));
+        try { localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      setMyPublishedBlessings(prev => {
+        const next = prev.filter(b => !isMatch(b));
+        try { localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      setCustomBlessings(prev => {
+        const next = prev.filter(b => !isMatch(b));
+        try { localStorage.setItem('nemaa_custom_blessings', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      setCustomizedBlessings(prev => {
+        const next = { ...prev };
+        let changed = false;
+        if (payload.id && next[payload.id]) {
+          delete next[payload.id];
+          changed = true;
+        }
+        for (const k of Object.keys(next)) {
+          if (delTitle && (next[k]?.title || '').trim().toLowerCase() === delTitle) {
+            delete next[k];
+            changed = true;
+          }
+        }
+        if (changed) {
+          try { localStorage.setItem('nemaa_customized_blessings', JSON.stringify(next)); } catch {}
+        }
+        return next;
+      });
+
+      setMyPublishedIds(prev => {
+        const next = prev.filter(id => {
+          const s = String(id).trim().toLowerCase();
+          return s !== delId;
+        });
+        try { localStorage.setItem('nemaa_my_published_ids', JSON.stringify(next)); } catch {}
+        return next;
+      });
+    });
+
     return () => {
       isMounted = false;
       if (typeof unsubscribeBlessings === 'function') unsubscribeBlessings();
       if (typeof unsubscribeAdminDeleted === 'function') unsubscribeAdminDeleted();
+      if (typeof unsubscribeLiveDeletions === 'function') unsubscribeLiveDeletions();
     };
   }, []);
 
@@ -664,11 +938,15 @@ export default function App() {
     localStorage.setItem('nemaa_customized_blessings', JSON.stringify(updated));
   };
 
-  // Combined Blessings Pool with Strict Deduplication (Prevents duplicate cards)
+  // Combined Blessings Pool with Strict Deduplication & Single Source of Truth enforcement
   const allBlessings = useMemo(() => {
     const pool = [];
     const seenTitles = new Set();
     const seenIds = new Set();
+    const adminDeletedSet = new Set(adminDeletedIds.map(x => String(x).trim().toLowerCase()));
+
+    const initialCatalogIds = new Set(INITIAL_BLESSINGS.map(b => String(b.id)));
+    const initialCatalogTitles = new Set(INITIAL_BLESSINGS.map(b => (b.title || '').trim().toLowerCase()));
 
     const addUnique = (b) => {
       if (!b) return;
@@ -676,14 +954,28 @@ export default function App() {
       const cleanReflection = (b.reflection || '').trim();
       if (!cleanTitle || !cleanReflection) return;
       const strId = String(b.id || '');
+      const sig = cleanTitle.toLowerCase();
 
-      // Check admin deleted
-      if (adminDeletedIds.includes(strId) || adminDeletedIds.includes(cleanTitle)) {
+      // Check admin deleted (case-insensitive & trimmed)
+      if (adminDeletedSet.has(strId.toLowerCase()) || adminDeletedSet.has(sig)) {
         return;
       }
 
-      // Check uniqueness: deduplicate by id OR by (title + initial reflection preview)
-      const sig = cleanTitle.toLowerCase();
+      // Single Source of Truth Rule:
+      // If it is a community / shared blessing (not in the 100 initial catalog blessings),
+      // it MUST currently exist in sharedBlessings (verified remote) to be rendered.
+      // Any deleted or missing community blessing is blocked completely!
+      const isInitialCatalog = initialCatalogIds.has(strId) || initialCatalogTitles.has(sig);
+      if (!isInitialCatalog && (b.isShared || strId.startsWith('sb_') || strId.startsWith('pb_') || strId.startsWith('custom_'))) {
+        const existsInShared = sharedBlessings.some(sb => 
+          String(sb.id).toLowerCase() === strId.toLowerCase() || (sb.title || '').trim().toLowerCase() === sig
+        );
+        if (!existsInShared) {
+          return; // Server is Single Source of Truth: deleted community blessing is never shown!
+        }
+      }
+
+      // Check uniqueness: deduplicate by id OR by title
       if (seenIds.has(strId) || seenTitles.has(sig)) {
         return;
       }
@@ -706,13 +998,13 @@ export default function App() {
     // 1. First shared blessings (from Supabase, newest first)
     sharedBlessings.forEach(addUnique);
 
-    // 2. User's own published blessings (offline resilient)
+    // 2. User's own published blessings (offline resilient, strictly guarded)
     myPublishedBlessings.forEach(addUnique);
 
     // 3. Custom blessings
     customBlessings.forEach(addUnique);
 
-    // 4. Initial platform catalog
+    // 4. Initial platform catalog (100 curated blessings)
     INITIAL_BLESSINGS.forEach(addUnique);
 
     return pool;
@@ -1166,14 +1458,52 @@ export default function App() {
       return updated;
     });
 
-    // 4. Remote delete from Supabase if shared
+    // 4. Remove from user's published blessings (so author's device wipes it completely)
+    setMyPublishedBlessings(prev => {
+      const updated = prev.filter(b => {
+        if (strId && String(b.id) === strId) return false;
+        if (title && b.title === title) return false;
+        return true;
+      });
+      try {
+        localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 5. Remove from customizedBlessings (wipes badge "صياغتي الخاصة" permanently)
+    setCustomizedBlessings(prev => {
+      const next = { ...prev };
+      if (strId && next[strId]) delete next[strId];
+      const titleLower = title.toLowerCase();
+      for (const k of Object.keys(next)) {
+        if (titleLower && (next[k]?.title || '').trim().toLowerCase() === titleLower) {
+          delete next[k];
+        }
+      }
+      try {
+        localStorage.setItem('nemaa_customized_blessings', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 6. Remove from published IDs
+    setMyPublishedIds(prev => {
+      const updated = prev.filter(id => String(id) !== strId);
+      try {
+        localStorage.setItem('nemaa_my_published_ids', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    // 7. Remote delete from Supabase if shared
     try {
       await deleteSharedBlessing(blessingOrId);
     } catch (err) {
       console.warn('Admin remote delete error:', err);
     }
 
-    // 5. Remote record in Supabase 'admin_deleted_blessings' table
+    // 8. Remote record in Supabase 'admin_deleted_blessings' table
     // (This ensures all users on all devices have this blessing hidden)
     try {
       await recordAdminDeletedBlessing(blessingOrId, adminEmail);
@@ -1718,8 +2048,10 @@ export default function App() {
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
         allBlessings={allBlessings}
+        sharedBlessings={sharedBlessings}
         onDeleteBlessing={handleAdminDeleteBlessing}
         onUpdateBlessing={handleUpdateBlessing}
+        getBlessingPraises={getBlessingPraises}
         lang={currentLang}
       />
 

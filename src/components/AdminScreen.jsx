@@ -46,8 +46,10 @@ export default function AdminScreen({
   isOpen, 
   onClose, 
   allBlessings = [], 
+  sharedBlessings = [],
   onDeleteBlessing,
   onUpdateBlessing,
+  getBlessingPraises,
   lang = 'ar' 
 }) {
   const [currentUser, setCurrentUser] = useState(null);
@@ -56,8 +58,8 @@ export default function AdminScreen({
   const [authError, setAuthError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // Dashboard state
-  const [activeTab, setActiveTab] = useState('reports'); // 'reports' | 'feedback' | 'blessings'
+  // Dashboard state: 'reports' | 'feedback' | 'published' | 'blessings'
+  const [activeTab, setActiveTab] = useState('reports');
   
   // Reports
   const [reports, setReports] = useState([]);
@@ -68,7 +70,10 @@ export default function AdminScreen({
   const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
   const [feedbackFilter, setFeedbackFilter] = useState('all'); // 'all' | 'suggestion' | 'complaint'
 
-  // Blessings Management
+  // Published Blessings Management (النعم المنشورة من المجتمع)
+  const [publishedSearchQuery, setPublishedSearchQuery] = useState('');
+
+  // Catalog Blessings Management (كتالوج المنصة)
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [statusNotice, setStatusNotice] = useState('');
@@ -351,22 +356,43 @@ export default function AdminScreen({
     setTimeout(() => setStatusNotice(''), 3000);
   };
 
-  // Filtered blessings list for management tab
-  const filteredBlessings = useMemo(() => {
-    return allBlessings.filter(b => {
-      if (filterCategory === 'shared' && !b.isShared) return false;
-      if (filterCategory !== 'all' && filterCategory !== 'shared' && b.category !== filterCategory) return false;
+  // Raw list of community published blessings (authoritative live community blessings)
+  const rawPublishedList = useMemo(() => {
+    if (sharedBlessings && sharedBlessings.length > 0) return sharedBlessings;
+    return allBlessings.filter(b => b.isShared);
+  }, [sharedBlessings, allBlessings]);
 
+  // Filtered published blessings list for Tab 3 «النعم المنشورة»
+  const filteredPublishedBlessings = useMemo(() => {
+    return rawPublishedList.filter(b => {
+      if (!publishedSearchQuery.trim()) return true;
+      const q = publishedSearchQuery.toLowerCase();
+      const inTitle = (b.title || '').toLowerCase().includes(q);
+      const inRef = (b.reflection || '').toLowerCase().includes(q);
+      const inAuthor = (b.author || '').toLowerCase().includes(q);
+      const inProof = (b.proof || '').toLowerCase().includes(q);
+      return inTitle || inRef || inAuthor || inProof;
+    });
+  }, [rawPublishedList, publishedSearchQuery]);
+
+  // Platform catalog blessings (100 curated platform blessings)
+  const catalogBlessings = useMemo(() => {
+    return allBlessings.filter(b => !b.isShared);
+  }, [allBlessings]);
+
+  // Filtered catalog blessings list for Tab 4 «كتالوج المنصة»
+  const filteredCatalogBlessings = useMemo(() => {
+    return catalogBlessings.filter(b => {
+      if (filterCategory !== 'all' && b.category !== filterCategory) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const inTitle = (b.title || '').toLowerCase().includes(q);
         const inRef = (b.reflection || '').toLowerCase().includes(q);
-        const inAuthor = (b.author || '').toLowerCase().includes(q);
-        if (!inTitle && !inRef && !inAuthor) return false;
+        if (!inTitle && !inRef) return false;
       }
       return true;
     });
-  }, [allBlessings, filterCategory, searchQuery]);
+  }, [catalogBlessings, filterCategory, searchQuery]);
 
   // Filtered feedback list
   const filteredFeedback = useMemo(() => {
@@ -637,14 +663,14 @@ export default function AdminScreen({
           gap: '18px',
           boxSizing: 'border-box'
         }}>
-          {/* Segmented Full-Width Tab Navigation */}
+          {/* Segmented Full-Width Tab Navigation (4 Tabs) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
+            gridTemplateColumns: 'repeat(4, 1fr)',
             background: 'var(--surface-sunken)',
-            padding: '5px',
+            padding: '4px',
             borderRadius: '16px',
-            gap: '6px',
+            gap: '4px',
             border: '1px solid var(--border-subtle)'
           }}>
             {/* Tab 1: Reports */}
@@ -652,32 +678,34 @@ export default function AdminScreen({
               type="button"
               onClick={() => setActiveTab('reports')}
               style={{
-                padding: '10px 8px',
+                padding: '9px 4px',
                 borderRadius: '12px',
                 border: 'none',
                 background: activeTab === 'reports' ? '#FFFFFF' : 'transparent',
                 color: activeTab === 'reports' ? '#C53030' : 'var(--text-muted)',
                 fontWeight: activeTab === 'reports' ? '800' : '600',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '4px',
                 boxShadow: activeTab === 'reports' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                minWidth: 0
               }}
             >
-              <Flag size={15} color={activeTab === 'reports' ? '#C53030' : 'currentColor'} />
-              <span>{isRtl ? 'البلاغات' : 'Reports'}</span>
+              <Flag size={14} color={activeTab === 'reports' ? '#C53030' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'البلاغات' : 'Reports'}</span>
               {reports.length > 0 && (
                 <span style={{
                   background: '#E53E3E',
                   color: '#FFFFFF',
-                  fontSize: '11px',
+                  fontSize: '10.5px',
                   fontWeight: '800',
-                  padding: '1px 7px',
-                  borderRadius: '10px'
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  flexShrink: 0
                 }}>
                   {reports.length}
                 </span>
@@ -689,61 +717,103 @@ export default function AdminScreen({
               type="button"
               onClick={() => setActiveTab('feedback')}
               style={{
-                padding: '10px 8px',
+                padding: '9px 4px',
                 borderRadius: '12px',
                 border: 'none',
                 background: activeTab === 'feedback' ? '#FFFFFF' : 'transparent',
                 color: activeTab === 'feedback' ? 'var(--color-primary)' : 'var(--text-muted)',
                 fontWeight: activeTab === 'feedback' ? '800' : '600',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '4px',
                 boxShadow: activeTab === 'feedback' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                minWidth: 0
               }}
             >
-              <MessageSquare size={15} color={activeTab === 'feedback' ? 'var(--color-gold)' : 'currentColor'} />
-              <span>{isRtl ? 'الشكاوى والمقترحات' : 'Feedback'}</span>
+              <MessageSquare size={14} color={activeTab === 'feedback' ? 'var(--color-gold)' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'الشكاوى' : 'Feedback'}</span>
               {feedbackList.length > 0 && (
                 <span style={{
                   background: 'var(--color-gold)',
                   color: '#FFFFFF',
-                  fontSize: '11px',
+                  fontSize: '10.5px',
                   fontWeight: '800',
-                  padding: '1px 7px',
-                  borderRadius: '10px'
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  flexShrink: 0
                 }}>
                   {feedbackList.length}
                 </span>
               )}
             </button>
 
-            {/* Tab 3: Blessings Management */}
+            {/* Tab 3: Published Community Blessings */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('published')}
+              style={{
+                padding: '9px 4px',
+                borderRadius: '12px',
+                border: 'none',
+                background: activeTab === 'published' ? '#FFFFFF' : 'transparent',
+                color: activeTab === 'published' ? 'var(--color-gold)' : 'var(--text-muted)',
+                fontWeight: activeTab === 'published' ? '800' : '600',
+                fontSize: '12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                boxShadow: activeTab === 'published' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.2s',
+                minWidth: 0
+              }}
+            >
+              <Globe size={14} color={activeTab === 'published' ? 'var(--color-gold)' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'المنشورة' : 'Published'}</span>
+              {rawPublishedList.length > 0 && (
+                <span style={{
+                  background: 'var(--color-gold)',
+                  color: '#FFFFFF',
+                  fontSize: '10.5px',
+                  fontWeight: '800',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  flexShrink: 0
+                }}>
+                  {rawPublishedList.length}
+                </span>
+              )}
+            </button>
+
+            {/* Tab 4: Platform Catalog (100 Curated Blessings) */}
             <button
               type="button"
               onClick={() => setActiveTab('blessings')}
               style={{
-                padding: '10px 8px',
+                padding: '9px 4px',
                 borderRadius: '12px',
                 border: 'none',
                 background: activeTab === 'blessings' ? '#FFFFFF' : 'transparent',
                 color: activeTab === 'blessings' ? 'var(--color-primary)' : 'var(--text-muted)',
                 fontWeight: activeTab === 'blessings' ? '800' : '600',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '4px',
                 boxShadow: activeTab === 'blessings' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                minWidth: 0
               }}
             >
-              <Layers size={15} color={activeTab === 'blessings' ? 'var(--color-primary)' : 'currentColor'} />
-              <span>{isRtl ? 'إدارة النعم' : 'Blessings'}</span>
+              <Layers size={14} color={activeTab === 'blessings' ? 'var(--color-primary)' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'الكتالوج (100)' : 'Catalog'}</span>
             </button>
           </div>
 
@@ -1239,16 +1309,279 @@ export default function AdminScreen({
             </div>
           )}
 
-          {/* TAB 3: BLESSINGS MANAGEMENT CONTENT */}
+          {/* TAB 3: PUBLISHED BLESSINGS MANAGEMENT CONTENT (النعم المنشورة من المجتمع) */}
+          {activeTab === 'published' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Informative Guidance Banner */}
+              <div style={{
+                background: 'rgba(212, 175, 55, 0.08)',
+                border: '1px solid rgba(212, 175, 55, 0.25)',
+                borderRadius: '14px',
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontSize: '12.5px',
+                color: 'var(--text-main)',
+                lineHeight: '1.5'
+              }}>
+                <Globe size={18} color="var(--color-gold)" style={{ flexShrink: 0 }} />
+                <span>
+                  {isRtl 
+                    ? 'قسم النعم المنشورة من مجتمع المنصة (السيرفر الحي): أي نعمة يتم حذفها من هنا تُحذف فوراً ونهائياً من قاعدة البيانات ومن جميع الأجهزة بما فيها جهاز صاحب النعمة.'
+                    : 'Community published blessings (Live Server): Any blessing deleted from here is permanently purged from the database and all devices.'}
+                </span>
+              </div>
+
+              {/* Search Bar for Published Blessings */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  value={publishedSearchQuery}
+                  onChange={e => setPublishedSearchQuery(e.target.value)}
+                  placeholder={isRtl ? 'ابحث في النعم المنشورة بالعنوان أو الكاتب أو التدبر...' : 'Search published blessings...'}
+                  style={{
+                    width: '100%',
+                    padding: '11px 40px 11px 14px',
+                    borderRadius: '14px',
+                    border: '1px solid var(--border-subtle)',
+                    background: 'var(--surface-card)',
+                    color: 'var(--text-main)',
+                    fontSize: '13.5px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <Search size={18} color="var(--text-muted)" style={{ position: 'absolute', right: isRtl ? '14px' : 'auto', left: isRtl ? 'auto' : '14px', top: '12px' }} />
+                {publishedSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setPublishedSearchQuery('')}
+                    style={{ position: 'absolute', left: isRtl ? '12px' : 'auto', right: isRtl ? 'auto' : '12px', top: '11px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-heading)' }}>
+                  {isRtl ? `إجمالي النعم المنشورة: ${rawPublishedList.length}` : `Total Published Blessings: ${rawPublishedList.length}`}
+                </span>
+                {publishedSearchQuery && (
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {isRtl ? `نتائج البحث: ${filteredPublishedBlessings.length}` : `Search results: ${filteredPublishedBlessings.length}`}
+                  </span>
+                )}
+              </div>
+
+              {filteredPublishedBlessings.length === 0 ? (
+                <div style={{
+                  background: 'var(--surface-card)',
+                  borderRadius: '16px',
+                  border: '1px dashed var(--border-subtle)',
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)'
+                }}>
+                  <Globe size={36} color="var(--color-gold)" style={{ margin: '0 auto 12px', opacity: 0.6 }} />
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-heading)', marginBottom: '6px' }}>
+                    {isRtl ? 'لا توجد نعم منشورة حالياً من المجتمع' : 'No community published blessings yet'}
+                  </div>
+                  <div style={{ fontSize: '13px' }}>
+                    {isRtl ? 'كل نعمة يشاركها الزوار ستظهر هنا فوراً للإدارة والتعديل والمراسلة.' : 'Shared blessings will appear here live for management.'}
+                  </div>
+                </div>
+              ) : (
+                filteredPublishedBlessings.map((b) => {
+                  const praises = getBlessingPraises ? getBlessingPraises(b) : (b.praisesCount || 0);
+                  return (
+                    <div
+                      key={b.id || b.title}
+                      style={{
+                        background: 'var(--surface-card)',
+                        borderRadius: '16px',
+                        border: '1px solid var(--border-subtle)',
+                        padding: '16px 18px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              background: 'rgba(212,175,55,0.15)',
+                              color: 'var(--color-gold)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Globe size={11} />
+                              <span>{isRtl ? 'نعمة متشارَكة' : 'Community'}</span>
+                            </span>
+
+                            <span style={{
+                              fontSize: '11.5px',
+                              fontWeight: '600',
+                              color: 'var(--color-primary)',
+                              background: 'var(--surface-sunken)',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <User size={11} />
+                              <span>{isRtl ? `بقلم: ${b.author || 'محب للخير'}` : `By: ${b.author || 'Contributor'}`}</span>
+                            </span>
+
+                            <span style={{
+                              fontSize: '11.5px',
+                              color: 'var(--text-muted)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Heart size={11} color="var(--color-gold)" />
+                              <span>{isRtl ? `${praises} حمدوا الله عليها` : `${praises} praises`}</span>
+                            </span>
+                          </div>
+
+                          <h4 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                            {b.title}
+                          </h4>
+                          <p style={{ margin: '0 0 8px', fontSize: '13.5px', color: 'var(--text-main)', lineHeight: '1.6' }}>
+                            {b.reflection}
+                          </p>
+
+                          {b.proof && (
+                            <div style={{
+                              padding: '8px 12px',
+                              background: 'var(--surface-sunken)',
+                              borderRadius: '10px',
+                              borderRight: isRtl ? '3px solid var(--color-gold)' : 'none',
+                              borderLeft: !isRtl ? '3px solid var(--color-gold)' : 'none',
+                              fontSize: '12.5px',
+                              color: 'var(--text-main)'
+                            }}>
+                              <div style={{ fontFamily: 'Amiri, serif', fontSize: '13.5px', marginBottom: '2px' }}>
+                                {b.proof}
+                              </div>
+                              {b.proofSource && (
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  {b.proofSource}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions Bar */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end',
+                        gap: '8px',
+                        paddingTop: '10px',
+                        borderTop: '1px solid var(--border-subtle)',
+                        flexWrap: 'wrap'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(b)}
+                          style={{
+                            padding: '7px 12px',
+                            borderRadius: '8px',
+                            background: 'var(--surface-sunken)',
+                            border: '1px solid var(--border-subtle)',
+                            color: 'var(--color-primary)',
+                            fontSize: '12.5px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <Edit3 size={13} />
+                          <span>{isRtl ? 'تعديل وتصحيح' : 'Edit'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAuthorMessage(b, 'message')}
+                          title={isRtl ? 'إرسال رسالة في بريد إشعارات الناشر' : 'Send message to author inbox'}
+                          style={{
+                            padding: '7px 12px',
+                            borderRadius: '8px',
+                            background: 'rgba(212, 175, 55, 0.1)',
+                            border: '1px solid rgba(212, 175, 55, 0.35)',
+                            color: 'var(--color-primary)',
+                            fontSize: '12.5px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <Send size={12} color="var(--color-gold)" />
+                          <span>{isRtl ? 'مراسلة المؤلف' : 'Message Author'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBlessingAction(b)}
+                          style={{
+                            padding: '7px 12px',
+                            borderRadius: '8px',
+                            background: 'rgba(229,62,62,0.08)',
+                            border: '1px solid rgba(229,62,62,0.2)',
+                            color: '#C53030',
+                            fontSize: '12.5px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Trash2 size={13} />
+                          <span>{isRtl ? 'حذف نهائي' : 'Delete'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: PLATFORM CATALOG CONTENT (كتالوج الـ 100 نعمة الأصلية) */}
           {activeTab === 'blessings' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                  {isRtl ? 'كتالوج نعم المنصة الأصلية (100 نعمة)' : 'Platform Blessings Catalog (100 Blessings)'}
+                </span>
+                <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                  {isRtl ? `المعروض: ${filteredCatalogBlessings.length}` : `Showing ${filteredCatalogBlessings.length}`}
+                </span>
+              </div>
+
               {/* Search Bar */}
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder={isRtl ? 'ابحث في النعم بالعنوان أو الشرح أو الكاتب...' : 'Search blessings...'}
+                  placeholder={isRtl ? 'ابحث في نعم الكتالوج بالعنوان أو الشرح...' : 'Search catalog blessings...'}
                   style={{
                     width: '100%',
                     padding: '11px 40px 11px 14px',
@@ -1272,11 +1605,7 @@ export default function AdminScreen({
                 )}
               </div>
 
-              <div style={{ fontSize: '13px', color: 'var(--text-muted)', padding: '0 4px' }}>
-                {isRtl ? `إجمالي النعم المعروضة: ${filteredBlessings.length}` : `Showing ${filteredBlessings.length} blessings`}
-              </div>
-
-              {filteredBlessings.map((b) => (
+              {filteredCatalogBlessings.map((b) => (
                 <div
                   key={b.id}
                   style={{
@@ -1292,12 +1621,12 @@ export default function AdminScreen({
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', background: b.isShared ? 'rgba(212,175,55,0.15)' : 'var(--surface-sunken)', color: b.isShared ? 'var(--color-gold)' : 'var(--text-muted)' }}>
-                          {b.isShared ? (isRtl ? 'متشارَكة' : 'Community') : (isRtl ? 'كتالوج التطبيق' : 'Built-in')}
+                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', background: 'var(--surface-sunken)', color: 'var(--text-muted)' }}>
+                          {isRtl ? 'كتالوج المنصة' : 'Built-in'}
                         </span>
-                        {b.author && b.author !== 'محب للخير' && (
+                        {b.categoryName && (
                           <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                            {isRtl ? `بقلم: ${b.author}` : `By: ${b.author}`}
+                            {b.categoryName}
                           </span>
                         )}
                       </div>
@@ -1330,28 +1659,6 @@ export default function AdminScreen({
                     >
                       <Edit3 size={13} />
                       <span>{isRtl ? 'تعديل' : 'Edit'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenAuthorMessage(b, 'message')}
-                      title={isRtl ? 'إرسال رسالة أو توضيح في بريد المؤلف' : 'Send message to author inbox'}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        background: 'rgba(212, 175, 55, 0.1)',
-                        border: '1px solid rgba(212, 175, 55, 0.35)',
-                        color: 'var(--color-primary)',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px'
-                      }}
-                    >
-                      <Send size={12} color="var(--color-gold)" />
-                      <span>{isRtl ? 'مراسلة المؤلف' : 'Message'}</span>
                     </button>
 
                     <button

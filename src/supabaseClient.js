@@ -214,6 +214,9 @@ export async function deleteSharedBlessing(blessingOrId) {
       }
     }
 
+    // Broadcast deletion in real time to all connected devices immediately
+    broadcastBlessingDeletion({ title, id: blessingId }).catch(() => {});
+
     if (success) {
       return { success: true, deletedCount };
     }
@@ -416,6 +419,44 @@ export function subscribeToLiveBlessingUpdates(onBlessingUpdated) {
     return () => {};
   } catch (err) {
     console.warn('Subscribe to live blessing updates error:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Broadcast blessing deletion event to all connected users in real time
+ */
+export async function broadcastBlessingDeletion({ title = '', id = '' }) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    await channel.send({
+      type: 'broadcast',
+      event: 'blessing_deleted',
+      payload: {
+        title: (title || '').trim(),
+        id: String(id || ''),
+        timestamp: Date.now()
+      }
+    });
+  } catch (err) {
+    console.warn('Broadcast blessing deletion error:', err);
+  }
+}
+
+/**
+ * Subscribe to live blessing deletion events across all connected devices
+ */
+export function subscribeToLiveBlessingDeletions(onBlessingDeleted) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    channel.on('broadcast', { event: 'blessing_deleted' }, (event) => {
+      if (event && event.payload && typeof onBlessingDeleted === 'function') {
+        onBlessingDeleted(event.payload);
+      }
+    });
+    return () => {};
+  } catch (err) {
+    console.warn('Subscribe to live blessing deletion error:', err);
     return () => {};
   }
 }
@@ -657,6 +698,10 @@ export async function recordAdminDeletedBlessing(blessingItem, adminEmail = '') 
     if (error) {
       console.warn('Error recording admin deleted blessing in Supabase:', error);
     }
+
+    // Broadcast deletion immediately across all devices
+    broadcastBlessingDeletion({ title: title || rawId, id: rawId }).catch(() => {});
+
     return { success: !error, data, error };
   } catch (err) {
     console.warn('Failed to record admin deleted blessing:', err);
