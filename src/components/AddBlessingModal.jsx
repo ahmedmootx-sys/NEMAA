@@ -102,6 +102,18 @@ export default function AddBlessingModal({
       });
 
       if (result.success) {
+        const trimmedAuthor = author.trim();
+        if (trimmedAuthor) {
+          try {
+            localStorage.setItem('nemaa_author_name', trimmedAuthor);
+          } catch {}
+        }
+        try {
+          const hist = JSON.parse(localStorage.getItem('nemaa_my_published_history') || '[]');
+          hist.unshift({ id: result.data?.id, title: title.trim(), author: trimmedAuthor, timestamp: Date.now() });
+          localStorage.setItem('nemaa_my_published_history', JSON.stringify(hist.slice(0, 50)));
+        } catch {}
+
         onBlessingPublished(result.data, {
           successMessage: lang === 'ar' 
             ? 'تمت إضافة نعمتك بنجاح وستظهر للجميع!' 

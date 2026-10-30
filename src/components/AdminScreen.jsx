@@ -288,12 +288,39 @@ export default function AdminScreen({
     }
   };
 
-  // Open author messaging modal
+  // Open author messaging modal (with smart resolution of live blessing details)
   const handleOpenAuthorMessage = (item, defaultAction = 'message') => {
+    if (!item) return;
+    const targetId = String(item.blessing_id || item.id || '').trim();
+    const targetTitle = (item.blessing_title || item.title || '').trim();
+    const targetTitleLower = targetTitle.toLowerCase();
+
+    // Helper to normalize arabic strings for fuzzy matching
+    const norm = (str) => (str || '').replace(/[.,!؟،؛ـ«»"']/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const targetNorm = norm(targetTitle);
+
+    // Look up in allBlessings or sharedBlessings
+    const pool = [...(sharedBlessings || []), ...(allBlessings || [])];
+    const match = pool.find(b => {
+      if (!b) return false;
+      const bId = String(b.id || '').trim().toLowerCase();
+      const bTitle = (b.title || '').trim().toLowerCase();
+      const bNorm = norm(b.title);
+
+      if (targetId && bId === targetId.toLowerCase()) return true;
+      if (targetTitleLower && bTitle === targetTitleLower) return true;
+      if (targetNorm && (bNorm === targetNorm || bNorm.includes(targetNorm) || targetNorm.includes(bNorm))) return true;
+      return false;
+    });
+
+    const resolvedId = match ? String(match.id) : targetId;
+    const resolvedTitle = match ? match.title : targetTitle;
+    const resolvedAuthor = match?.author || item.author || '';
+
     setMessageRecipientBlessing({
-      id: item.blessing_id || item.id || '',
-      title: item.blessing_title || item.title || '',
-      author: item.author || ''
+      id: resolvedId,
+      title: resolvedTitle,
+      author: resolvedAuthor
     });
     setAuthorMessageAction(defaultAction);
     setAuthorMessageText('');

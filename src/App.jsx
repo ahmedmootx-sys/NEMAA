@@ -345,14 +345,15 @@ export default function App() {
         setSharedBlessings(cleanedShared);
       }
 
-      // Purge orphan entries from customizedBlessings (fixes badge "صياغتي الخاصة" on deleted blessings)
+      // Purge all shared/community blessing keys from customizedBlessings (fixes badge "صياغتي الخاصة" on other users' devices)
       const rawCustomized = localStorage.getItem('nemaa_customized_blessings');
       if (rawCustomized) {
         const custObj = JSON.parse(rawCustomized);
         if (custObj && typeof custObj === 'object') {
           let dirty = false;
           for (const k of Object.keys(custObj)) {
-            if (k.toLowerCase() === 'sb_vrgco8' || (custObj[k]?.title || '').includes('نعم الله تترا ولا يمكن حصرها')) {
+            const isCommunityKey = k.startsWith('sb_') || k.startsWith('pb_') || k.startsWith('custom_') || custObj[k]?.isShared;
+            if (isCommunityKey || k.toLowerCase() === 'sb_vrgco8' || (custObj[k]?.title || '').includes('نعم الله تترا ولا يمكن حصرها')) {
               delete custObj[k];
               dirty = true;
             }
@@ -800,10 +801,13 @@ export default function App() {
       const title = (updatedBlessing.title || '').trim();
       const oldTitle = (oldBlessing?.title || '').trim();
 
-      // 1. Update customizedBlessings (affects built-in & shared)
+      // 1. NEVER pollute customizedBlessings with community blessings!
+      // If a local customization entry exists for this community blessing, remove it so it's clean for all users.
       if (id) {
         setCustomizedBlessings(prev => {
-          const next = { ...prev, [id]: { ...(prev[id] || {}), ...updatedBlessing } };
+          if (!prev[id]) return prev;
+          const next = { ...prev };
+          delete next[id];
           try {
             localStorage.setItem('nemaa_customized_blessings', JSON.stringify(next));
           } catch {}
@@ -811,7 +815,7 @@ export default function App() {
         });
       }
 
-      // 2. Update sharedBlessings
+      // 2. Update sharedBlessings (Community live update for everyone)
       setSharedBlessings(prev => {
         const next = prev.map(b => {
           if ((id && String(b.id) === id) || (title && b.title === title) || (oldTitle && b.title === oldTitle)) {
@@ -825,7 +829,7 @@ export default function App() {
         return next;
       });
 
-      // 3. Update myPublishedBlessings
+      // 3. Update myPublishedBlessings (Preserves author's published list)
       setMyPublishedBlessings(prev => {
         const next = prev.map(b => {
           if ((id && String(b.id) === id) || (title && b.title === title) || (oldTitle && b.title === oldTitle)) {
@@ -845,12 +849,23 @@ export default function App() {
     };
   }, []);
 
-  // Notifications fetching & real-time listening
+  // Notifications fetching & real-time listening (Robust multi-tier matching)
   useEffect(() => {
     let isMounted = true;
+    const normalizeText = (str) => {
+      if (!str) return '';
+      return String(str)
+        .toLowerCase()
+        .replace(/[\u064B-\u065F\u0670]/g, '')
+        .replace(/[.,!؟،؛ـ«»"']/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
     async function loadNotifications() {
       try {
-        const notifs = await fetchAuthorNotifications(myPublishedBlessings);
+        const savedAuthor = localStorage.getItem('nemaa_author_name') || '';
+        const notifs = await fetchAuthorNotifications(myPublishedBlessings, savedAuthor);
         if (!isMounted || !Array.isArray(notifs)) return;
         setUserNotifications(prev => {
           const merged = [...prev];
@@ -874,13 +889,53 @@ export default function App() {
     const unsub = subscribeToAuthorNotifications((payload) => {
       if (!isMounted || !payload) return;
       const myTitles = new Set((myPublishedBlessingsRef.current || []).map(b => (b.title || '').trim().toLowerCase()));
-      const myIds = new Set((myPublishedBlessingsRef.current || []).map(b => String(b.id || '')));
+      const myNormTitles = (myPublishedBlessingsRef.current || []).map(b => normalizeText(b.title)).filter(Boolean);
+      const myIds = new Set((myPublishedBlessingsRef.current || []).map(b => String(b.id || '').toLowerCase()));
+
+      // Include user's historical published titles from localStorage (reaches author even if blessing was removed)
+      try {
+        const hist = JSON.parse(localStorage.getItem('nemaa_my_published_history') || '[]');
+        if (Array.isArray(hist)) {
+          hist.forEach(h => {
+            if (typeof h === 'string') {
+              myTitles.add(h.trim().toLowerCase());
+              myNormTitles.push(normalizeText(h));
+            } else if (h && typeof h === 'object') {
+              if (h.id) myIds.add(String(h.id).toLowerCase());
+              if (h.title) {
+                myTitles.add(h.title.trim().toLowerCase());
+                myNormTitles.push(normalizeText(h.title));
+              }
+            }
+          });
+        }
+      } catch {}
+
+      // Collect author names
+      const authorSet = new Set();
+      (myPublishedBlessingsRef.current || []).forEach(b => {
+        if (b.author && b.author.trim() && b.author !== 'محب للخير') {
+          authorSet.add(b.author.trim().toLowerCase());
+        }
+      });
+      try {
+        const storedAuthor = localStorage.getItem('nemaa_author_name');
+        if (storedAuthor && storedAuthor.trim() && storedAuthor !== 'محب للخير') {
+          authorSet.add(storedAuthor.trim().toLowerCase());
+        }
+      } catch {}
 
       const notifTitle = (payload.blessingTitle || '').trim().toLowerCase();
-      const notifId = String(payload.blessingId || '');
+      const notifNormTitle = normalizeText(payload.blessingTitle || '');
+      const notifId = String(payload.blessingId || '').toLowerCase();
+      const notifAuthor = (payload.authorName || '').trim().toLowerCase();
 
-      const isMatch = (notifTitle && myTitles.has(notifTitle)) || (notifId && myIds.has(notifId));
-      if (isMatch) {
+      const idMatch = notifId && myIds.has(notifId);
+      const titleMatch = (notifTitle && myTitles.has(notifTitle)) ||
+        (notifNormTitle && myNormTitles.some(mnt => mnt === notifNormTitle || mnt.includes(notifNormTitle) || notifNormTitle.includes(mnt)));
+      const authorMatch = notifAuthor && authorSet.has(notifAuthor);
+
+      if (idMatch || titleMatch || authorMatch) {
         setUserNotifications(prev => {
           if (prev.some(n => n.id === payload.id)) return prev;
           const next = [payload, ...prev];
@@ -983,14 +1038,16 @@ export default function App() {
       seenIds.add(strId);
       seenTitles.add(sig);
 
-      // Check if user has personal local customizations
-      if (customizedBlessings[strId]) {
+      // Check if user has personal local customizations (STRICTLY for built-in catalog blessings only)
+      const isCatalog = initialCatalogIds.has(strId) || initialCatalogTitles.has(sig);
+      if (isCatalog && customizedBlessings[strId]) {
         pool.push({
           ...b,
           ...customizedBlessings[strId],
           isCustomized: true
         });
       } else {
+        // Community / shared blessings are always regular community cards (never tagged with "صياغتي الخاصة")
         pool.push(b);
       }
     };
@@ -1608,6 +1665,12 @@ export default function App() {
 
     if (isSharedBlessing) {
       handleResetCustomization(oldBlessing.id);
+      // Also update in historical published titles so author still matches if admin sends messages
+      try {
+        const hist = JSON.parse(localStorage.getItem('nemaa_my_published_history') || '[]');
+        hist.unshift({ id: oldId, title: mergedUpdated.title, author: mergedUpdated.author, timestamp: Date.now() });
+        localStorage.setItem('nemaa_my_published_history', JSON.stringify(hist.slice(0, 50)));
+      } catch {}
     } else {
       // Record customization strictly for built-in catalog blessings
       handleSaveCustomization(oldBlessing.id, {

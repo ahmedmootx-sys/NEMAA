@@ -525,7 +525,7 @@ export async function adminSendAuthorNotification({
 }
 
 /**
- * Fetch notifications sent to this user (filtered by their published blessings or author name)
+ * Fetch notifications sent to this user (filtered by their published blessings, historical submissions, or author name)
  */
 export async function fetchAuthorNotifications(userBlessingsList = [], authorName = '') {
   try {
@@ -539,9 +539,57 @@ export async function fetchAuthorNotifications(userBlessingsList = [], authorNam
       return [];
     }
 
+    // Helper to normalize arabic strings for robust matching (strips diacritics and punctuation)
+    const normalizeText = (str) => {
+      if (!str) return '';
+      return String(str)
+        .toLowerCase()
+        .replace(/[\u064B-\u065F\u0670]/g, '') // remove arabic tashkeel
+        .replace(/[.,!؟،؛ـ«»"']/g, ' ') // replace punctuation with spaces
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
+    // Collect all user's blessing titles, normalized titles, and IDs
     const myTitles = new Set((userBlessingsList || []).map(b => (b.title || '').trim().toLowerCase()));
-    const myIds = new Set((userBlessingsList || []).map(b => String(b.id || '')));
-    const cleanAuthor = (authorName || '').trim().toLowerCase();
+    const myNormTitles = (userBlessingsList || []).map(b => normalizeText(b.title)).filter(Boolean);
+    const myIds = new Set((userBlessingsList || []).map(b => String(b.id || '').toLowerCase()));
+
+    // Also include user's historical published titles and IDs from localStorage if available
+    try {
+      const hist = JSON.parse(localStorage.getItem('nemaa_my_published_history') || '[]');
+      if (Array.isArray(hist)) {
+        hist.forEach(h => {
+          if (typeof h === 'string') {
+            myTitles.add(h.trim().toLowerCase());
+            myNormTitles.push(normalizeText(h));
+          } else if (h && typeof h === 'object') {
+            if (h.id) myIds.add(String(h.id).toLowerCase());
+            if (h.title) {
+              myTitles.add(h.title.trim().toLowerCase());
+              myNormTitles.push(normalizeText(h.title));
+            }
+          }
+        });
+      }
+    } catch {}
+
+    // Collect all user's author names (from param, from published list, and from localStorage)
+    const authorSet = new Set();
+    if (authorName && authorName.trim() && authorName !== 'محب للخير') {
+      authorSet.add(authorName.trim().toLowerCase());
+    }
+    (userBlessingsList || []).forEach(b => {
+      if (b.author && b.author.trim() && b.author !== 'محب للخير') {
+        authorSet.add(b.author.trim().toLowerCase());
+      }
+    });
+    try {
+      const storedAuthor = localStorage.getItem('nemaa_author_name');
+      if (storedAuthor && storedAuthor.trim() && storedAuthor !== 'محب للخير') {
+        authorSet.add(storedAuthor.trim().toLowerCase());
+      }
+    } catch {}
 
     const notifications = [];
     for (const r of data) {
@@ -553,14 +601,21 @@ export async function fetchAuthorNotifications(userBlessingsList = [], authorNam
       }
 
       const notifTitle = (r.blessing_title || parsed.blessingTitle || '').trim().toLowerCase();
-      const notifId = String(r.blessing_id || parsed.blessingId || '');
+      const notifNormTitle = normalizeText(r.blessing_title || parsed.blessingTitle || '');
+      const notifId = String(r.blessing_id || parsed.blessingId || '').toLowerCase();
       const notifAuthor = (parsed.authorName || '').trim().toLowerCase();
 
-      const isMatch = (notifTitle && myTitles.has(notifTitle)) ||
-                      (notifId && myIds.has(notifId)) ||
-                      (cleanAuthor && notifAuthor && cleanAuthor === notifAuthor);
+      // Check ID match
+      const idMatch = notifId && (myIds.has(notifId) || (r.blessing_id && myIds.has(String(r.blessing_id).toLowerCase())));
 
-      if (isMatch) {
+      // Check Title match (exact or normalized/substring)
+      const titleMatch = (notifTitle && myTitles.has(notifTitle)) ||
+        (notifNormTitle && myNormTitles.some(mnt => mnt === notifNormTitle || mnt.includes(notifNormTitle) || notifNormTitle.includes(mnt)));
+
+      // Check Author match
+      const authorMatch = notifAuthor && authorSet.has(notifAuthor);
+
+      if (idMatch || titleMatch || authorMatch) {
         notifications.push({
           id: r.id,
           blessingTitle: r.blessing_title || parsed.blessingTitle || 'نعمة منشورة',
@@ -856,10 +911,11 @@ export async function fetchBlessingReports() {
     });
   } catch {}
 
-  // Filter OUT suggestions, complaints, and praise sync records
+  // Filter OUT suggestions, complaints, praise sync records, and admin author notifications
   return reports.filter(r => {
     if (!r) return false;
     if (r.reason === 'praise_sync') return false;
+    if (r.reason === 'admin_author_notification') return false;
     const isFeedback = (r.reason === 'اقتراح وتطوير' || r.reason === 'شكوى أو مشكلة' ||
       (r.blessing_title && (r.blessing_title.startsWith('[اقتراح]') || r.blessing_title.startsWith('[شكوى]'))));
     return !isFeedback;
