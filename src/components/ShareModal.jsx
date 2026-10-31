@@ -9,9 +9,10 @@ import {
   Send, 
   Palette,
   Smartphone,
-  Square
+  Square,
+  Sparkles
 } from 'lucide-react';
-import { THEME_CONFIGS } from '../utils/cardExporter';
+import { THEME_CONFIGS, shareBlessingAsImage } from '../utils/cardExporter';
 
 const TEMPLATES = [
   { id: 'olive', name: 'الزيتوني الملكي', dotColor: '#2C4A3E', border: '#D4AF37' },
@@ -226,33 +227,91 @@ export default function ShareModal({
           </div>
         </div>
 
-        {/* Download as Designed Image Card */}
-        <button
-          onClick={handleDownload}
-          disabled={isExporting}
-          className="form-submit-btn"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-light))',
-            marginBottom: '14px',
-            cursor: isExporting ? 'wait' : 'pointer',
-            opacity: isExporting ? 0.8 : 1
-          }}
-        >
-          <Download size={18} />
-          <span>{isExporting ? 'جاري رسم وتصدير البطاقة...' : 'تحميل البطاقة بالنمط والمقاس المختار'}</span>
-        </button>
+        {/* Dual Primary Actions: Direct Share OR Save to Device */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+          {/* 1. Direct Share Image to Apps (WhatsApp, Telegram, Statuses) */}
+          <button
+            type="button"
+            onClick={async () => {
+              setIsExporting(true);
+              try {
+                await shareBlessingAsImage(blessing, {
+                  theme: selectedTheme,
+                  ratio: selectedRatio
+                });
+              } catch (err) {
+                console.warn('Share error:', err);
+              } finally {
+                setIsExporting(false);
+              }
+            }}
+            disabled={isExporting}
+            className="form-submit-btn"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              background: 'linear-gradient(135deg, #128C7E, #25D366)',
+              color: '#FFFFFF',
+              boxShadow: '0 4px 14px rgba(37, 211, 102, 0.3)',
+              cursor: isExporting ? 'wait' : 'pointer',
+              opacity: isExporting ? 0.8 : 1,
+              fontWeight: 800,
+              fontSize: '13.5px'
+            }}
+          >
+            <Send size={18} style={{ transform: 'scaleX(-1)' }} />
+            <span>{isExporting ? 'جاري تجهيز البوستر...' : 'مشاركة البوستر مباشرة للتطبيق أو الحالة'}</span>
+            <Sparkles size={16} color="#FFE699" />
+          </button>
+
+          {/* 2. Download Image to Device */}
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={isExporting}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '11px 16px',
+              borderRadius: 'var(--radius-md)',
+              border: '1.5px solid var(--border-gold)',
+              background: 'var(--surface-sunken)',
+              color: 'var(--text-main)',
+              cursor: isExporting ? 'wait' : 'pointer',
+              opacity: isExporting ? 0.8 : 1,
+              fontWeight: 700,
+              fontSize: '13px',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Download size={17} color="var(--color-gold)" />
+            <span>{isExporting ? 'جاري الحفظ...' : 'حفظ وتنزيل الصورة على الجهاز'}</span>
+          </button>
+        </div>
 
         {/* Action Buttons Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '10px' }}>
           {/* WhatsApp */}
-          <a
-            href={`https://api.whatsapp.com/send?text=${encodedText}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={async () => {
+              if (navigator.canShare) {
+                setIsExporting(true);
+                try {
+                  const shared = await shareBlessingAsImage(blessing, { theme: selectedTheme, ratio: selectedRatio });
+                  if (shared) {
+                    setIsExporting(false);
+                    return;
+                  }
+                } catch {}
+                setIsExporting(false);
+              }
+              window.open(`https://api.whatsapp.com/send?text=${encodedText}`, '_blank');
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -261,21 +320,34 @@ export default function ShareModal({
               padding: '11px',
               background: '#25D366',
               color: '#FFFFFF',
+              border: 'none',
               borderRadius: 'var(--radius-md)',
-              textDecoration: 'none',
               fontWeight: 700,
-              fontSize: '13px'
+              fontSize: '13px',
+              cursor: 'pointer'
             }}
           >
             <MessageCircle size={17} />
-            <span>واتساب</span>
-          </a>
+            <span>واتساب (بوستر)</span>
+          </button>
 
           {/* Telegram */}
-          <a
-            href={`https://t.me/share/url?url=${encodeURIComponent(currentUrl)}&text=${encodedText}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={async () => {
+              if (navigator.canShare) {
+                setIsExporting(true);
+                try {
+                  const shared = await shareBlessingAsImage(blessing, { theme: selectedTheme, ratio: selectedRatio });
+                  if (shared) {
+                    setIsExporting(false);
+                    return;
+                  }
+                } catch {}
+                setIsExporting(false);
+              }
+              window.open(`https://t.me/share/url?url=${encodeURIComponent(currentUrl)}&text=${encodedText}`, '_blank');
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -284,15 +356,16 @@ export default function ShareModal({
               padding: '11px',
               background: '#0088CC',
               color: '#FFFFFF',
+              border: 'none',
               borderRadius: 'var(--radius-md)',
-              textDecoration: 'none',
               fontWeight: 700,
-              fontSize: '13px'
+              fontSize: '13px',
+              cursor: 'pointer'
             }}
           >
             <Send size={17} />
-            <span>تيليجرام</span>
-          </a>
+            <span>تيليجرام (بوستر)</span>
+          </button>
 
           {/* X (Twitter) */}
           <a

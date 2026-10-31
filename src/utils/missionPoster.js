@@ -48,14 +48,23 @@ export async function generateMissionPoster({ lang = 'ar' } = {}) {
   const appUrl = 'https://ahmedmootx-sys.github.io/NEMAA/';
   const isRtl = lang === 'ar';
 
-  // 1. Royal Emerald Islamic Night Gradient
+  // 1. Royal Emerald Islamic Night Gradient with Soft Subtle Vignette
   const bg = ctx.createLinearGradient(0, 0, 0, 1920);
-  bg.addColorStop(0, '#06140F');
-  bg.addColorStop(0.25, '#0B261D');
-  bg.addColorStop(0.65, '#12392C');
-  bg.addColorStop(1, '#05100B');
+  bg.addColorStop(0, '#04100C');
+  bg.addColorStop(0.22, '#09241B');
+  bg.addColorStop(0.55, '#0E3326');
+  bg.addColorStop(0.85, '#081D16');
+  bg.addColorStop(1, '#030B08');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, 1080, 1920);
+
+  // Soft Central Spiritual Glow behind Emblem
+  const glow = ctx.createRadialGradient(540, 140, 20, 540, 140, 320);
+  glow.addColorStop(0, 'rgba(212, 175, 55, 0.18)');
+  glow.addColorStop(0.5, 'rgba(212, 175, 55, 0.05)');
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, 1080, 480);
 
   // 2. Gold Decorative Borders
   ctx.save();

@@ -115,7 +115,7 @@ function splitTextIntoLines(ctx, text, maxWidth) {
   return lines;
 }
 
-export async function exportBlessingAsImage(blessing, options = {}) {
+export async function renderBlessingCard(blessing, options = {}) {
   // Wait for Google Fonts to be fully ready before measuring or drawing
   if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
     try {
@@ -383,10 +383,11 @@ export async function exportBlessingAsImage(blessing, options = {}) {
 
     // Export image
     const dataUrl = canvas.toDataURL('image/png');
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     const safeTitle = (blessing.title || 'نعمة').replace(/[\\/:*?"<>|\s]+/g, '_').substring(0, 30);
     const filename = `نعمة-${safeTitle}-${themeKey}-${ratio}.png`;
-    downloadURI(dataUrl, filename);
-    return true;
+
+    return { canvas, blob, dataUrl, filename };
   } catch (err) {
     console.error('Canvas export failed, falling back to DOM...', err);
     const element = document.getElementById('blessing-card-exportable');
@@ -397,10 +398,56 @@ export async function exportBlessingAsImage(blessing, options = {}) {
         backgroundColor: theme.bgStart
       });
       const dataUrl = canvas.toDataURL('image/png');
-      downloadURI(dataUrl, `نعمة-${blessing.title.replace(/\s+/g, '_')}.png`);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const safeTitle = (blessing.title || 'نعمة').replace(/[\\/:*?"<>|\s]+/g, '_').substring(0, 30);
+      const filename = `نعمة-${safeTitle}.png`;
+      return { canvas, blob, dataUrl, filename };
+    }
+    return null;
+  }
+}
+
+export async function exportBlessingAsImage(blessing, options = {}) {
+  const result = await renderBlessingCard(blessing, options);
+  if (result && result.dataUrl) {
+    downloadURI(result.dataUrl, result.filename);
+    return true;
+  }
+  return false;
+}
+
+export async function shareBlessingAsImage(blessing, options = {}) {
+  const result = await renderBlessingCard(blessing, options);
+  if (!result || !result.blob) {
+    return false;
+  }
+
+  const title = blessing.title || 'نعمة';
+  const text = `«${blessing.title}»\n${blessing.reflection}\n\nمن منصة نِعْمَة — تَذَكَّرْ لِتَشْكُرْ\nhttps://ahmedmootx-sys.github.io/NEMAA/`;
+  const file = new File([result.blob], result.filename, { type: 'image/png' });
+
+  if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title,
+        text
+      });
       return true;
+    } catch {
+      // User cancelled
+      return false;
     }
   }
+
+  // Fallback: download the image and copy text
+  downloadURI(result.dataUrl, result.filename);
+  try {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+    }
+  } catch {}
+  return false;
 }
 
 function downloadURI(uri, name) {

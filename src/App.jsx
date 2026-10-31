@@ -38,7 +38,9 @@ import {
   subscribeToLiveBlessingDeletions,
   fetchAuthorNotifications,
   dismissAuthorNotification,
-  subscribeToAuthorNotifications
+  subscribeToAuthorNotifications,
+  fetchLatestAdminBroadcast,
+  subscribeToAdminGlobalBroadcasts
 } from './supabaseClient';
 import confetti from 'canvas-confetti';
 import { audioEngine } from './utils/audioEngine';
@@ -50,6 +52,7 @@ import SettingsScreen from './components/SettingsScreen';
 import AppMissionModal from './components/AppMissionModal';
 import FeedbackModal from './components/FeedbackModal';
 import UserNotificationsDrawer from './components/UserNotificationsDrawer';
+import AdminBroadcastModal from './components/AdminBroadcastModal';
 
 export default function App() {
   // 1. Theme State (Day / Night)
@@ -86,6 +89,9 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMissionOpen, setIsMissionOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
+  // Admin Global Broadcast Announcement State
+  const [activeAdminBroadcast, setActiveAdminBroadcast] = useState(null);
 
   // User Notifications Inbox State (بريد الإشعارات وتنبيهات الإدارة)
   const [isNotificationsDrawerOpen, setIsNotificationsDrawerOpen] = useState(false);
@@ -308,11 +314,9 @@ export default function App() {
     try {
       const isOrphan = (b) => {
         if (!b) return true;
-        const t = (b.title || '').trim().toLowerCase();
-        const id = String(b.id || '').trim().toLowerCase();
-        if (t.includes('نعم الله تترا ولا يمكن حصرها') || id === 'sb_vrgco8') return true;
-        if (t === 'نعمة السكينة وحسن الظن بالله') return true;
-        return false;
+        const t = (b.title || '').trim();
+        const r = (b.reflection || '').trim();
+        return !t || !r;
       };
 
       const purgeLegacy = (key) => {
@@ -353,7 +357,7 @@ export default function App() {
           let dirty = false;
           for (const k of Object.keys(custObj)) {
             const isCommunityKey = k.startsWith('sb_') || k.startsWith('pb_') || k.startsWith('custom_') || custObj[k]?.isShared;
-            if (isCommunityKey || k.toLowerCase() === 'sb_vrgco8' || (custObj[k]?.title || '').includes('نعم الله تترا ولا يمكن حصرها')) {
+            if (isCommunityKey) {
               delete custObj[k];
               dirty = true;
             }
@@ -462,7 +466,17 @@ export default function App() {
           };
 
           setMyPublishedBlessings(prev => {
-            const next = prev.filter(isCommunityActive);
+            const next = prev.filter(isCommunityActive).map(b => {
+              const bTitle = (b.title || '').trim().toLowerCase();
+              const matchingRemote = remote.find(r => 
+                (b.id && String(r.id).toLowerCase() === String(b.id).toLowerCase()) ||
+                ((r.title || '').trim().toLowerCase() === bTitle)
+              );
+              if (matchingRemote) {
+                return { ...b, ...matchingRemote, id: matchingRemote.id };
+              }
+              return b;
+            });
             try { localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next)); } catch {}
             return next;
           });
@@ -474,9 +488,19 @@ export default function App() {
           });
 
           setMyPublishedIds(prev => {
-            const next = prev.filter(id => remoteIds.has(String(id).toLowerCase()));
-            try { localStorage.setItem('nemaa_my_published_ids', JSON.stringify(next)); } catch {}
-            return next;
+            const activeIds = remote
+              .filter(r => {
+                const rId = String(r.id || '').toLowerCase();
+                const rTitle = (r.title || '').trim().toLowerCase();
+                return prev.some(id => String(id).toLowerCase() === rId) || 
+                       myPublishedBlessingsRef.current.some(mb => (mb.title || '').trim().toLowerCase() === rTitle);
+              })
+              .map(r => String(r.id));
+            const merged = [...new Set([...prev, ...activeIds])].filter(id => 
+              remoteIds.has(id.toLowerCase()) || id.startsWith('pb_') || id.startsWith('custom_')
+            );
+            try { localStorage.setItem('nemaa_my_published_ids', JSON.stringify(merged)); } catch {}
+            return merged;
           });
 
           setCustomizedBlessings(prev => {
@@ -946,6 +970,32 @@ export default function App() {
         });
         setToastMessage(currentLangRef.current === 'ar' ? 'وصلتك رسالة جديدة من إدارة المنصة في بريد الإشعارات 🔔' : 'New notification from Admin in your inbox 🔔');
         setTimeout(() => setToastMessage(''), 5000);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
+
+  // Fetch and subscribe to Admin Global Broadcast Announcements
+  useEffect(() => {
+    let isMounted = true;
+    fetchLatestAdminBroadcast().then(b => {
+      if (!isMounted || !b || !b.id) return;
+      const dismissedId = localStorage.getItem('nemaa_dismissed_admin_broadcast_id');
+      if (String(dismissedId) !== String(b.id)) {
+        setActiveAdminBroadcast(b);
+      }
+    });
+
+    const unsub = subscribeToAdminGlobalBroadcasts((broadcast) => {
+      if (broadcast && broadcast.id) {
+        setActiveAdminBroadcast(broadcast);
+        try {
+          audioEngine.playGratitudeChime();
+        } catch {}
       }
     });
 
@@ -1840,7 +1890,15 @@ export default function App() {
           onOpenFocusMode={() => setIsFocusModeOpen(true)}
           onOpenEdit={handleOpenEdit}
           onOpenPublishModal={() => setIsAddModalOpen(true)}
-          isMyPublished={currentBlessing ? myPublishedIds.includes(String(currentBlessing.id)) : false}
+          isMyPublished={
+            currentBlessing ? (
+              myPublishedIds.includes(String(currentBlessing.id)) ||
+              myPublishedBlessings.some(mb => 
+                (mb.id && String(mb.id) === String(currentBlessing.id)) ||
+                (mb.title && (mb.title || '').trim().toLowerCase() === (currentBlessing.title || '').trim().toLowerCase())
+              )
+            ) : false
+          }
           onEditPublished={handleOpenEditPublished}
           onDeletePublished={handleDeletePublished}
           onOpenReport={(b) => {
@@ -2175,6 +2233,20 @@ export default function App() {
         isAdmin={false}
         lang={currentLang}
       />
+
+      {/* Admin Global Broadcast Announcement Modal */}
+      {activeAdminBroadcast && (
+        <AdminBroadcastModal
+          broadcast={activeAdminBroadcast}
+          onClose={() => {
+            try {
+              localStorage.setItem('nemaa_dismissed_admin_broadcast_id', String(activeAdminBroadcast.id));
+            } catch {}
+            setActiveAdminBroadcast(null);
+          }}
+          lang={currentLang}
+        />
+      )}
 
       {/* Friendly Success Notification Toast */}
       {toastMessage && (

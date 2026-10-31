@@ -153,17 +153,8 @@ export default function GratitudeInteractions({
         </button>
       </div>
 
-      {/* Quick Toolbar (Download, Copy, Share) */}
+      {/* Quick Toolbar (Copy, Share) */}
       <div className="card-quick-toolbar">
-        <button 
-          className="toolbar-btn"
-          onClick={() => onDownloadImage(currentBlessing)}
-          title={t.downloadBtn}
-        >
-          <Download size={14} />
-          <span>{t.downloadBtn}</span>
-        </button>
-
         <button 
           className="toolbar-btn"
           onClick={handleCopy}

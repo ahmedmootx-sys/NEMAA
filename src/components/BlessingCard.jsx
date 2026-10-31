@@ -66,28 +66,27 @@ export default function BlessingCard({
     prevPraisesRef.current = praisesCount;
   }, [praisesCount]);
 
-  // Swipe Gesture Handling (Touch & Mouse Drag)
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const touchStartRef = useRef({ x: 0, y: 0, isHorizontal: null });
+  // Swipe Gesture Handling (High performance 60/120fps direct DOM animation)
+  const cardRef = useRef(null);
+  const touchStartRef = useRef({ x: 0, y: 0, dx: 0, isHorizontal: null, isMoving: false });
+  const rafIdRef = useRef(null);
 
   const handleTouchStart = (e) => {
     if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.card-action-btn')) return;
     const touch = e.touches ? e.touches[0] : e;
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY, isHorizontal: null };
-    setIsDragging(true);
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, dx: 0, isHorizontal: null, isMoving: true };
   };
 
   const handleTouchMove = (e) => {
-    if (!isDragging) return;
+    if (!touchStartRef.current.isMoving) return;
     const touch = e.touches ? e.touches[0] : e;
     const dx = touch.clientX - touchStartRef.current.x;
     const dy = touch.clientY - touchStartRef.current.y;
 
     if (touchStartRef.current.isHorizontal === null) {
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) {
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
         touchStartRef.current.isHorizontal = true;
-      } else if (Math.abs(dy) > 8) {
+      } else if (Math.abs(dy) > 6) {
         touchStartRef.current.isHorizontal = false;
       }
     }
@@ -96,26 +95,62 @@ export default function BlessingCard({
       if (e.cancelable && e.touches) {
         e.preventDefault();
       }
-      const clamped = Math.max(-140, Math.min(140, dx));
-      setDragOffset(clamped);
+      touchStartRef.current.dx = dx;
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = requestAnimationFrame(() => {
+        if (!cardRef.current) return;
+        const clamped = Math.max(-130, Math.min(130, dx));
+        cardRef.current.style.transition = 'none';
+        cardRef.current.style.transform = `translateX(${clamped}px) rotate(${clamped * 0.03}deg)`;
+        cardRef.current.style.opacity = `${Math.max(0.7, 1 - Math.abs(clamped) / 600)}`;
+      });
     }
   };
 
   const handleTouchEnd = () => {
-    if (!isDragging) return;
-    const threshold = 60; // px to trigger navigation
+    if (!touchStartRef.current.isMoving) return;
+    touchStartRef.current.isMoving = false;
+    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
 
-    if (dragOffset < -threshold) {
-      // Swiped Left
-      if (onNextBlessing) onNextBlessing();
-    } else if (dragOffset > threshold) {
-      // Swiped Right
-      if (onPrevBlessing) onPrevBlessing();
+    const dx = touchStartRef.current.dx;
+    const threshold = 48; // Responsive swipe threshold in px
+
+    if (cardRef.current) {
+      if (dx < -threshold) {
+        // Swiped Left -> Next Blessing
+        cardRef.current.style.transition = 'transform 0.18s ease-out, opacity 0.16s ease-out';
+        cardRef.current.style.transform = 'translateX(-120px) rotate(-4deg)';
+        cardRef.current.style.opacity = '0';
+        setTimeout(() => {
+          if (cardRef.current) {
+            cardRef.current.style.transition = 'none';
+            cardRef.current.style.transform = '';
+            cardRef.current.style.opacity = '';
+          }
+          if (onNextBlessing) onNextBlessing();
+        }, 160);
+      } else if (dx > threshold) {
+        // Swiped Right -> Prev Blessing
+        cardRef.current.style.transition = 'transform 0.18s ease-out, opacity 0.16s ease-out';
+        cardRef.current.style.transform = 'translateX(120px) rotate(4deg)';
+        cardRef.current.style.opacity = '0';
+        setTimeout(() => {
+          if (cardRef.current) {
+            cardRef.current.style.transition = 'none';
+            cardRef.current.style.transform = '';
+            cardRef.current.style.opacity = '';
+          }
+          if (onPrevBlessing) onPrevBlessing();
+        }, 160);
+      } else {
+        // Returned to center
+        cardRef.current.style.transition = 'transform 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.15), opacity 0.2s ease';
+        cardRef.current.style.transform = '';
+        cardRef.current.style.opacity = '';
+      }
     }
 
-    setDragOffset(0);
-    setIsDragging(false);
-    touchStartRef.current = { x: 0, y: 0, isHorizontal: null };
+    touchStartRef.current = { x: 0, y: 0, dx: 0, isHorizontal: null, isMoving: false };
   };
 
   // Check if user's device has an authentic Arabic voice
@@ -245,9 +280,10 @@ export default function BlessingCard({
   return (
     <div className="blessing-card-container">
       <div 
+        ref={cardRef}
         key={animatingKey}
         id="blessing-card-exportable"
-        className={`blessing-card ${isDragging ? 'is-swiping' : ''}`}
+        className="blessing-card"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -256,11 +292,8 @@ export default function BlessingCard({
         onMouseUp={handleTouchEnd}
         onMouseLeave={handleTouchEnd}
         style={{
-          transform: dragOffset ? `translateX(${dragOffset}px) rotate(${dragOffset * 0.035}deg)` : undefined,
-          opacity: dragOffset ? 1 - Math.abs(dragOffset) / 550 : undefined,
-          transition: isDragging ? 'none' : 'transform 0.32s cubic-bezier(0.18, 0.89, 0.32, 1.15), opacity 0.28s ease',
-          cursor: isDragging ? 'grabbing' : 'grab',
-          touchAction: 'pan-y'
+          touchAction: 'pan-y',
+          willChange: 'transform, opacity'
         }}
       >
         {/* Subtle Watermark Emblem */}
@@ -328,7 +361,7 @@ export default function BlessingCard({
               </span>
             )}
 
-            {blessing.isCustomized && (
+            {!blessing.isShared && blessing.category !== 'shared' && blessing.isCustomized && (
               <button 
                 type="button"
                 className="card-user-edited-badge"

@@ -916,6 +916,7 @@ export async function fetchBlessingReports() {
     if (!r) return false;
     if (r.reason === 'praise_sync') return false;
     if (r.reason === 'admin_author_notification') return false;
+    if (r.reason === 'admin_global_broadcast') return false;
     const isFeedback = (r.reason === 'اقتراح وتطوير' || r.reason === 'شكوى أو مشكلة' ||
       (r.blessing_title && (r.blessing_title.startsWith('[اقتراح]') || r.blessing_title.startsWith('[شكوى]'))));
     return !isFeedback;
@@ -1348,4 +1349,108 @@ export function subscribeToFeedback(onNewFeedback, onDeleteFeedback, onUpdateFee
     return () => {};
   }
 }
+
+/**
+ * Publish a global announcement from Admin to all users
+ */
+export async function publishAdminGlobalBroadcast({ title, message, adminEmail }) {
+  try {
+    const payload = {
+      blessing_id: 'global_broadcast',
+      blessing_title: (title || 'إعلان وتنبيه عام من إدارة نِعْمَة').trim(),
+      reason: 'admin_global_broadcast',
+      notes: JSON.stringify({
+        message: (message || '').trim(),
+        title: (title || 'إعلان وتنبيه عام من إدارة نِعْمَة').trim(),
+        timestamp: Date.now()
+      }),
+      reporter_email: adminEmail || 'admin',
+      status: 'active',
+      created_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('reports')
+      .insert([payload])
+      .select();
+
+    const broadcastData = {
+      id: Array.isArray(data) && data[0]?.id ? data[0].id : Date.now(),
+      title: payload.blessing_title,
+      message: (message || '').trim(),
+      timestamp: Date.now()
+    };
+
+    // Broadcast across realtime channel to wake up all active devices immediately
+    try {
+      const channel = getPraisesBroadcastChannel();
+      await channel.send({
+        type: 'broadcast',
+        event: 'admin_global_broadcast',
+        payload: broadcastData
+      });
+    } catch (chErr) {
+      console.warn('Realtime broadcast channel send error:', chErr);
+    }
+
+    return { success: !error, data: broadcastData, error };
+  } catch (err) {
+    console.warn('publishAdminGlobalBroadcast error:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Fetch latest global broadcast announcement from Admin
+ */
+export async function fetchLatestAdminBroadcast() {
+  try {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .eq('reason', 'admin_global_broadcast')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const item = data[0];
+      let details = {};
+      try {
+        details = JSON.parse(item.notes || '{}');
+      } catch {}
+
+      return {
+        id: item.id,
+        title: details.title || item.blessing_title || 'إعلان عام من الإدارة',
+        message: details.message || '',
+        createdAt: item.created_at,
+        timestamp: details.timestamp || new Date(item.created_at).getTime()
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn('fetchLatestAdminBroadcast error:', err);
+    return null;
+  }
+}
+
+/**
+ * Subscribe to realtime global broadcast announcements from Admin
+ */
+export function subscribeToAdminGlobalBroadcasts(onBroadcastReceived) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    channel.on('broadcast', { event: 'admin_global_broadcast' }, (payload) => {
+      if (payload && payload.payload && typeof onBroadcastReceived === 'function') {
+        onBroadcastReceived(payload.payload);
+      }
+    });
+
+    return () => {};
+  } catch (err) {
+    console.warn('subscribeToAdminGlobalBroadcasts error:', err);
+    return () => {};
+  }
+}
+
 

@@ -695,6 +695,8 @@ html, body {
   width: 100%;
   animation: slideFadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+  will-change: transform, opacity;
+  touch-action: pan-y;
 }
 @media (min-width: 640px) {
   .blessing-card {

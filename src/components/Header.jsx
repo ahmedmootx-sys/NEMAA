@@ -40,7 +40,7 @@ export default function Header({
             alt="شعار نِعْمَة" 
             className="brand-logo-img"
             onError={(e) => {
-              e.target.src = `${import.meta.env.BASE_URL}brand/logo-wordmark.png`;
+              e.target.src = `${import.meta.env.BASE_URL}brand/icon-192.png`;
             }}
           />
           <div className="brand-text">

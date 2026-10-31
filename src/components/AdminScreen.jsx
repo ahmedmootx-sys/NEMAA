@@ -23,7 +23,8 @@ import {
   AlertCircle,
   X,
   Send,
-  Mail
+  Mail,
+  Megaphone
 } from 'lucide-react';
 import { 
   adminLogin, 
@@ -38,7 +39,9 @@ import {
   deleteFeedback,
   subscribeToFeedback,
   recordAdminDeletedBlessing,
-  adminSendAuthorNotification
+  adminSendAuthorNotification,
+  publishAdminGlobalBroadcast,
+  fetchLatestAdminBroadcast
 } from '../supabaseClient';
 import EditSharedBlessingModal from './EditSharedBlessingModal';
 
@@ -86,6 +89,45 @@ export default function AdminScreen({
   const [authorMessageAction, setAuthorMessageAction] = useState('message'); // 'message' | 'edit' | 'delete'
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
+  // Global Broadcast Announcement State (إذاعة رسالة لجميع المستخدمين)
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [isPublishingBroadcast, setIsPublishingBroadcast] = useState(false);
+  const [activeBroadcastInfo, setActiveBroadcastInfo] = useState(null);
+
+  async function loadBroadcastData() {
+    try {
+      const latest = await fetchLatestAdminBroadcast();
+      setActiveBroadcastInfo(latest);
+    } catch (err) {
+      console.warn('Failed to load broadcast data:', err);
+    }
+  }
+
+  const handlePublishBroadcast = async (e) => {
+    e.preventDefault();
+    if (!broadcastMessage.trim()) return;
+    setIsPublishingBroadcast(true);
+    try {
+      const res = await publishAdminGlobalBroadcast({
+        title: broadcastTitle.trim() || (isRtl ? 'إعلان وتنبيه عام من إدارة نِعْمَة' : 'Global Announcement from NEMAA Team'),
+        message: broadcastMessage.trim(),
+        adminEmail: currentUser?.email || 'admin'
+      });
+      if (res.success) {
+        setActiveBroadcastInfo(res.data);
+        setBroadcastMessage('');
+        setBroadcastTitle('');
+        setStatusNotice(isRtl ? 'تم نشر الرسالة وإذاعتها بنجاح لجميع مستخدمي المنصة ✨' : 'Announcement broadcasted to all users successfully ✨');
+        setTimeout(() => setStatusNotice(''), 4500);
+      }
+    } catch (err) {
+      console.warn('Error broadcasting announcement:', err);
+    } finally {
+      setIsPublishingBroadcast(false);
+    }
+  };
+
   const isRtl = lang === 'ar';
   const BackArrow = isRtl ? ArrowRight : ArrowLeft;
 
@@ -122,6 +164,7 @@ export default function AdminScreen({
       if (user) {
         loadReports();
         loadFeedbackData();
+        loadBroadcastData();
       }
     }
     checkAuth();
@@ -690,10 +733,10 @@ export default function AdminScreen({
           gap: '18px',
           boxSizing: 'border-box'
         }}>
-          {/* Segmented Full-Width Tab Navigation (4 Tabs) */}
+          {/* Segmented Full-Width Tab Navigation (5 Tabs) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
+            gridTemplateColumns: 'repeat(5, 1fr)',
             background: 'var(--surface-sunken)',
             padding: '4px',
             borderRadius: '16px',
@@ -711,26 +754,26 @@ export default function AdminScreen({
                 background: activeTab === 'reports' ? '#FFFFFF' : 'transparent',
                 color: activeTab === 'reports' ? '#C53030' : 'var(--text-muted)',
                 fontWeight: activeTab === 'reports' ? '800' : '600',
-                fontSize: '12px',
+                fontSize: '11px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px',
+                gap: '3px',
                 boxShadow: activeTab === 'reports' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                 transition: 'all 0.2s',
                 minWidth: 0
               }}
             >
-              <Flag size={14} color={activeTab === 'reports' ? '#C53030' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <Flag size={13} color={activeTab === 'reports' ? '#C53030' : 'currentColor'} style={{ flexShrink: 0 }} />
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'البلاغات' : 'Reports'}</span>
               {reports.length > 0 && (
                 <span style={{
                   background: '#E53E3E',
                   color: '#FFFFFF',
-                  fontSize: '10.5px',
+                  fontSize: '9.5px',
                   fontWeight: '800',
-                  padding: '1px 6px',
+                  padding: '1px 5px',
                   borderRadius: '10px',
                   flexShrink: 0
                 }}>
@@ -750,26 +793,26 @@ export default function AdminScreen({
                 background: activeTab === 'feedback' ? '#FFFFFF' : 'transparent',
                 color: activeTab === 'feedback' ? 'var(--color-primary)' : 'var(--text-muted)',
                 fontWeight: activeTab === 'feedback' ? '800' : '600',
-                fontSize: '12px',
+                fontSize: '11px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px',
+                gap: '3px',
                 boxShadow: activeTab === 'feedback' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                 transition: 'all 0.2s',
                 minWidth: 0
               }}
             >
-              <MessageSquare size={14} color={activeTab === 'feedback' ? 'var(--color-gold)' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <MessageSquare size={13} color={activeTab === 'feedback' ? 'var(--color-gold)' : 'currentColor'} style={{ flexShrink: 0 }} />
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'الشكاوى' : 'Feedback'}</span>
               {feedbackList.length > 0 && (
                 <span style={{
                   background: 'var(--color-gold)',
                   color: '#FFFFFF',
-                  fontSize: '10.5px',
+                  fontSize: '9.5px',
                   fontWeight: '800',
-                  padding: '1px 6px',
+                  padding: '1px 5px',
                   borderRadius: '10px',
                   flexShrink: 0
                 }}>
@@ -789,26 +832,26 @@ export default function AdminScreen({
                 background: activeTab === 'published' ? '#FFFFFF' : 'transparent',
                 color: activeTab === 'published' ? 'var(--color-gold)' : 'var(--text-muted)',
                 fontWeight: activeTab === 'published' ? '800' : '600',
-                fontSize: '12px',
+                fontSize: '11px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px',
+                gap: '3px',
                 boxShadow: activeTab === 'published' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                 transition: 'all 0.2s',
                 minWidth: 0
               }}
             >
-              <Globe size={14} color={activeTab === 'published' ? 'var(--color-gold)' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <Globe size={13} color={activeTab === 'published' ? 'var(--color-gold)' : 'currentColor'} style={{ flexShrink: 0 }} />
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'المنشورة' : 'Published'}</span>
               {rawPublishedList.length > 0 && (
                 <span style={{
                   background: 'var(--color-gold)',
                   color: '#FFFFFF',
-                  fontSize: '10.5px',
+                  fontSize: '9.5px',
                   fontWeight: '800',
-                  padding: '1px 6px',
+                  padding: '1px 5px',
                   borderRadius: '10px',
                   flexShrink: 0
                 }}>
@@ -828,19 +871,45 @@ export default function AdminScreen({
                 background: activeTab === 'blessings' ? '#FFFFFF' : 'transparent',
                 color: activeTab === 'blessings' ? 'var(--color-primary)' : 'var(--text-muted)',
                 fontWeight: activeTab === 'blessings' ? '800' : '600',
-                fontSize: '12px',
+                fontSize: '11px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px',
+                gap: '3px',
                 boxShadow: activeTab === 'blessings' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                 transition: 'all 0.2s',
                 minWidth: 0
               }}
             >
-              <Layers size={14} color={activeTab === 'blessings' ? 'var(--color-primary)' : 'currentColor'} style={{ flexShrink: 0 }} />
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'الكتالوج (100)' : 'Catalog'}</span>
+              <Layers size={13} color={activeTab === 'blessings' ? 'var(--color-primary)' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'الكتالوج' : 'Catalog'}</span>
+            </button>
+
+            {/* Tab 5: Global Broadcast Announcement (إذاعة عامة) */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('broadcast')}
+              style={{
+                padding: '9px 4px',
+                borderRadius: '12px',
+                border: 'none',
+                background: activeTab === 'broadcast' ? '#FFFFFF' : 'transparent',
+                color: activeTab === 'broadcast' ? '#3182ce' : 'var(--text-muted)',
+                fontWeight: activeTab === 'broadcast' ? '800' : '600',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '3px',
+                boxShadow: activeTab === 'broadcast' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.2s',
+                minWidth: 0
+              }}
+            >
+              <Megaphone size={13} color={activeTab === 'broadcast' ? '#3182ce' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'إذاعة عامة' : 'Broadcast'}</span>
             </button>
           </div>
 
@@ -1713,6 +1782,222 @@ export default function AdminScreen({
               ))}
             </div>
           )}
+
+          {/* TAB 5: GLOBAL BROADCAST ANNOUNCEMENT CONTENT */}
+          {activeTab === 'broadcast' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Guidance Banner */}
+              <div style={{
+                background: 'rgba(49, 130, 206, 0.08)',
+                border: '1px solid rgba(49, 130, 206, 0.25)',
+                borderRadius: '16px',
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: 'var(--surface-card)',
+                  border: '1px solid rgba(49, 130, 206, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#3182ce',
+                  flexShrink: 0
+                }}>
+                  <Megaphone size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                    {isRtl ? 'إذاعة رسالة وتنبيه عام لكافة مستخدمي التطبيق' : 'Broadcast Announcement to All App Users'}
+                  </h4>
+                  <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                    {isRtl 
+                      ? 'الرسالة التي تنشرها هنا ستظهر لجميع مستخدمي منصة نِعْمَة دفعة واحدة فوراً في شاشة التطبيق.'
+                      : 'Messages published here appear immediately to all active NEMAA users worldwide.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Active Broadcast Preview if exists */}
+              {activeBroadcastInfo && (
+                <div style={{
+                  background: 'var(--surface-sunken)',
+                  border: '1px solid var(--border-gold)',
+                  borderRadius: '16px',
+                  padding: '16px 18px',
+                  position: 'relative'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{
+                        background: 'rgba(212, 175, 55, 0.2)',
+                        color: 'var(--color-gold)',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        padding: '2px 8px',
+                        borderRadius: '8px'
+                      }}>
+                        {isRtl ? 'الإعلان النشط حالياً' : 'Currently Active Broadcast'}
+                      </span>
+                    </div>
+                    {activeBroadcastInfo.createdAt && (
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {new Date(activeBroadcastInfo.createdAt).toLocaleString(isRtl ? 'ar-EG' : 'en-US')}
+                      </span>
+                    )}
+                  </div>
+                  <h5 style={{ margin: '0 0 6px', fontSize: '14.5px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                    {activeBroadcastInfo.title}
+                  </h5>
+                  <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.6', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
+                    {activeBroadcastInfo.message}
+                  </p>
+                </div>
+              )}
+
+              {/* Compose New Broadcast Form */}
+              <form onSubmit={handlePublishBroadcast} style={{
+                background: 'var(--surface-card)',
+                border: '1px solid var(--border-card)',
+                borderRadius: '18px',
+                padding: '18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                  {isRtl ? 'كتابة ونشر رسالة جديدة للجميع:' : 'Compose New Global Broadcast:'}
+                </h4>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '5px', color: 'var(--text-main)' }}>
+                    {isRtl ? 'عنوان الإعلان أو التنبيه (اختياري)' : 'Announcement Title (optional)'}
+                  </label>
+                  <input
+                    type="text"
+                    value={broadcastTitle}
+                    onChange={e => setBroadcastTitle(e.target.value)}
+                    placeholder={isRtl ? 'مثال: تحديث مبارك في المنصة، أو تذكير بفضل الشكر...' : 'e.g. New spiritual features or community notice...'}
+                    maxLength={100}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid var(--border-subtle)',
+                      background: 'var(--surface-sunken)',
+                      color: 'var(--text-main)',
+                      fontSize: '13px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                {/* Quick Templates */}
+                <div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                    {isRtl ? 'قوالب مقترحة للسرعة (اضغط للتعبئة):' : 'Suggested quick templates:'}
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                    {[
+                      {
+                        title: isRtl ? 'تذكير بفضل الشكر والحمد' : 'Gratitude Reminder',
+                        msg: isRtl ? '«اللَّهُمَّ أَعِنَّا عَلَى ذِكْرِكَ وَشُكْرِكَ وَحُسْنِ عِبَادَتِكَ».. نذكركم ونفسنا باستشعار نعم الله الظاهرة والباطنة في هذا اليوم المبارك، وجعل لسانك رطباً بحمده سبحانه.' : 'A gentle reminder to pause and thank Allah for endless blessings.'
+                      },
+                      {
+                        title: isRtl ? 'تحديث مبارك وإضافات جديدة' : 'New Platform Update',
+                        msg: isRtl ? 'تم بحمد الله وتوفيقه إضافة وتحديث مجموعة من النعم والتدبرات المحررة في المنصة، مع تسريع التصفح وتحسين تجربة المشاركة. تقبل الله طاعاتكم ونفع بكم.' : 'New curated reflections and features have been added to NEMAA platform.'
+                      },
+                      {
+                        title: isRtl ? 'دعوة للمشاركة في نشر النعم' : 'Community Participation',
+                        msg: isRtl ? 'يسرنا استقبال تدبراتكم واستشعاركم للنعم عبر زر «انشر نعمة» لتكون لكم صدقة جارية وينتفع بها إخوانكم في كل مكان. جزاكم الله خيراً.' : 'We welcome your shared blessings to inspire Muslims worldwide.'
+                      },
+                      {
+                        title: isRtl ? 'صيانة دورية وتطوير' : 'Maintenance Notice',
+                        msg: isRtl ? 'نعمل حالياً على تحسين الخوادم والخدمات لضمان أسرع استجابة وتجربة مريحة في المنصة، نشكر تفهمكم ودعواتكم الكريمة.' : 'Platform servers are undergoing maintenance to ensure the best experience.'
+                      }
+                    ].map((tpl, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setBroadcastTitle(tpl.title);
+                          setBroadcastMessage(tpl.msg);
+                        }}
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: '10px',
+                          background: 'var(--surface-sunken)',
+                          border: '1px dashed var(--border-subtle)',
+                          fontSize: '11.5px',
+                          fontWeight: '700',
+                          color: 'var(--text-main)',
+                          textAlign: isRtl ? 'right' : 'left',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        «{tpl.title}»
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '5px', color: 'var(--text-main)' }}>
+                    {isRtl ? 'نص الرسالة العامة *' : 'Broadcast Message *'}
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={broadcastMessage}
+                    onChange={e => setBroadcastMessage(e.target.value)}
+                    placeholder={isRtl ? 'اكتب الرسالة التي ستصل لجميع مستخدمي المنصة...' : 'Type message to be broadcasted to all users...'}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid var(--border-subtle)',
+                      background: 'var(--surface-sunken)',
+                      color: 'var(--text-main)',
+                      fontSize: '13px',
+                      lineHeight: '1.6',
+                      boxSizing: 'border-box',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isPublishingBroadcast || !broadcastMessage.trim()}
+                  className="form-submit-btn"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '11px',
+                    borderRadius: '12px',
+                    fontSize: '13.5px',
+                    fontWeight: '800',
+                    cursor: (isPublishingBroadcast || !broadcastMessage.trim()) ? 'not-allowed' : 'pointer',
+                    opacity: (isPublishingBroadcast || !broadcastMessage.trim()) ? 0.6 : 1,
+                    background: 'linear-gradient(135deg, #2b6cb0 0%, #1a365d 100%)',
+                    color: '#FFFFFF'
+                  }}
+                >
+                  <Megaphone size={16} />
+                  <span>{isPublishingBroadcast ? (isRtl ? 'جاري الإذاعة والنشر...' : 'Broadcasting...') : (isRtl ? '📢 نشر وإذاعة للجميع فوراً' : 'Broadcast to All Now')}</span>
+                </button>
+              </form>
+            </div>
+          )}
         </main>
       )}
 
@@ -1731,26 +2016,25 @@ export default function AdminScreen({
         />
       )}
 
-      {/* Send Author Message Modal (بريد الإشعارات للمؤلف) */}
+      {/* Send Author Message Modal (بريد الإشعارات للمؤلف - مصمم للهاتف دون أي قص) */}
       {messageRecipientBlessing && (
         <div 
           className="modal-overlay" 
           onClick={() => setMessageRecipientBlessing(null)} 
           role="dialog" 
           aria-modal="true" 
-          style={{ zIndex: 10010, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}
+          style={{ zIndex: 10010, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}
         >
           <div 
-            className="modal-content"
             onClick={e => e.stopPropagation()}
             style={{
-              maxWidth: '540px',
+              maxWidth: '520px',
               width: '100%',
-              maxHeight: '90vh',
+              maxHeight: 'min(92vh, calc(100dvh - 20px))',
               display: 'flex',
               flexDirection: 'column',
               background: 'var(--surface-card)',
-              borderRadius: '24px',
+              borderRadius: '22px',
               border: '1.5px solid var(--border-gold)',
               boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
               overflow: 'hidden',
@@ -1759,7 +2043,7 @@ export default function AdminScreen({
           >
             {/* Modal Header */}
             <div style={{
-              padding: '16px 20px',
+              padding: '14px 18px',
               background: 'linear-gradient(135deg, rgba(212,175,55,0.14) 0%, rgba(44,74,62,0.08) 100%)',
               borderBottom: '1px solid var(--border-subtle)',
               display: 'flex',
@@ -1769,8 +2053,8 @@ export default function AdminScreen({
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
-                  width: '38px',
-                  height: '38px',
+                  width: '36px',
+                  height: '36px',
                   borderRadius: '10px',
                   background: 'var(--surface-card)',
                   border: '1px solid var(--border-gold)',
@@ -1780,13 +2064,13 @@ export default function AdminScreen({
                   color: 'var(--color-gold)',
                   flexShrink: 0
                 }}>
-                  <Send size={18} />
+                  <Send size={17} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: 'var(--text-heading)' }}>
                     {isRtl ? 'إرسال إشعار إلى بريد صاحب النعمة' : 'Send Notification to Author Inbox'}
                   </h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
                     {isRtl ? 'سيصل التنبيه مباشرة في بريد إشعارات المستخدم داخل التطبيق' : 'Delivered directly to user in-app notifications inbox'}
                   </p>
                 </div>
@@ -1795,10 +2079,10 @@ export default function AdminScreen({
                 type="button"
                 onClick={() => setMessageRecipientBlessing(null)}
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '30px',
+                  height: '30px',
                   borderRadius: '50%',
-                  background: 'var(--surface-card)',
+                  background: 'var(--surface-sunken)',
                   border: '1px solid var(--border-subtle)',
                   cursor: 'pointer',
                   display: 'flex',
@@ -1807,7 +2091,7 @@ export default function AdminScreen({
                   color: 'var(--text-muted)'
                 }}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
 
@@ -1815,10 +2099,10 @@ export default function AdminScreen({
             <form 
               onSubmit={handleSendAuthorMessage} 
               style={{ 
-                padding: '16px 20px 20px', 
+                padding: '14px 18px', 
                 display: 'flex', 
                 flexDirection: 'column', 
-                gap: '12px',
+                gap: '10px',
                 overflowY: 'auto',
                 flex: 1
               }}
@@ -1826,35 +2110,35 @@ export default function AdminScreen({
               {/* Target Blessing Summary */}
               <div style={{
                 background: 'var(--surface-sunken)',
-                padding: '10px 14px',
-                borderRadius: '12px',
+                padding: '8px 12px',
+                borderRadius: '10px',
                 border: '1px solid var(--border-subtle)',
-                fontSize: '12.5px'
+                fontSize: '12px'
               }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginBottom: '2px' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '10.5px', marginBottom: '2px' }}>
                   {isRtl ? 'النعمة المستهدفة:' : 'Target Blessing:'}
                 </div>
-                <div style={{ fontWeight: '800', color: 'var(--color-primary-dark)', fontSize: '13.5px' }}>
+                <div style={{ fontWeight: '800', color: 'var(--color-primary-dark)', fontSize: '13px' }}>
                   «{messageRecipientBlessing.title || (isRtl ? 'نعمة منشورة' : 'Blessing')}»
                 </div>
               </div>
 
               {/* Action Type Selector */}
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)' }}>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', marginBottom: '5px', color: 'var(--text-main)' }}>
                   {isRtl ? 'نوع الإشعار والتصنيف:' : 'Notification Category:'}
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
                   <button
                     type="button"
                     onClick={() => setAuthorMessageAction('message')}
                     style={{
-                      padding: '7px 4px',
-                      borderRadius: '10px',
+                      padding: '6px 4px',
+                      borderRadius: '8px',
                       border: authorMessageAction === 'message' ? '1.5px solid var(--color-primary)' : '1px solid var(--border-subtle)',
                       background: authorMessageAction === 'message' ? 'rgba(44, 74, 62, 0.12)' : 'var(--surface-sunken)',
                       color: authorMessageAction === 'message' ? 'var(--color-primary)' : 'var(--text-muted)',
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       fontWeight: '700',
                       cursor: 'pointer'
                     }}
@@ -1865,12 +2149,12 @@ export default function AdminScreen({
                     type="button"
                     onClick={() => setAuthorMessageAction('edit')}
                     style={{
-                      padding: '7px 4px',
-                      borderRadius: '10px',
+                      padding: '6px 4px',
+                      borderRadius: '8px',
                       border: authorMessageAction === 'edit' ? '1.5px solid var(--color-gold)' : '1px solid var(--border-subtle)',
                       background: authorMessageAction === 'edit' ? 'rgba(212, 175, 55, 0.15)' : 'var(--surface-sunken)',
                       color: authorMessageAction === 'edit' ? 'var(--color-gold)' : 'var(--text-muted)',
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       fontWeight: '700',
                       cursor: 'pointer'
                     }}
@@ -1881,12 +2165,12 @@ export default function AdminScreen({
                     type="button"
                     onClick={() => setAuthorMessageAction('delete')}
                     style={{
-                      padding: '7px 4px',
-                      borderRadius: '10px',
+                      padding: '6px 4px',
+                      borderRadius: '8px',
                       border: authorMessageAction === 'delete' ? '1.5px solid #E53E3E' : '1px solid var(--border-subtle)',
                       background: authorMessageAction === 'delete' ? 'rgba(229, 62, 62, 0.12)' : 'var(--surface-sunken)',
                       color: authorMessageAction === 'delete' ? '#E53E3E' : 'var(--text-muted)',
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       fontWeight: '700',
                       cursor: 'pointer'
                     }}
@@ -1896,38 +2180,36 @@ export default function AdminScreen({
                 </div>
               </div>
 
-              {/* Quick Template Chips */}
+              {/* Quick Template Chips (Compact 2x2 Grid) */}
               <div>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '5px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                   {isRtl ? 'قوالب سريعة مقترحة (اضغط للتعبئة):' : 'Quick templates (click to apply):'}
                 </span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
                   {[
-                    isRtl ? 'تم تعديل صياغة النعمة لضبط المعنى والاستدلال المباشر بما يتوافق مع معايير المنصة.' : 'Blessing text was refined to match our verified standards.',
-                    isRtl ? 'تم حذف النعمة بناءً على مراجعة ضوابط النشر، نشكر تفهمكم وحرصكم الدائم.' : 'Blessing was removed per publishing guidelines. Thank you for understanding.',
-                    isRtl ? 'تم تصحيح بعض الأخطاء الإملائية مع تثبيت النعمة للجميع، جزاكم الله خيراً.' : 'Typographical corrections made while keeping your blessing published.',
-                    isRtl ? 'جزاك الله خيراً وبارك فيك على مساهمتك الطيبة في إيقاظ وعي الشكر.' : 'Thank you for your blessed contribution to NEMAA community.'
+                    { label: isRtl ? 'تعديل صياغة المعنى' : 'Wording refinement', text: isRtl ? 'تم تعديل صياغة النعمة لضبط المعنى والاستدلال المباشر بما يتوافق مع معايير المنصة.' : 'Blessing text was refined to match our verified standards.' },
+                    { label: isRtl ? 'حذف وفق الضوابط' : 'Removal notice', text: isRtl ? 'تم حذف النعمة بناءً على مراجعة ضوابط النشر، نشكر تفهمكم وحرصكم الدائم.' : 'Blessing was removed per publishing guidelines. Thank you for understanding.' },
+                    { label: isRtl ? 'تصحيح أخطاء إملائية' : 'Typo correction', text: isRtl ? 'تم تصحيح بعض الأخطاء الإملائية مع تثبيت النعمة للجميع، جزاكم الله خيراً.' : 'Typographical corrections made while keeping your blessing published.' },
+                    { label: isRtl ? 'شكر وتقدير للمؤلف' : 'Thank you', text: isRtl ? 'جزاك الله خيراً وبارك فيك على مساهمتك الطيبة في إيقاظ وعي الشكر.' : 'Thank you for your blessed contribution to NEMAA community.' }
                   ].map((tpl, i) => (
                     <button
                       key={i}
                       type="button"
-                      onClick={() => setAuthorMessageText(tpl)}
+                      onClick={() => setAuthorMessageText(tpl.text)}
                       style={{
-                        padding: '6px 9px',
+                        padding: '6px 8px',
                         borderRadius: '8px',
                         background: 'var(--surface-sunken)',
                         border: '1px dashed var(--border-subtle)',
                         fontSize: '11px',
-                        textAlign: isRtl ? 'right' : 'left',
-                        color: 'var(--text-muted)',
+                        fontWeight: '700',
+                        color: 'var(--text-main)',
                         cursor: 'pointer',
-                        lineHeight: '1.4',
+                        textAlign: 'center',
                         transition: 'all 0.15s'
                       }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-gold)'}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-subtle)'}
                     >
-                      «{tpl}»
+                      {tpl.label}
                     </button>
                   ))}
                 </div>
@@ -1935,7 +2217,7 @@ export default function AdminScreen({
 
               {/* Textarea */}
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-main)' }}>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', marginBottom: '5px', color: 'var(--text-main)' }}>
                   {isRtl ? 'نص الرسالة للمؤلف:' : 'Message to Author:'}
                 </label>
                 <textarea
@@ -1946,12 +2228,12 @@ export default function AdminScreen({
                   required
                   style={{
                     width: '100%',
-                    padding: '9px 12px',
-                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
                     border: '1px solid var(--border-subtle)',
                     background: 'var(--surface-card)',
                     color: 'var(--text-main)',
-                    fontSize: '13px',
+                    fontSize: '12.5px',
                     lineHeight: '1.5',
                     boxSizing: 'border-box',
                     resize: 'vertical',
@@ -1960,20 +2242,20 @@ export default function AdminScreen({
                 />
               </div>
 
-              {/* Submit / Cancel Buttons */}
-              <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexShrink: 0 }}>
+              {/* Submit / Cancel Buttons (Fixed at bottom) */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexShrink: 0 }}>
                 <button
                   type="button"
                   onClick={() => setMessageRecipientBlessing(null)}
                   disabled={isSendingMessage}
                   style={{
                     flex: 1,
-                    padding: '10px',
-                    borderRadius: '12px',
+                    padding: '9px',
+                    borderRadius: '10px',
                     background: 'var(--surface-sunken)',
                     border: '1px solid var(--border-subtle)',
                     color: 'var(--text-muted)',
-                    fontSize: '12.5px',
+                    fontSize: '12px',
                     fontWeight: '700',
                     cursor: 'pointer'
                   }}
@@ -1985,12 +2267,12 @@ export default function AdminScreen({
                   disabled={isSendingMessage || !authorMessageText.trim()}
                   style={{
                     flex: 2,
-                    padding: '10px',
-                    borderRadius: '12px',
+                    padding: '9px',
+                    borderRadius: '10px',
                     background: 'linear-gradient(135deg, #1b4535 0%, #0f2b21 100%)',
                     border: '1.5px solid var(--color-gold)',
                     color: '#FFFFFF',
-                    fontSize: '13px',
+                    fontSize: '12.5px',
                     fontWeight: '700',
                     cursor: (isSendingMessage || !authorMessageText.trim()) ? 'not-allowed' : 'pointer',
                     opacity: (isSendingMessage || !authorMessageText.trim()) ? 0.6 : 1,
@@ -2000,7 +2282,7 @@ export default function AdminScreen({
                     gap: '6px'
                   }}
                 >
-                  <Send size={14} color="var(--color-gold)" />
+                  <Send size={13} color="var(--color-gold)" />
                   <span>{isSendingMessage ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : (isRtl ? 'إرسال الإشعار فوراً' : 'Send Notification')}</span>
                 </button>
               </div>
