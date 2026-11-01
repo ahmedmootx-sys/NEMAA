@@ -57,8 +57,6 @@ export default function SettingsScreen({
   getBlessingPraises,
   onShowToast
 }) {
-  if (!isOpen) return null;
-
   const isRtl = currentLang === 'ar';
   const BackArrow = isRtl ? ArrowRight : ArrowLeft;
   const NextChevron = isRtl ? ChevronLeft : ChevronRight;
@@ -163,6 +161,8 @@ export default function SettingsScreen({
       setIsTestingPush(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div 
