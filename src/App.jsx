@@ -40,7 +40,9 @@ import {
   dismissAuthorNotification,
   subscribeToAuthorNotifications,
   fetchLatestAdminBroadcast,
-  subscribeToAdminGlobalBroadcasts
+  subscribeToAdminGlobalBroadcasts,
+  subscribeToLiveBlessingRestorations,
+  getReporterDeviceId
 } from './supabaseClient';
 import confetti from 'canvas-confetti';
 import { audioEngine } from './utils/audioEngine';
@@ -53,8 +55,13 @@ import AppMissionModal from './components/AppMissionModal';
 import FeedbackModal from './components/FeedbackModal';
 import UserNotificationsDrawer from './components/UserNotificationsDrawer';
 import AdminBroadcastModal from './components/AdminBroadcastModal';
+import { initOneSignal } from './utils/oneSignalHelper';
 
 export default function App() {
+  // Initialize OneSignal Web SDK quietly (strictly no prompt on load)
+  useEffect(() => {
+    initOneSignal();
+  }, []);
   // 1. Theme State (Day / Night)
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('nemaa_theme') || 'day';
@@ -531,17 +538,15 @@ export default function App() {
     async function loadAdminDeleted() {
       try {
         const remoteDeleted = await fetchAdminDeletedBlessings();
-        if (isMounted && Array.isArray(remoteDeleted) && remoteDeleted.length > 0) {
+        if (isMounted && Array.isArray(remoteDeleted)) {
           const identifiers = remoteDeleted.flatMap(d => [d.blessing_title, d.id]).filter(Boolean).map(s => String(s).trim());
           const idSet = new Set(identifiers.map(s => s.toLowerCase()));
 
-          setAdminDeletedIds(prev => {
-            const combined = [...new Set([...prev, ...identifiers])];
-            try {
-              localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(combined));
-            } catch {}
-            return combined;
-          });
+          // Server is Single Source of Truth for deleted items:
+          setAdminDeletedIds(identifiers);
+          try {
+            localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(identifiers));
+          } catch {}
 
           const isNotDeleted = (b) => {
             if (!b) return false;
@@ -809,11 +814,78 @@ export default function App() {
       });
     });
 
+    // Realtime broadcast listener for instant multi-device blessing restoration
+    const unsubscribeLiveRestorations = subscribeToLiveBlessingRestorations((payload) => {
+      if (!isMounted || !payload) return;
+      const cleanTitle = (payload.title || payload.blessing?.title || '').trim().toLowerCase();
+      const resId = String(payload.id || payload.blessing?.id || '').trim().toLowerCase();
+      const oldId = String(payload.oldId || '').trim().toLowerCase();
+
+      // 1. Remove from adminDeletedIds
+      setAdminDeletedIds(prev => {
+        const next = prev.filter(x => {
+          const s = String(x).trim().toLowerCase();
+          return s !== cleanTitle && s !== resId && s !== oldId;
+        });
+        try { localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      // 2. Put into sharedBlessings
+      const restoredItem = payload.blessing || {
+        id: payload.id,
+        title: payload.title,
+        author: payload.author,
+        isShared: true
+      };
+      setSharedBlessings(prev => {
+        if (prev.some(b => String(b.id).toLowerCase() === resId || (b.title || '').trim().toLowerCase() === cleanTitle)) {
+          return prev;
+        }
+        const next = [{ ...restoredItem, isShared: true, isCustomized: false }, ...prev];
+        try { localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      // 3. Reconcile publisher ownership: check if current user is author
+      const authorName = (payload.author || payload.blessing?.author || '').trim().toLowerCase();
+      const storedAuthor = (localStorage.getItem('nemaa_author_name') || '').trim().toLowerCase();
+      let isAuthorMatch = Boolean(authorName && storedAuthor && authorName === storedAuthor && authorName !== 'محب للخير');
+
+      if (!isAuthorMatch) {
+        try {
+          const hist = JSON.parse(localStorage.getItem('nemaa_my_published_history') || '[]');
+          isAuthorMatch = hist.some(h => {
+            if (typeof h === 'string') return h.trim().toLowerCase() === cleanTitle;
+            if (h && typeof h === 'object') {
+              return (h.title && h.title.trim().toLowerCase() === cleanTitle) ||
+                     (h.id && String(h.id).toLowerCase() === oldId);
+            }
+            return false;
+          });
+        } catch {}
+      }
+
+      if (isAuthorMatch) {
+        setMyPublishedBlessings(prev => {
+          if (prev.some(b => String(b.id).toLowerCase() === resId || (b.title || '').trim().toLowerCase() === cleanTitle)) {
+            return prev;
+          }
+          const next = [{ ...restoredItem, isShared: true, isCustomized: false }, ...prev];
+          try { localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next)); } catch {}
+          return next;
+        });
+        setToastMessage(currentLangRef.current === 'ar' ? 'تمت استعادة نعمتك وعادت إلى المنصة وقائمة نعمك بنجاح ✨' : 'Your blessing was restored back to the platform ✨');
+        setTimeout(() => setToastMessage(''), 5500);
+      }
+    });
+
     return () => {
       isMounted = false;
       if (typeof unsubscribeBlessings === 'function') unsubscribeBlessings();
       if (typeof unsubscribeAdminDeleted === 'function') unsubscribeAdminDeleted();
       if (typeof unsubscribeLiveDeletions === 'function') unsubscribeLiveDeletions();
+      if (typeof unsubscribeLiveRestorations === 'function') unsubscribeLiveRestorations();
     };
   }, []);
 
@@ -912,6 +984,51 @@ export default function App() {
 
     const unsub = subscribeToAuthorNotifications((payload) => {
       if (!isMounted || !payload) return;
+
+      // Check if this notification is an administrative inquiry to a reporter
+      if (payload.actionType === 'reporter_inquiry' || payload.type === 'reporter_inquiry') {
+        const myDevId = getReporterDeviceId();
+        const targetDevId = (payload.reporterDeviceId || '').trim();
+        const targetReportId = String(payload.reportId || '').trim();
+
+        let isMyReport = false;
+        try {
+          const submitted = JSON.parse(localStorage.getItem('nemaa_my_submitted_reports') || '[]');
+          if (Array.isArray(submitted)) {
+            isMyReport = submitted.some(s => 
+              (s && s.reportId && String(s.reportId) === targetReportId) ||
+              (s && s.id && String(s.id) === targetReportId)
+            );
+          }
+        } catch {}
+
+        const isTargetReporter = Boolean((targetDevId && targetDevId === myDevId) || isMyReport);
+        if (isTargetReporter) {
+          const inquiryItem = {
+            id: payload.id || `inq_${Date.now()}`,
+            type: 'reporter_inquiry',
+            actionType: 'reporter_inquiry',
+            blessingTitle: payload.blessingTitle || 'نعمة أبلغت عنها',
+            blessingId: payload.blessingId || '',
+            message: payload.message || '',
+            adminEmail: payload.adminEmail || 'إدارة منصة نِعْمَة',
+            authorName: 'المُبلّغ',
+            timestamp: payload.timestamp || Date.now(),
+            status: 'unread'
+          };
+
+          setUserNotifications(prev => {
+            if (prev.some(n => n.id === inquiryItem.id)) return prev;
+            const next = [inquiryItem, ...prev];
+            try { localStorage.setItem('nemaa_user_notifications', JSON.stringify(next)); } catch {}
+            return next;
+          });
+          setToastMessage(currentLangRef.current === 'ar' ? 'وصلك استفسار من إدارة المنصة بشأن بلاغك 🔔' : 'New inquiry from Admin regarding your report 🔔');
+          setTimeout(() => setToastMessage(''), 5500);
+        }
+        return; // Handled reporter inquiry, do not process as author notification
+      }
+
       const myTitles = new Set((myPublishedBlessingsRef.current || []).map(b => (b.title || '').trim().toLowerCase()));
       const myNormTitles = (myPublishedBlessingsRef.current || []).map(b => normalizeText(b.title)).filter(Boolean);
       const myIds = new Set((myPublishedBlessingsRef.current || []).map(b => String(b.id || '').toLowerCase()));
@@ -1098,7 +1215,8 @@ export default function App() {
         });
       } else {
         // Community / shared blessings are always regular community cards (never tagged with "صياغتي الخاصة")
-        pool.push(b);
+        const cleanB = b.isCustomized ? { ...b, isCustomized: false } : b;
+        pool.push(cleanB);
       }
     };
 
@@ -2210,6 +2328,10 @@ export default function App() {
           }
         }}
         getBlessingPraises={getBlessingPraises}
+        onShowToast={(msg) => {
+          setToastMessage(msg);
+          setTimeout(() => setToastMessage(''), 5500);
+        }}
       />
 
       {/* App Mission & Purpose Modal (رسالة وهدف منصة نِعْمَة) */}

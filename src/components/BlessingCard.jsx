@@ -361,7 +361,7 @@ export default function BlessingCard({
               </span>
             )}
 
-            {!blessing.isShared && blessing.category !== 'shared' && blessing.isCustomized && (
+            {!blessing.isShared && blessing.category !== 'shared' && displayBlessing.categoryName !== 'نعم متشارَكة' && !blessing.author && blessing.isCustomized && (
               <button 
                 type="button"
                 className="card-user-edited-badge"

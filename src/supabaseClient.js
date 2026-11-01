@@ -675,6 +675,18 @@ export async function fetchAuthorNotifications(userBlessingsList = [], authorNam
       }
     } catch {}
 
+    // Collect user's submitted report IDs to match admin inquiries even if device ID changes
+    const mySubmittedReports = new Set();
+    try {
+      const repList = JSON.parse(localStorage.getItem('nemaa_my_submitted_reports') || '[]');
+      if (Array.isArray(repList)) {
+        repList.forEach(item => {
+          if (item && item.reportId) mySubmittedReports.add(String(item.reportId));
+          if (item && item.id) mySubmittedReports.add(String(item.id));
+        });
+      }
+    } catch {}
+
     const myDeviceId = getReporterDeviceId();
     const notifications = [];
 
@@ -688,8 +700,12 @@ export async function fetchAuthorNotifications(userBlessingsList = [], authorNam
 
       // 1. Check if this is an Admin Inquiry to this device's report
       if (r.reason === 'admin_reporter_inquiry') {
-        const targetDeviceId = parsed.reporterDeviceId || '';
-        if (targetDeviceId && targetDeviceId === myDeviceId) {
+        const targetDeviceId = (parsed.reporterDeviceId || '').trim();
+        const targetReportId = String(parsed.reportId || '').trim();
+        const isDeviceMatch = Boolean(targetDeviceId && targetDeviceId === myDeviceId);
+        const isReportMatch = Boolean(targetReportId && mySubmittedReports.has(targetReportId));
+
+        if (isDeviceMatch || isReportMatch) {
           notifications.push({
             id: r.id,
             type: 'reporter_inquiry',
@@ -758,19 +774,12 @@ export function subscribeToAuthorNotifications(onNotificationReceived) {
     });
     channel.on('broadcast', { event: 'admin_reporter_inquiry' }, (event) => {
       if (event && event.payload && typeof onNotificationReceived === 'function') {
-        const myDevId = getReporterDeviceId();
-        if (event.payload.reporterDeviceId === myDevId) {
-          onNotificationReceived({
-            id: event.payload.id,
-            type: 'reporter_inquiry',
-            actionType: 'reporter_inquiry',
-            blessingTitle: event.payload.blessingTitle,
-            message: event.payload.message,
-            adminEmail: event.payload.adminEmail,
-            timestamp: event.payload.timestamp || Date.now(),
-            status: 'unread'
-          });
-        }
+        onNotificationReceived({
+          ...event.payload,
+          type: 'reporter_inquiry',
+          actionType: 'reporter_inquiry',
+          status: 'unread'
+        });
       }
     });
     return () => {};
@@ -1003,11 +1012,14 @@ export async function restoreAdminDeletedBlessing(deletedItem) {
       } catch {}
     }
 
-    const title = full?.title || deletedItem.blessing_title || '';
+    const title = (full?.title || deletedItem.blessing_title || '').trim();
     const reflection = full?.reflection || 'نعمة مستعادة من أرشيف المنصة.';
-    const author = full?.author || '';
+    const author = (full?.author || '').trim();
     const proof = full?.proof || '';
     const proofSource = full?.proofSource || full?.proof_source || '';
+    const category = full?.category || 'spiritual';
+    const categoryName = full?.categoryName || 'نعم متشارَكة';
+    const tags = full?.tags || [];
 
     // 1. Re-publish to blessings table
     const pubRes = await publishSharedBlessing({
@@ -1015,31 +1027,116 @@ export async function restoreAdminDeletedBlessing(deletedItem) {
       reflection,
       author,
       proof,
-      proofSource
+      proofSource,
+      category,
+      categoryName,
+      tags
     });
 
-    // 2. Remove from admin_deleted_blessings
-    await supabase
-      .from('admin_deleted_blessings')
-      .delete()
-      .or(`id.eq.${deletedItem.id},blessing_title.eq.${deletedItem.blessing_title}`);
+    // 2. Remove from admin_deleted_blessings in Supabase
+    try {
+      if (deletedItem.id) {
+        await supabase
+          .from('admin_deleted_blessings')
+          .delete()
+          .eq('id', deletedItem.id);
+      }
+      if (title) {
+        await supabase
+          .from('admin_deleted_blessings')
+          .delete()
+          .eq('blessing_title', title);
+      }
+    } catch (e) {
+      console.warn('Supabase delete from archive warning:', e);
+    }
 
     // Clean up from local archive
     try {
       const localArchive = JSON.parse(localStorage.getItem('nemaa_admin_archived_deleted_blessings') || '[]');
-      const filtered = localArchive.filter(i => i.id !== deletedItem.id && i.blessing_title !== deletedItem.blessing_title);
+      const filtered = localArchive.filter(i => 
+        i.id !== deletedItem.id && 
+        (i.blessing_title || '').trim() !== title
+      );
       localStorage.setItem('nemaa_admin_archived_deleted_blessings', JSON.stringify(filtered));
     } catch {}
 
-    // 3. Broadcast restoration across all clients
-    if (pubRes.data) {
-      broadcastBlessingUpdate({ updated: pubRes.data }).catch(() => {});
-    }
+    // Clean up from local admin deleted ids on this device
+    try {
+      const delIds = JSON.parse(localStorage.getItem('nemaa_admin_deleted_ids') || '[]');
+      const filteredIds = delIds.filter(x => 
+        String(x).toLowerCase() !== String(deletedItem.id).toLowerCase() &&
+        String(x).trim().toLowerCase() !== title.toLowerCase()
+      );
+      localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(filteredIds));
+    } catch {}
 
-    return { success: true, data: pubRes.data };
+    // 3. Broadcast restoration across all clients
+    const restoredBlessing = pubRes.data || {
+      id: `sb_${Date.now()}`,
+      title,
+      reflection,
+      author,
+      proof,
+      proofSource,
+      category,
+      categoryName,
+      isShared: true
+    };
+
+    await broadcastBlessingRestored({
+      blessing: restoredBlessing,
+      title,
+      id: restoredBlessing.id,
+      oldId: deletedItem.id,
+      author
+    });
+
+    return { success: true, data: restoredBlessing };
   } catch (err) {
     console.warn('Failed to restore admin deleted blessing:', err);
     return { success: false, error: err };
+  }
+}
+
+/**
+ * Broadcast blessing restoration to all connected clients
+ */
+export async function broadcastBlessingRestored({ blessing, title, id, oldId, author }) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    await channel.send({
+      type: 'broadcast',
+      event: 'blessing_restored',
+      payload: {
+        blessing,
+        title: (title || blessing?.title || '').trim(),
+        id: String(id || blessing?.id || ''),
+        oldId: String(oldId || ''),
+        author: (author || blessing?.author || '').trim(),
+        timestamp: Date.now()
+      }
+    });
+  } catch (err) {
+    console.warn('broadcastBlessingRestored error:', err);
+  }
+}
+
+/**
+ * Subscribe to realtime restoration of archived blessings
+ */
+export function subscribeToLiveBlessingRestorations(onRestored) {
+  try {
+    const channel = getPraisesBroadcastChannel();
+    channel.on('broadcast', { event: 'blessing_restored' }, (event) => {
+      if (event?.payload && typeof onRestored === 'function') {
+        onRestored(event.payload);
+      }
+    });
+    return () => {};
+  } catch (err) {
+    console.warn('subscribeToLiveBlessingRestorations error:', err);
+    return () => {};
   }
 }
 
@@ -1130,7 +1227,7 @@ export async function submitBlessingReport({ blessingId, blessingTitle, reason, 
 
   // 1. Store in Supabase 'reports' table
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('reports')
       .insert([reportObj])
       .select();
@@ -1163,7 +1260,7 @@ export async function submitBlessingReport({ blessingId, blessingTitle, reason, 
           .eq('title', blessingTitle);
       }
     }
-  } catch (err) {
+  } catch {
     // Non-critical
   }
 
@@ -1176,6 +1273,19 @@ export async function submitBlessingReport({ blessingId, blessingTitle, reason, 
       reporterDeviceId: devId
     });
     localStorage.setItem('nemaa_reports_cache', JSON.stringify(cached));
+  } catch {}
+
+  // 4. Save to user's submitted reports list for matching admin inquiries
+  try {
+    const mySubmitted = JSON.parse(localStorage.getItem('nemaa_my_submitted_reports') || '[]');
+    mySubmitted.unshift({
+      reportId: reportObj.id,
+      blessingId: String(blessingId || ''),
+      blessingTitle: (blessingTitle || '').trim(),
+      reporterDeviceId: devId,
+      timestamp: Date.now()
+    });
+    localStorage.setItem('nemaa_my_submitted_reports', JSON.stringify(mySubmitted.slice(0, 50)));
   } catch {}
 
   return { success: true, remoteSuccess, error: remoteError, report: reportObj };
@@ -1223,12 +1333,12 @@ export async function fetchBlessingReports() {
     })
     .map(r => {
       let cleanNote = r.notes || '';
-      let reporterDeviceId = r.reporterDeviceId || '';
-      if (cleanNote.startsWith('{') && cleanNote.includes('reporterDeviceId')) {
+      let reporterDeviceId = r.reporterDeviceId || r.reporter_device_id || '';
+      if (cleanNote && typeof cleanNote === 'string') {
         try {
           const parsed = JSON.parse(cleanNote);
-          cleanNote = parsed.note || '';
-          reporterDeviceId = parsed.reporterDeviceId || '';
+          cleanNote = parsed.note || parsed.message || cleanNote;
+          reporterDeviceId = parsed.reporterDeviceId || parsed.reporter_device_id || reporterDeviceId;
         } catch {}
       }
       return {
@@ -1237,6 +1347,37 @@ export async function fetchBlessingReports() {
         reporterDeviceId
       };
     });
+}
+
+/**
+ * Clean corrupt or orphaned admin notifications from reports table
+ */
+export async function cleanOrphanedNotificationsFromReports() {
+  try {
+    // 1. Delete admin inquiries with empty reporterDeviceId from Supabase
+    await supabase
+      .from('reports')
+      .delete()
+      .eq('reason', 'admin_reporter_inquiry')
+      .ilike('notes', '%"reporterDeviceId":""%');
+
+    // 2. Also clean local cache of any admin notification records
+    try {
+      const local = JSON.parse(localStorage.getItem('nemaa_reports_cache') || '[]');
+      const filtered = local.filter(r => 
+        r && r.reason !== 'admin_author_notification' && 
+        r.reason !== 'admin_reporter_inquiry' && 
+        r.reason !== 'admin_global_broadcast' &&
+        r.reason !== 'praise_sync'
+      );
+      localStorage.setItem('nemaa_reports_cache', JSON.stringify(filtered));
+    } catch {}
+
+    return { success: true };
+  } catch (err) {
+    console.warn('cleanOrphanedNotificationsFromReports notice:', err);
+    return { success: false, error: err };
+  }
 }
 
 /**
@@ -1270,8 +1411,29 @@ export function subscribeToReports(onNewReport, onDeleteReport) {
         { event: '*', schema: 'public', table: 'reports' },
         (payload) => {
           if (payload && payload.eventType === 'INSERT' && payload.new) {
+            const row = payload.new;
+            // Strict filter out notifications, broadcasts, and praise sync records
+            if (row.reason === 'praise_sync' || 
+                row.reason === 'admin_author_notification' || 
+                row.reason === 'admin_reporter_inquiry' || 
+                row.reason === 'admin_global_broadcast') {
+              return;
+            }
             if (typeof onNewReport === 'function') {
-              onNewReport(payload.new);
+              let cleanNote = row.notes || '';
+              let reporterDeviceId = row.reporterDeviceId || row.reporter_device_id || '';
+              if (cleanNote && typeof cleanNote === 'string') {
+                try {
+                  const parsed = JSON.parse(cleanNote);
+                  cleanNote = parsed.note || parsed.message || cleanNote;
+                  reporterDeviceId = parsed.reporterDeviceId || parsed.reporter_device_id || reporterDeviceId;
+                } catch {}
+              }
+              onNewReport({
+                ...row,
+                notes: cleanNote,
+                reporterDeviceId
+              });
             }
           } else if (payload && payload.eventType === 'DELETE' && payload.old) {
             if (typeof onDeleteReport === 'function') {

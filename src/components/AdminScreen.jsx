@@ -48,7 +48,8 @@ import {
   fetchAdminDeletedBlessings,
   restoreAdminDeletedBlessing,
   permanentlyDeleteArchivedBlessing,
-  adminSendReporterInquiry
+  adminSendReporterInquiry,
+  cleanOrphanedNotificationsFromReports
 } from '../supabaseClient';
 import EditSharedBlessingModal from './EditSharedBlessingModal';
 
@@ -152,6 +153,7 @@ export default function AdminScreen({
   async function loadReports() {
     setIsLoadingReports(true);
     try {
+      await cleanOrphanedNotificationsFromReports();
       const list = await fetchBlessingReports();
       setReports(list);
     } catch (err) {
@@ -186,7 +188,17 @@ export default function AdminScreen({
   }
 
   const handleOpenReporterInquiry = (report) => {
-    setActiveReporterInquiryModal(report);
+    let devId = report.reporterDeviceId || report.reporter_device_id || '';
+    if (!devId && report.notes) {
+      try {
+        const p = typeof report.notes === 'string' ? JSON.parse(report.notes) : report.notes;
+        devId = p.reporterDeviceId || p.reporter_device_id || p.deviceId || '';
+      } catch {}
+    }
+    setActiveReporterInquiryModal({
+      ...report,
+      reporterDeviceId: devId
+    });
     setReporterInquiryText('');
   };
 

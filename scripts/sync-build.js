@@ -68,4 +68,11 @@ if (fs.existsSync(distDir)) {
   }
 }
 
-console.log('✅ Successfully synced all dist artifacts (manifest, sw, brand, assets, html) to root and docs/');
+// 6. Explicitly ensure OneSignal worker is mirrored in root and docs
+const workerSrc = path.join(rootDir, 'public', 'OneSignalSDKWorker.js');
+if (fs.existsSync(workerSrc)) {
+  fs.copyFileSync(workerSrc, path.join(rootDir, 'OneSignalSDKWorker.js'));
+  fs.copyFileSync(workerSrc, path.join(docsDir, 'OneSignalSDKWorker.js'));
+}
+
+console.log('✅ Successfully synced all dist artifacts (manifest, sw, OneSignal, brand, assets, html) to root and docs/');

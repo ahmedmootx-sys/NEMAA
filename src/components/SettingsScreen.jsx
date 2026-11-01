@@ -19,8 +19,19 @@ import {
   ChevronRight,
   PlusCircle,
   Check,
-  Bell
+  Bell,
+  Clock,
+  Send
 } from 'lucide-react';
+import {
+  getPushSubscriptionState,
+  requestPushPermission,
+  unsubscribePush,
+  updateReminderTimeSlot,
+  sendLocalTestNotification,
+  isIOS,
+  isStandalone
+} from '../utils/oneSignalHelper';
 
 export default function SettingsScreen({
   isOpen,
@@ -43,13 +54,115 @@ export default function SettingsScreen({
   onOpenShareApp,
   deferredPrompt,
   onInstallPwa,
-  getBlessingPraises
+  getBlessingPraises,
+  onShowToast
 }) {
   if (!isOpen) return null;
 
   const isRtl = currentLang === 'ar';
   const BackArrow = isRtl ? ArrowRight : ArrowLeft;
   const NextChevron = isRtl ? ChevronLeft : ChevronRight;
+
+  const [isPushActive, setIsPushActive] = useState(() => {
+    return localStorage.getItem('nemaa_push_notifications_enabled') === 'true';
+  });
+  const [preferredSlot, setPreferredSlot] = useState(() => {
+    return localStorage.getItem('nemaa_push_preferred_slot') || 'morning';
+  });
+  const [isPushLoading, setIsPushLoading] = useState(false);
+  const [isTestingPush, setIsTestingPush] = useState(false);
+  const [localToast, setLocalToast] = useState('');
+
+  const triggerToast = (msg) => {
+    setLocalToast(msg);
+    if (typeof onShowToast === 'function') {
+      onShowToast(msg);
+    }
+    setTimeout(() => setLocalToast(''), 6000);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    async function checkState() {
+      const state = await getPushSubscriptionState();
+      if (state.isSubscribed) {
+        setIsPushActive(true);
+      }
+    }
+    checkState();
+  }, [isOpen]);
+
+  const handleTogglePush = async () => {
+    if (isPushLoading) return;
+
+    if (isPushActive) {
+      setIsPushLoading(true);
+      try {
+        await unsubscribePush();
+        setIsPushActive(false);
+        triggerToast(isRtl ? 'تم إيقاف رسائل التذكير' : 'Daily reminders turned off');
+      } finally {
+        setIsPushLoading(false);
+      }
+      return;
+    }
+
+    // Checking iOS limitation
+    if (isIOS() && !isStandalone()) {
+      triggerToast('لتفعيل الإشعارات على آيفون، يرجى إضافة التطبيق للشاشة الرئيسية أولاً');
+      return;
+    }
+
+    setIsPushLoading(true);
+    try {
+      const res = await requestPushPermission(preferredSlot);
+      if (res.success) {
+        setIsPushActive(true);
+        triggerToast(isRtl ? 'تم تفعيل رسائل الطمأنينة بنجاح ✨ ستصلك نفحات الحمد اليومية' : 'Daily reminders enabled successfully ✨');
+      } else if (res.reason === 'ios_pwa_required') {
+        triggerToast(res.message || 'لتفعيل الإشعارات على آيفون، يرجى إضافة التطبيق للشاشة الرئيسية أولاً');
+      } else if (res.reason === 'permission_denied') {
+        triggerToast(isRtl ? 'تم رفض إذن الإشعارات من إعدادات المتصفح. يمكنك السماح بها من إعدادات الموقع' : 'Push permission was denied in browser settings');
+      } else {
+        triggerToast(isRtl ? (res.message || 'تعذر تفعيل الإشعارات حالياً') : 'Could not enable notifications');
+      }
+    } catch {
+      triggerToast(isRtl ? 'حدث خطأ أثناء طلب الإذن' : 'Error requesting permission');
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
+
+  const handleSelectTimeSlot = async (slot) => {
+    setPreferredSlot(slot);
+    await updateReminderTimeSlot(slot);
+    triggerToast(
+      slot === 'morning' 
+        ? (isRtl ? 'تم ضبط التذكير: أذكار الصباح (~ 8:00 ص) ✨' : 'Morning reminder selected')
+        : slot === 'afternoon'
+        ? (isRtl ? 'تم ضبط التذكير: بعد العصر (~ 4:30 م) ✨' : 'Afternoon reminder selected')
+        : (isRtl ? 'تم ضبط التذكير: المساء قبل النوم (~ 10:00 م) ✨' : 'Evening reminder selected')
+    );
+  };
+
+  const handleSendTest = async () => {
+    if (isTestingPush) return;
+    setIsTestingPush(true);
+    try {
+      const ok = await sendLocalTestNotification(currentLang);
+      if (ok) {
+        triggerToast(isRtl ? 'تم إرسال إشعار تجريبي بنجاح إلى جهازك 🔔' : 'Test notification sent successfully 🔔');
+      } else {
+        if (!isPushActive) {
+          triggerToast(isRtl ? 'يرجى تفعيل رسائل الطمأنينة أولاً لتلقي الإشعارات' : 'Please enable daily reminders first');
+        } else {
+          triggerToast(isRtl ? 'تعذر إرسال الإشعار. تأكد من إعدادات المتصفح' : 'Could not send test notification');
+        }
+      }
+    } finally {
+      setIsTestingPush(false);
+    }
+  };
 
   return (
     <div 
@@ -124,6 +237,45 @@ export default function SettingsScreen({
         {/* Right balance spacer */}
         <div style={{ width: '40px' }} />
       </header>
+
+      {/* Dynamic Local Feedback Toast Banner */}
+      {localToast && (
+        <div style={{
+          position: 'sticky',
+          top: '64px',
+          zIndex: 60,
+          margin: '8px 16px -12px',
+          padding: '11px 16px',
+          borderRadius: '14px',
+          background: 'linear-gradient(135deg, #0d241b 0%, #17382d 100%)',
+          color: '#F4ECE1',
+          border: '1px solid var(--color-gold)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px',
+          fontSize: '13px',
+          fontWeight: '700',
+          animation: 'slideDown 0.25s ease-out'
+        }}>
+          <span>{localToast}</span>
+          <button
+            type="button"
+            onClick={() => setLocalToast('')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--color-gold)',
+              fontSize: '16px',
+              cursor: 'pointer',
+              padding: '2px 6px'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Main Settings Body */}
       <main style={{
@@ -396,6 +548,209 @@ export default function SettingsScreen({
                 </button>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Section: Daily Reminders & Push Notifications (رسائل الطمأنينة والإشعارات اليومية) */}
+        <section>
+          <div style={{
+            fontSize: '12px',
+            fontWeight: '800',
+            letterSpacing: '1px',
+            color: 'var(--color-gold)',
+            textTransform: 'uppercase',
+            marginBottom: '10px',
+            padding: '0 4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <Bell size={13} color="var(--color-gold)" />
+            <span>{isRtl ? 'رسائل الطمأنينة والإشعارات' : 'Peaceful Reminders & Notifications'}</span>
+          </div>
+
+          <div style={{
+            background: 'var(--surface-card)',
+            borderRadius: '20px',
+            border: '1px solid var(--border-subtle)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+            overflow: 'hidden'
+          }}>
+            {/* Main Toggle Row */}
+            <div style={{
+              padding: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: isPushActive ? '1px solid var(--border-subtle)' : 'none'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, paddingRight: isRtl ? 0 : '10px', paddingLeft: isRtl ? '10px' : 0 }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '14px',
+                  background: isPushActive ? 'rgba(212,175,55,0.15)' : 'var(--surface-sunken)',
+                  border: isPushActive ? '1px solid rgba(212,175,55,0.3)' : '1px solid var(--border-subtle)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: isPushActive ? 'var(--color-gold)' : 'var(--text-muted)',
+                  transition: 'all 0.25s ease',
+                  flexShrink: 0
+                }}>
+                  <Bell size={20} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '15.5px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                    {isRtl ? 'تفعيل رسائل الطمأنينة' : 'Enable Daily Reminders'}
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.4' }}>
+                    {isPushActive 
+                      ? (isRtl ? 'مُفعّلة — ستصلك نفحات وتأملات تذكيرية هادئة حتى والتطبيق مغلق ✨' : 'Active — daily peaceful blessings enabled ✨')
+                      : (isRtl ? 'تلقّ نفحات تدبرية هادئة لترطيب اللسان بالحمد في أوقاتك المفضلة' : 'Receive peaceful daily reminders to give thanks')}
+                  </div>
+                </div>
+              </div>
+
+              {/* iOS-Style Toggle Switch */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isPushActive}
+                onClick={handleTogglePush}
+                disabled={isPushLoading}
+                aria-label={isRtl ? 'تفعيل أو إيقاف رسائل الطمأنينة' : 'Toggle Daily Reminders'}
+                style={{
+                  width: '52px',
+                  height: '30px',
+                  borderRadius: '30px',
+                  background: isPushActive ? 'var(--color-gold)' : 'var(--surface-sunken)',
+                  border: '1.5px solid var(--border-subtle)',
+                  padding: '2px',
+                  cursor: isPushLoading ? 'wait' : 'pointer',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  outline: 'none',
+                  flexShrink: 0,
+                  opacity: isPushLoading ? 0.6 : 1
+                }}
+              >
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: '#FFFFFF',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                  transform: isPushActive 
+                    ? (isRtl ? 'translateX(-22px)' : 'translateX(22px)') 
+                    : 'translateX(0)',
+                  transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+                }} />
+              </button>
+            </div>
+
+            {/* Sub-Panel: Reminder Time Preference & Test Notification (shown when active) */}
+            {isPushActive && (
+              <div style={{
+                padding: '16px 18px',
+                background: 'rgba(212, 175, 55, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }}>
+                <div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    color: 'var(--text-heading)',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Clock size={14} color="var(--color-gold)" />
+                    <span>{isRtl ? 'الوقت المفضّل لوصول النعمة والتذكير:' : 'Preferred Reminder Time:'}</span>
+                  </div>
+
+                  {/* Time Slot Chips */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                    gap: '8px'
+                  }}>
+                    {[
+                      { id: 'morning', label: isRtl ? 'أذكار الصباح' : 'Morning', sub: isRtl ? '~ 8:00 ص' : '8:00 AM' },
+                      { id: 'afternoon', label: isRtl ? 'بعد العصر' : 'Afternoon', sub: isRtl ? '~ 4:30 م' : '4:30 PM' },
+                      { id: 'evening', label: isRtl ? 'المساء قبل النوم' : 'Evening', sub: isRtl ? '~ 10:00 م' : '10:00 PM' }
+                    ].map(slot => {
+                      const isSelected = preferredSlot === slot.id;
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => handleSelectTimeSlot(slot.id)}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '12px',
+                            border: isSelected ? '1.5px solid var(--color-gold)' : '1px solid var(--border-subtle)',
+                            background: isSelected ? 'var(--surface-card)' : 'var(--surface-sunken)',
+                            color: isSelected ? 'var(--color-primary)' : 'var(--text-main)',
+                            fontWeight: isSelected ? '800' : '500',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '2px',
+                            boxShadow: isSelected ? '0 3px 12px rgba(212,175,55,0.15)' : 'none',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <span style={{ fontSize: '13px' }}>{slot.label}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{slot.sub}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Instant Test Push Button */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingTop: '6px',
+                  borderTop: '1px dashed var(--border-subtle)'
+                }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {isRtl ? 'جرّب وصول الإشعار لهاتفك الآن:' : 'Test notification on device:'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSendTest}
+                    disabled={isTestingPush}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: '10px',
+                      border: '1px solid var(--color-gold)',
+                      background: 'rgba(212,175,55,0.1)',
+                      color: 'var(--color-primary)',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: isTestingPush ? 'wait' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <Send size={13} color="var(--color-gold)" />
+                    <span>{isRtl ? (isTestingPush ? 'جاري الإرسال...' : 'إرسال إشعار تجريبي 🔔') : 'Send Test Notification'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
