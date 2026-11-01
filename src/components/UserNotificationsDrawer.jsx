@@ -6,7 +6,8 @@ import {
   MessageSquare, 
   Sparkles, 
   Edit3, 
-  Clock 
+  Clock,
+  HelpCircle 
 } from 'lucide-react';
 
 export default function UserNotificationsDrawer({ 
@@ -41,6 +42,14 @@ export default function UserNotificationsDrawer({
 
   const getActionBadge = (type) => {
     switch (type) {
+      case 'reporter_inquiry':
+        return {
+          icon: <HelpCircle size={13} />,
+          label: isRtl ? 'استفسار من الإدارة عن بلاغك' : 'Report Inquiry',
+          bg: 'rgba(212, 175, 55, 0.18)',
+          color: 'var(--color-gold)',
+          border: '1px solid rgba(212, 175, 55, 0.4)'
+        };
       case 'edit':
         return {
           icon: <Edit3 size={13} />,

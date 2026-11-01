@@ -24,7 +24,10 @@ import {
   X,
   Send,
   Mail,
-  Megaphone
+  Megaphone,
+  Archive,
+  RotateCcw,
+  HelpCircle
 } from 'lucide-react';
 import { 
   adminLogin, 
@@ -41,7 +44,11 @@ import {
   recordAdminDeletedBlessing,
   adminSendAuthorNotification,
   publishAdminGlobalBroadcast,
-  fetchLatestAdminBroadcast
+  fetchLatestAdminBroadcast,
+  fetchAdminDeletedBlessings,
+  restoreAdminDeletedBlessing,
+  permanentlyDeleteArchivedBlessing,
+  adminSendReporterInquiry
 } from '../supabaseClient';
 import EditSharedBlessingModal from './EditSharedBlessingModal';
 
@@ -88,6 +95,17 @@ export default function AdminScreen({
   const [authorMessageText, setAuthorMessageText] = useState('');
   const [authorMessageAction, setAuthorMessageAction] = useState('message'); // 'message' | 'edit' | 'delete'
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+
+  // Reporter inquiry state (استفسار من المبلّغ)
+  const [activeReporterInquiryModal, setActiveReporterInquiryModal] = useState(null);
+  const [reporterInquiryText, setReporterInquiryText] = useState('');
+  const [isSendingReporterInquiry, setIsSendingReporterInquiry] = useState(false);
+
+  // Deleted Archive state (أرشيف المحذوفات وسلة الاستعادة)
+  const [archivedBlessings, setArchivedBlessings] = useState([]);
+  const [isLoadingArchive, setIsLoadingArchive] = useState(false);
+  const [archiveSearchQuery, setArchiveSearchQuery] = useState('');
+  const [isRestoringId, setIsRestoringId] = useState(null);
 
   // Global Broadcast Announcement State (إذاعة رسالة لجميع المستخدمين)
   const [broadcastTitle, setBroadcastTitle] = useState('');
@@ -155,6 +173,85 @@ export default function AdminScreen({
     }
   }
 
+  async function loadArchivedBlessings() {
+    setIsLoadingArchive(true);
+    try {
+      const data = await fetchAdminDeletedBlessings();
+      setArchivedBlessings(data || []);
+    } catch (err) {
+      console.warn('Failed to load archive:', err);
+    } finally {
+      setIsLoadingArchive(false);
+    }
+  }
+
+  const handleOpenReporterInquiry = (report) => {
+    setActiveReporterInquiryModal(report);
+    setReporterInquiryText('');
+  };
+
+  const handleSendReporterInquiry = async (e) => {
+    e.preventDefault();
+    if (!activeReporterInquiryModal || !reporterInquiryText.trim()) return;
+    setIsSendingReporterInquiry(true);
+    try {
+      const res = await adminSendReporterInquiry({
+        reportId: activeReporterInquiryModal.id,
+        blessingTitle: activeReporterInquiryModal.blessing_title,
+        reporterDeviceId: activeReporterInquiryModal.reporterDeviceId,
+        message: reporterInquiryText.trim(),
+        adminEmail: currentUser?.email || 'admin'
+      });
+      if (res.success) {
+        setStatusNotice(isRtl ? 'تم إرسال الاستفسار بنجاح وسيصل للمُبلّغ في جرس الإشعارات ✨' : 'Inquiry sent to reporter successfully!');
+        setTimeout(() => setStatusNotice(''), 4500);
+        setActiveReporterInquiryModal(null);
+        setReporterInquiryText('');
+      } else {
+        alert(isRtl ? 'تعذر إرسال الاستفسار: ' + (res.error?.message || 'خطأ غير معروف') : 'Failed to send inquiry');
+      }
+    } catch (err) {
+      console.warn('Error sending inquiry:', err);
+    } finally {
+      setIsSendingReporterInquiry(false);
+    }
+  };
+
+  const handleRestoreArchivedBlessing = async (item) => {
+    if (!item) return;
+    setIsRestoringId(item.id || item.blessing_title);
+    try {
+      const res = await restoreAdminDeletedBlessing(item);
+      if (res.success) {
+        setArchivedBlessings(prev => prev.filter(a => a.id !== item.id && a.blessing_title !== item.blessing_title));
+        if (onRefreshBlessings) onRefreshBlessings();
+        setStatusNotice(isRtl ? 'تمت استعادة النعمة ونشرها للجميع بنجاح ✨' : 'Blessing restored and published successfully!');
+        setTimeout(() => setStatusNotice(''), 4500);
+      } else {
+        alert(isRtl ? 'تعذر استعادة النعمة: ' + (res.error?.message || 'خطأ غير معروف') : 'Failed to restore blessing');
+      }
+    } catch (err) {
+      console.warn('Error restoring blessing:', err);
+    } finally {
+      setIsRestoringId(null);
+    }
+  };
+
+  const handlePermanentDeleteArchivedBlessing = async (item) => {
+    const confirmPrompt = isRtl
+      ? `هل أنت متأكد من الحذف النهائي القطعي لهذه النعمة من الأرشيف؟ لن يمكن استعادتها مرة أخرى.`
+      : 'Permanently purge this blessing from archive?';
+    if (!window.confirm(confirmPrompt)) return;
+    try {
+      await permanentlyDeleteArchivedBlessing(item);
+      setArchivedBlessings(prev => prev.filter(a => a.id !== item.id && a.blessing_title !== item.blessing_title));
+      setStatusNotice(isRtl ? 'تم الحذف النهائي للنعمة من الأرشيف.' : 'Blessing permanently purged.');
+      setTimeout(() => setStatusNotice(''), 3500);
+    } catch (err) {
+      console.warn('Error purging blessing:', err);
+    }
+  };
+
   // Check admin session on mount / open
   useEffect(() => {
     if (!isOpen) return;
@@ -165,6 +262,7 @@ export default function AdminScreen({
         loadReports();
         loadFeedbackData();
         loadBroadcastData();
+        loadArchivedBlessings();
       }
     }
     checkAuth();
@@ -265,8 +363,9 @@ export default function AdminScreen({
       }
 
       setReports(prev => prev.filter(r => String(r.blessing_id) !== String(blessingId) && r.blessing_title !== title));
+      loadArchivedBlessings();
 
-      setStatusNotice(isRtl ? 'تم حذف النعمة نهائياً وتطبيق ذلك لجميع المستخدمين' : 'Blessing permanently deleted');
+      setStatusNotice(isRtl ? 'تم حذف النعمة وأرشفتها بنجاح (يمكن استعادتها من تبويب الأرشيف)' : 'Blessing deleted and archived (can be restored)');
       setTimeout(() => setStatusNotice(''), 4000);
     } catch (err) {
       console.warn('Failed to delete blessing:', err);
@@ -733,15 +832,17 @@ export default function AdminScreen({
           gap: '18px',
           boxSizing: 'border-box'
         }}>
-          {/* Segmented Full-Width Tab Navigation (5 Tabs) */}
+          {/* Segmented Full-Width Tab Navigation (6 Tabs) */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
+            gridTemplateColumns: 'repeat(6, 1fr)',
             background: 'var(--surface-sunken)',
             padding: '4px',
             borderRadius: '16px',
-            gap: '4px',
-            border: '1px solid var(--border-subtle)'
+            gap: '3px',
+            border: '1px solid var(--border-subtle)',
+            overflowX: 'auto',
+            scrollbarWidth: 'none'
           }}>
             {/* Tab 1: Reports */}
             <button
@@ -910,6 +1011,48 @@ export default function AdminScreen({
             >
               <Megaphone size={13} color={activeTab === 'broadcast' ? '#3182ce' : 'currentColor'} style={{ flexShrink: 0 }} />
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'إذاعة عامة' : 'Broadcast'}</span>
+            </button>
+
+            {/* Tab 6: Deleted Blessings Archive (أرشيف المحذوفات) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('archive');
+                loadArchivedBlessings();
+              }}
+              style={{
+                padding: '9px 4px',
+                borderRadius: '12px',
+                border: 'none',
+                background: activeTab === 'archive' ? '#FFFFFF' : 'transparent',
+                color: activeTab === 'archive' ? '#DD6B20' : 'var(--text-muted)',
+                fontWeight: activeTab === 'archive' ? '800' : '600',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '3px',
+                boxShadow: activeTab === 'archive' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.2s',
+                minWidth: 0
+              }}
+            >
+              <Archive size={13} color={activeTab === 'archive' ? '#DD6B20' : 'currentColor'} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isRtl ? 'الأرشيف' : 'Archive'}</span>
+              {archivedBlessings.length > 0 && (
+                <span style={{
+                  background: '#DD6B20',
+                  color: '#FFFFFF',
+                  fontSize: '9.5px',
+                  fontWeight: '800',
+                  padding: '1px 5px',
+                  borderRadius: '10px',
+                  flexShrink: 0
+                }}>
+                  {archivedBlessings.length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -1112,6 +1255,30 @@ export default function AdminScreen({
                       >
                         <Send size={13} color="var(--color-gold)" />
                         <span>{isRtl ? 'مراسلة المؤلف' : 'Message Author'}</span>
+                      </button>
+
+                      {/* Button 2.8: Direct Inquiry to Reporter */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenReporterInquiry(rep)}
+                        title={isRtl ? 'إرسال استفسار أو سؤال لصاحب البلاغ' : 'Inquire from reporter'}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '10px',
+                          background: 'rgba(212, 175, 55, 0.16)',
+                          border: '1.5px solid var(--border-gold)',
+                          color: 'var(--color-primary)',
+                          fontSize: '12.5px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <HelpCircle size={14} color="var(--color-gold)" />
+                        <span>{isRtl ? 'استفسار من المُبلّغ' : 'Inquire from Reporter'}</span>
                       </button>
 
                       {/* Button 3: Delete Blessing Permanently */}
@@ -1998,6 +2165,212 @@ export default function AdminScreen({
               </form>
             </div>
           )}
+
+          {/* TAB 6: DELETED ARCHIVE CONTENT (أرشيف المحذوفات وسلة الاستعادة) */}
+          {activeTab === 'archive' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                    {isRtl ? 'أرشيف النعم المحذوفة (سلة الاستعادة):' : 'Deleted Blessings Archive (Recycle Bin):'}
+                  </h4>
+                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {isRtl ? 'جميع النعم المحذوفة تُحفظ هنا تلقائياً لتمكين استعادتها فوراً في أي وقت.' : 'All deleted blessings are kept here for one-click recovery.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadArchivedBlessings}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--color-primary)',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <RefreshCw size={13} className={isLoadingArchive ? 'spinner-icon' : ''} />
+                  <span>{isRtl ? 'تحديث' : 'Refresh'}</span>
+                </button>
+              </div>
+
+              {/* Search in Archive */}
+              <div style={{ position: 'relative' }}>
+                <Search size={14} style={{
+                  position: 'absolute',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  [isRtl ? 'right' : 'left']: '12px',
+                  color: 'var(--text-muted)'
+                }} />
+                <input
+                  type="text"
+                  value={archiveSearchQuery}
+                  onChange={e => setArchiveSearchQuery(e.target.value)}
+                  placeholder={isRtl ? 'بحث في النعم المحذوفة بالعنوان أو الكاتب أو المحتوى...' : 'Search deleted blessings...'}
+                  style={{
+                    width: '100%',
+                    padding: isRtl ? '9px 34px 9px 12px' : '9px 12px 9px 34px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-subtle)',
+                    background: 'var(--surface-card)',
+                    color: 'var(--text-main)',
+                    fontSize: '12.5px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* List of Archived Blessings */}
+              {isLoadingArchive ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  {isRtl ? 'جاري تحميل الأرشيف...' : 'Loading archive...'}
+                </div>
+              ) : archivedBlessings.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '48px 16px',
+                  background: 'var(--surface-card)',
+                  borderRadius: '20px',
+                  border: '1px solid var(--border-subtle)'
+                }}>
+                  <div style={{
+                    width: '54px',
+                    height: '54px',
+                    borderRadius: '50%',
+                    background: 'rgba(221, 107, 32, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#DD6B20',
+                    margin: '0 auto 12px'
+                  }}>
+                    <Archive size={26} />
+                  </div>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                    {isRtl ? 'الأرشيف فارغ حالياً' : 'Archive is Empty'}
+                  </h4>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {isRtl ? 'لم يتم حذف أي نعمة مؤخراً أو تم تفريغ الأرشيف بالكامل.' : 'No deleted blessings in the archive.'}
+                  </p>
+                </div>
+              ) : (
+                archivedBlessings
+                  .filter(item => {
+                    if (!archiveSearchQuery.trim()) return true;
+                    const q = archiveSearchQuery.toLowerCase();
+                    const full = item.full_data || {};
+                    return (
+                      (item.blessing_title && item.blessing_title.toLowerCase().includes(q)) ||
+                      (full.reflection && full.reflection.toLowerCase().includes(q)) ||
+                      (full.author && full.author.toLowerCase().includes(q))
+                    );
+                  })
+                  .map((item) => {
+                    const full = item.full_data || {};
+                    const isRestoring = isRestoringId === (item.id || item.blessing_title);
+                    return (
+                      <div
+                        key={item.id || item.blessing_title}
+                        style={{
+                          background: 'var(--surface-card)',
+                          borderRadius: '16px',
+                          border: '1px solid var(--border-card)',
+                          padding: '16px 18px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          boxShadow: 'var(--shadow-sm)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                          <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                            {full.title || item.blessing_title}
+                          </h4>
+                          <span style={{
+                            fontSize: '11px',
+                            color: '#DD6B20',
+                            background: 'rgba(221, 107, 32, 0.12)',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontWeight: '700'
+                          }}>
+                            {isRtl ? 'محذوفة في الأرشيف' : 'Archived'}
+                          </span>
+                        </div>
+
+                        {full.reflection && (
+                          <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.6', color: 'var(--text-muted)' }}>
+                            {full.reflection}
+                          </p>
+                        )}
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11.5px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                          {full.author && (
+                            <span>{isRtl ? `الكاتب: ${full.author}` : `Author: ${full.author}`}</span>
+                          )}
+                          {item.created_at && (
+                            <span>{isRtl ? `تاريخ الحذف: ${new Date(item.created_at).toLocaleDateString(isRtl ? 'ar-EG' : 'en-US')}` : `Deleted: ${new Date(item.created_at).toLocaleDateString()}`}</span>
+                          )}
+                        </div>
+
+                        {/* Action Buttons: Restore or Purge */}
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreArchivedBlessing(item)}
+                            disabled={isRestoring}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '10px',
+                              background: 'rgba(56, 161, 105, 0.12)',
+                              border: '1.5px solid #38A169',
+                              color: '#276749',
+                              fontSize: '12.5px',
+                              fontWeight: '800',
+                              cursor: isRestoring ? 'wait' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <RotateCcw size={14} className={isRestoring ? 'spinner-icon' : ''} />
+                            <span>{isRestoring ? (isRtl ? 'جاري الاستعادة...' : 'Restoring...') : (isRtl ? 'استعادة النعمة للمنصة ✨' : 'Restore Blessing')}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handlePermanentDeleteArchivedBlessing(item)}
+                            style={{
+                              padding: '8px 14px',
+                              borderRadius: '10px',
+                              background: 'transparent',
+                              border: '1px solid var(--border-subtle)',
+                              color: '#E53E3E',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            <span>{isRtl ? 'حذف نهائي قطعي' : 'Purge Permanently'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+          )}
         </main>
       )}
 
@@ -2284,6 +2657,236 @@ export default function AdminScreen({
                 >
                   <Send size={13} color="var(--color-gold)" />
                   <span>{isSendingMessage ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : (isRtl ? 'إرسال الإشعار فوراً' : 'Send Notification')}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Send Reporter Inquiry Modal (استفسار من المُبلّغ - مصمم للهاتف دون أي قص) */}
+      {activeReporterInquiryModal && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setActiveReporterInquiryModal(null)} 
+          role="dialog" 
+          aria-modal="true" 
+          style={{ zIndex: 10010, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}
+        >
+          <div 
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '520px',
+              width: '100%',
+              maxHeight: 'min(90vh, calc(100dvh - 30px))',
+              display: 'flex',
+              flexDirection: 'column',
+              background: 'var(--surface-card)',
+              borderRadius: '22px',
+              border: '1.5px solid var(--border-gold)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.18s ease-out'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '14px 18px',
+              background: 'linear-gradient(135deg, rgba(212,175,55,0.16) 0%, rgba(44,74,62,0.08) 100%)',
+              borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: 'var(--surface-card)',
+                  border: '1px solid var(--border-gold)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-gold)',
+                  flexShrink: 0
+                }}>
+                  <HelpCircle size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                    {isRtl ? 'إرسال استفسار لصاحب البلاغ' : 'Inquire from Reporter'}
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {isRtl ? 'سيصل الاستفسار مباشرة في جرس إشعارات جهاز المُبلّغ' : 'Delivered directly to reporter notification drawer'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveReporterInquiryModal(null)}
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  background: 'var(--surface-sunken)',
+                  border: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-muted)'
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Modal Form with Scrollable Body */}
+            <form 
+              onSubmit={handleSendReporterInquiry} 
+              style={{ 
+                padding: '16px 20px 24px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px',
+                overflowY: 'auto',
+                flex: 1
+              }}
+            >
+              {/* Target Report Summary */}
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: 'var(--surface-sunken)',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  {isRtl ? 'النعمة المُبلّغ عنها:' : 'Reported Blessing:'}
+                </span>
+                <span style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                  «{activeReporterInquiryModal.blessing_title}»
+                </span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                  <span style={{ fontSize: '11px', color: '#C53030', fontWeight: '700' }}>
+                    {isRtl ? `سبب البلاغ: ${activeReporterInquiryModal.reason}` : `Reason: ${activeReporterInquiryModal.reason}`}
+                  </span>
+                </div>
+                {activeReporterInquiryModal.notes && (
+                  <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-main)', fontStyle: 'italic' }}>
+                    "{activeReporterInquiryModal.notes}"
+                  </p>
+                )}
+              </div>
+
+              {/* Quick Template Chips */}
+              <div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '5px' }}>
+                  {isRtl ? 'قوالب سريعة مقترحة (اضغط للتعبئة الفورية):' : 'Quick templates:'}
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                  {[
+                    { label: isRtl ? 'توضيح موضع الإشكال' : 'Clarify issue', text: isRtl ? 'نرجو توضيح موضع الإشكال في النعمة بالتحديد، جزاكم الله خيراً.' : 'Could you please clarify the specific issue in this blessing?' },
+                    { label: isRtl ? 'خطأ في الآية أو الحديث' : 'Proof error', text: isRtl ? 'هل الإشكال في نص الآية/الحديث الشريف أم في التدبّر؟ نرجو التكرم بالتوضيح.' : 'Is the mistake in the scripture text or the reflection wording?' },
+                    { label: isRtl ? 'شكر وتأكيد المراجعة' : 'Under review', text: isRtl ? 'تم الاطلاع على بلاغكم الكريم، وسنقوم بالتدقيق فيه وتصحيحه فوراً.' : 'Thank you for your report. We are reviewing and correcting it.' },
+                    { label: isRtl ? 'طلب صياغة بديلة' : 'Alternative wording', text: isRtl ? 'نشكر حرصكم المبارك، هل لديكم صياغة بديلة أو توثيق أدق تفيدنا به؟' : 'Thank you. Do you have a suggested correction or better source?' }
+                  ].map((tpl, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setReporterInquiryText(tpl.text)}
+                      style={{
+                        padding: '7px 8px',
+                        borderRadius: '8px',
+                        background: 'var(--surface-sunken)',
+                        border: '1px dashed var(--border-subtle)',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        color: 'var(--text-main)',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {tpl.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Textarea */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', marginBottom: '5px', color: 'var(--text-main)' }}>
+                  {isRtl ? 'نص الاستفسار للمُبلّغ:' : 'Inquiry message to reporter:'}
+                </label>
+                <textarea
+                  value={reporterInquiryText}
+                  onChange={e => setReporterInquiryText(e.target.value)}
+                  placeholder={isRtl ? 'اكتب استفسارك بالتفصيل للمُبلّغ لمعرفة سبب الإشكال وتصحيحه بدقة...' : 'Type your question to the user who reported this blessing...'}
+                  rows={3}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-subtle)',
+                    background: 'var(--surface-card)',
+                    color: 'var(--text-main)',
+                    fontSize: '12.5px',
+                    lineHeight: '1.5',
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              {/* Submit / Cancel Buttons */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveReporterInquiryModal(null)}
+                  disabled={isSendingReporterInquiry}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '10px',
+                    background: 'var(--surface-sunken)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-muted)',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSendingReporterInquiry || !reporterInquiryText.trim()}
+                  style={{
+                    flex: 2,
+                    padding: '10px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #1A382B 0%, #2C4A3E 60%, #15261F 100%)',
+                    border: '1.5px solid var(--color-gold)',
+                    color: '#FFFFFF',
+                    fontSize: '12.5px',
+                    fontWeight: '800',
+                    cursor: (isSendingReporterInquiry || !reporterInquiryText.trim()) ? 'not-allowed' : 'pointer',
+                    opacity: (isSendingReporterInquiry || !reporterInquiryText.trim()) ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Send size={13} color="var(--color-gold)" />
+                  <span>{isSendingReporterInquiry ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : (isRtl ? 'إرسال الاستفسار للمُبلّغ' : 'Send Inquiry')}</span>
                 </button>
               </div>
             </form>

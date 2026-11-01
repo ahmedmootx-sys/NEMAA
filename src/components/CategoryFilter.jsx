@@ -6,11 +6,13 @@ import {
   Activity, 
   Compass, 
   Users, 
-  Sun 
+  Sun,
+  Sparkles 
 } from 'lucide-react';
 
 const CATEGORY_ICONS = {
   all: Layers,
+  scholars_gems: Sparkles,
   shared: Globe,
   hidden: ShieldCheck,
   body: Activity,

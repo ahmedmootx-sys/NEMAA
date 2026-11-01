@@ -2172,6 +2172,10 @@ export default function App() {
         sharedBlessings={sharedBlessings}
         onDeleteBlessing={handleAdminDeleteBlessing}
         onUpdateBlessing={handleUpdateBlessing}
+        onRefreshBlessings={async () => {
+          const remote = await fetchSharedBlessings();
+          if (Array.isArray(remote)) setSharedBlessings(remote);
+        }}
         getBlessingPraises={getBlessingPraises}
         lang={currentLang}
       />

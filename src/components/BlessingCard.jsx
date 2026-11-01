@@ -471,10 +471,38 @@ export default function BlessingCard({
           <span>◆</span>
         </div>
 
-        {/* Reflection (التدبّر) */}
-        <p className="blessing-reflection">
-          {displayBlessing.reflection}
-        </p>
+        {/* Reflection (التدبّر) with Graceful Internal Scroll for Long Classical Texts */}
+        <div className={`blessing-reflection-container ${displayBlessing.reflection?.length > 180 ? 'has-long-text' : ''}`}>
+          <p className="blessing-reflection">
+            {displayBlessing.reflection}
+          </p>
+        </div>
+
+        {/* Classical Scholar Citation Box */}
+        {(blessing.author || blessing.source) && (blessing.category === 'scholars_gems' || blessing.source) && (
+          <div className="scholar-citation-card-box">
+            <div className="scholar-citation-meta">
+              {blessing.author && (
+                <div className="scholar-author-title">
+                  <span className="scholar-author-label">
+                    {lang === 'ar' 
+                      ? (blessing.category === 'scholars_gems' 
+                          ? `— من درر الإمام ${blessing.author} رحمه الله` 
+                          : `— بقلم: ${blessing.author}`) 
+                      : (blessing.category === 'scholars_gems' 
+                          ? `— By Imam ${blessing.author}` 
+                          : `— By: ${blessing.author}`)}
+                  </span>
+                </div>
+              )}
+              {blessing.source && (
+                <div className="scholar-source-badge">
+                  <span>{lang === 'ar' ? `المصدر: ${blessing.source}` : `Source: ${blessing.source}`}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Quranic Verse / Prophetic Hadith Callout Box */}
         {hasProof && (

@@ -78,6 +78,7 @@ export const TRANSLATIONS = {
     // Categories
     categories: {
       all: 'كافة النعم',
+      scholars_gems: 'درر وتدبرات السلف',
       hidden: 'نعم باطنة وخفية',
       body: 'الصحة والجسد',
       spiritual: 'نعم إيمانية وروحية',
@@ -184,6 +185,7 @@ export const TRANSLATIONS = {
     // Categories
     categories: {
       all: 'All Blessings',
+      scholars_gems: "Scholars' Gems & Reflections",
       hidden: 'Hidden & Subtle Blessings',
       body: 'Health & Bodily Blessings',
       spiritual: 'Spiritual & Faith Blessings',

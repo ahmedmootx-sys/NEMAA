@@ -163,13 +163,13 @@ export async function generateMissionPoster({ lang = 'ar' } = {}) {
     // Greeting
     ctx.font = 'bold 28px "Cairo", sans-serif';
     ctx.fillStyle = '#F5D77F';
-    ctx.fillText('السَّلَامُ عَلَيْكُمْ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ،', contentX, currentY);
+    ctx.fillText('السلام عليكم ورحمة الله وبركاته،', contentX, currentY);
     currentY += 50;
 
     // Paragraph 1
     ctx.font = '24px "Cairo", sans-serif';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    const p1 = 'نَحْنُ نَعِيشُ فِي كَنَفِ نِعَمٍ سَابِغَةٍ لَا تُحْصَى، لَكِنَّ طُولَ الِاعْتِيَادِ يُورِثُ الْغَفْلَةَ، فَنَنْسَى أَنْ نَسْتَشْعِرَ مَا بَيْنَ أَيْدِينَا، أَوْ نَغْفُلُ عَنِ التَّفَكُّرِ فِي أَلْطَافِ اللَّهِ حَتَّى نَأْلَفَهَا وَلَا نَرَاهَا..';
+    const p1 = 'نحن نعيش في كنف نِعَمٍ سابغة لا تُحصى، لكن طول الاعتياد يورث الغفلة، فننسى أن نستشعر ما بين أيدينا، أو نغفل عن التفكر في ألطاف الله حتى نألفها ولا نراها..';
     const p1Lines = wrapText(ctx, p1, contentWidth);
     p1Lines.forEach(line => {
       ctx.fillText(line, contentX, currentY);
@@ -178,7 +178,7 @@ export async function generateMissionPoster({ lang = 'ar' } = {}) {
     currentY += 20;
 
     // Golden Highlighted Core Mission Box
-    const p2 = 'وَمِنْ هُنَا، بِفَضْلِ اللَّهِ وَتَوْفِيقِهِ، جَاءَتْ فِكْرَةُ تَطْبِيقِ «نِعْمَة»؛ لِيَكُونَ مَنَارَةً لِلتَّذْكِرَةِ، وَمَسَاحَةً لِتَأَمُّلِ الْقُلُوبِ وَيَقَظَتِهَا. أَوْدَعْنَا بَيْنَ يَدَيْكَ فِي الإِصْدَارِ الأَوَّلِ 100 نِعْمَةٍ مُخْتَارَةٍ وَمُحَرَّرَةٍ لِتَكُونَ مُنْطَلَقاً لِإِيقَاظِ الْوَعْيِ وَتَجْدِيدِ الشُّكْرِ فِي حَيَاتِك..';
+    const p2 = 'ومن هنا، بفضل الله وتوفيقه، جاءت فكرة تطبيق «نِعْمَة»؛ ليكون منارةً للتذكرة، ومساحةً لتأمل القلوب ويقظتها. أودعنا بين يديك نفائس من النعم المختارة والمحررة لتكون منطلقاً لإيقاظ الوعي وتجديد الشكر في حياتك..';
     ctx.font = 'bold 25px "Cairo", sans-serif';
     const p2Lines = wrapText(ctx, p2, contentWidth - 60);
     const boxHeight = (p2Lines.length * 40) + 40;
@@ -204,7 +204,7 @@ export async function generateMissionPoster({ lang = 'ar' } = {}) {
     // Paragraph 3
     ctx.font = '24px "Cairo", sans-serif';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
-    const p3 = 'وَكُلُّ نِعْمَةٍ إِضَافِيَّةٍ تَجِدُهَا هُنَا مُسْتَقْبَلاً، مَا هِيَ إِلَّا رِسَالَةُ خَيْرٍ وَشَهَادَةُ حَقٍّ كَتَبَهَا الْمُشَارِكُونَ مِنْ تَجَارِبِهِمْ وَتَأَمُّلَاتِهِمْ، لِيَكُونَ التَّطْبِيقُ مِشْكَاةً حَيَّةً نَتَذَكَّرُ فِيهَا جَمِيعاً فَضْلَ اللَّهِ.';
+    const p3 = 'وكل نعمة إضافية تجدها هنا مستقبلاً، ما هي إلا رسالة خير وشهادة حق كتبها المشاركون من تجاربهم وتأملاتهم، ليكون التطبيق مشكاةً حية نتذكر فيها جميعاً فضل الله.';
     const p3Lines = wrapText(ctx, p3, contentWidth);
     p3Lines.forEach(line => {
       ctx.fillText(line, contentX, currentY);
@@ -215,7 +215,7 @@ export async function generateMissionPoster({ lang = 'ar' } = {}) {
     // Paragraph 4
     ctx.font = 'bold 25px "Cairo", sans-serif';
     ctx.fillStyle = '#9FE3C6';
-    const p4 = 'فَاسْتَشْعِرْ مَا لَدَيْك، وَشَارِكْنَا نِعْمَةً لَمَسْتَ فَضْلَهَا لِتَكُونَ تذكرةً وَنُوراً لإخوانك.';
+    const p4 = 'فاستشعر ما لديك، وشاركنا نعمةً لمستَ فضلها لتكون تذكرةً ونوراً لإخوانك.';
     const p4Lines = wrapText(ctx, p4, contentWidth);
     p4Lines.forEach(line => {
       ctx.fillText(line, contentX, currentY);
@@ -387,7 +387,7 @@ export async function shareMissionPoster({ lang = 'ar' } = {}) {
   const { blob, filename } = await generateMissionPoster({ lang });
   const title = lang === 'ar' ? 'رسالة وهدف منصة نِعْمَة' : 'NEMAA Platform Mission';
   const text = lang === 'ar'
-    ? '«السَّلَامُ عَلَيْكُمْ.. نَحْنُ نَعِيشُ فِي كَنَفِ نِعَمٍ سَابِغَةٍ لَا تُحْصَى، لَكِنَّ طُولَ الِاعْتِيَادِ يُورِثُ الْغَفْلَةَ.. تَذَكَّرْ لِتَشْكُرْ» — منصة نِعْمَة'
+    ? '«السلام عليكم.. نحن نعيش في كنف نِعَمٍ سابغة لا تُحصى، لكن طول الاعتياد يورث الغفلة.. تَذَكَّرْ لِتَشْكُرْ» — منصة نِعْمَة'
     : '«NEMAA Platform — Remember to give thanks»';
 
   if (navigator.share && blob && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
@@ -408,7 +408,7 @@ export async function shareMissionPoster({ lang = 'ar' } = {}) {
   await downloadMissionPoster({ lang });
   try {
     await navigator.clipboard.writeText(`${text}\nhttps://ahmedmootx-sys.github.io/NEMAA/`);
-  } catch {}
+  } catch { }
   return false;
 }
 

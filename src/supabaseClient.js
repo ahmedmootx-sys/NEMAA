@@ -462,6 +462,24 @@ export function subscribeToLiveBlessingDeletions(onBlessingDeleted) {
 }
 
 /**
+ * Get or generate a persistent anonymous device identifier for this client.
+ * Allows delivering admin replies/inquiries to reports without requiring login.
+ */
+export function getReporterDeviceId() {
+  if (typeof window === 'undefined') return 'rep_device_ssr';
+  try {
+    let devId = localStorage.getItem('nemaa_reporter_device_id');
+    if (!devId) {
+      devId = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9);
+      localStorage.setItem('nemaa_reporter_device_id', devId);
+    }
+    return devId;
+  } catch {
+    return 'rep_device_fallback';
+  }
+}
+
+/**
  * Send an administrative notification/message to a blessing author
  */
 export async function adminSendAuthorNotification({ 
@@ -525,14 +543,80 @@ export async function adminSendAuthorNotification({
 }
 
 /**
- * Fetch notifications sent to this user (filtered by their published blessings, historical submissions, or author name)
+ * Send an administrative inquiry to a user who reported a blessing
+ */
+export async function adminSendReporterInquiry({ 
+  reportId = '', 
+  blessingTitle = '', 
+  reporterDeviceId = '', 
+  message = '', 
+  adminEmail = '' 
+}) {
+  try {
+    const cleanTitle = (blessingTitle || '').trim();
+    const cleanMsg = (message || '').trim();
+    if (!cleanMsg) throw new Error('الرجاء كتابة نص الاستفسار للمُبلّغ');
+
+    const notifId = `inq_${Date.now()}_${simpleHash(cleanMsg + (reportId || ''))}`;
+    const notifData = {
+      message: cleanMsg,
+      actionType: 'reporter_inquiry',
+      adminEmail: adminEmail || 'إدارة منصة نِعْمَة',
+      reportId: String(reportId || ''),
+      blessingTitle: cleanTitle,
+      reporterDeviceId: (reporterDeviceId || '').trim(),
+      timestamp: Date.now()
+    };
+
+    const payload = {
+      id: notifId,
+      blessing_title: cleanTitle,
+      reason: 'admin_reporter_inquiry',
+      notes: JSON.stringify(notifData),
+      status: 'unread',
+      created_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase.from('reports').insert([payload]).select();
+    if (error) {
+      console.warn('adminSendReporterInquiry supabase error:', error);
+      // Local storage fallback for reporter inquiry
+      try {
+        const local = JSON.parse(localStorage.getItem('nemaa_local_reporter_inquiries') || '[]');
+        local.unshift(payload);
+        localStorage.setItem('nemaa_local_reporter_inquiries', JSON.stringify(local.slice(0, 50)));
+      } catch {}
+    }
+
+    // Broadcast in real-time
+    try {
+      const channel = getPraisesBroadcastChannel();
+      await channel.send({
+        type: 'broadcast',
+        event: 'admin_reporter_inquiry',
+        payload: {
+          id: notifId,
+          ...notifData
+        }
+      });
+    } catch {}
+
+    return { success: true, data: data ? data[0] : payload };
+  } catch (err) {
+    console.warn('adminSendReporterInquiry error:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Fetch notifications sent to this user (filtered by their published blessings, historical submissions, author name, or reporter device ID)
  */
 export async function fetchAuthorNotifications(userBlessingsList = [], authorName = '') {
   try {
     const { data, error } = await supabase
       .from('reports')
       .select('*')
-      .eq('reason', 'admin_author_notification')
+      .in('reason', ['admin_author_notification', 'admin_reporter_inquiry'])
       .order('created_at', { ascending: false });
 
     if (error || !Array.isArray(data)) {
@@ -591,7 +675,9 @@ export async function fetchAuthorNotifications(userBlessingsList = [], authorNam
       }
     } catch {}
 
+    const myDeviceId = getReporterDeviceId();
     const notifications = [];
+
     for (const r of data) {
       let parsed = {};
       try {
@@ -600,6 +686,27 @@ export async function fetchAuthorNotifications(userBlessingsList = [], authorNam
         parsed = { message: r.notes || '' };
       }
 
+      // 1. Check if this is an Admin Inquiry to this device's report
+      if (r.reason === 'admin_reporter_inquiry') {
+        const targetDeviceId = parsed.reporterDeviceId || '';
+        if (targetDeviceId && targetDeviceId === myDeviceId) {
+          notifications.push({
+            id: r.id,
+            type: 'reporter_inquiry',
+            actionType: 'reporter_inquiry',
+            blessingTitle: r.blessing_title || parsed.blessingTitle || 'نعمة أبلغت عنها',
+            blessingId: r.blessing_id || parsed.blessingId || '',
+            message: parsed.message || '',
+            adminEmail: parsed.adminEmail || 'إدارة منصة نِعْمَة',
+            authorName: 'المُبلّغ',
+            timestamp: parsed.timestamp || new Date(r.created_at).getTime(),
+            status: r.status || 'unread'
+          });
+        }
+        continue;
+      }
+
+      // 2. Author notification checks
       const notifTitle = (r.blessing_title || parsed.blessingTitle || '').trim().toLowerCase();
       const notifNormTitle = normalizeText(r.blessing_title || parsed.blessingTitle || '');
       const notifId = String(r.blessing_id || parsed.blessingId || '').toLowerCase();
@@ -618,6 +725,7 @@ export async function fetchAuthorNotifications(userBlessingsList = [], authorNam
       if (idMatch || titleMatch || authorMatch) {
         notifications.push({
           id: r.id,
+          type: 'author_notification',
           blessingTitle: r.blessing_title || parsed.blessingTitle || 'نعمة منشورة',
           blessingId: r.blessing_id || parsed.blessingId || '',
           message: parsed.message || '',
@@ -646,6 +754,23 @@ export function subscribeToAuthorNotifications(onNotificationReceived) {
     channel.on('broadcast', { event: 'admin_author_notification' }, (event) => {
       if (event && event.payload && typeof onNotificationReceived === 'function') {
         onNotificationReceived(event.payload);
+      }
+    });
+    channel.on('broadcast', { event: 'admin_reporter_inquiry' }, (event) => {
+      if (event && event.payload && typeof onNotificationReceived === 'function') {
+        const myDevId = getReporterDeviceId();
+        if (event.payload.reporterDeviceId === myDevId) {
+          onNotificationReceived({
+            id: event.payload.id,
+            type: 'reporter_inquiry',
+            actionType: 'reporter_inquiry',
+            blessingTitle: event.payload.blessingTitle,
+            message: event.payload.message,
+            adminEmail: event.payload.adminEmail,
+            timestamp: event.payload.timestamp || Date.now(),
+            status: 'unread'
+          });
+        }
       }
     });
     return () => {};
@@ -728,8 +853,8 @@ export async function incrementBlessingPraises(blessingId, blessingTitle = '', c
 }
 
 /**
- * Record a blessing as permanently deleted by admin in Supabase
- * (Syncs across all devices so built-in and shared blessings vanish globally)
+ * Record a blessing as deleted by admin in Supabase (with full recovery archive)
+ * Syncs across all devices while preserving full data for effortless restoration
  */
 export async function recordAdminDeletedBlessing(blessingItem, adminEmail = '') {
   try {
@@ -738,12 +863,37 @@ export async function recordAdminDeletedBlessing(blessingItem, adminEmail = '') 
     const title = isObj ? (blessingItem.title || '').trim() : '';
     const recordId = rawId || `del_${simpleHash(title)}_${Date.now()}`;
 
+    // Full serializable payload for 100% loss-free restore
+    const fullData = isObj ? {
+      title: blessingItem.title,
+      reflection: blessingItem.reflection,
+      author: blessingItem.author,
+      proof: blessingItem.proof,
+      proofSource: blessingItem.proofSource || blessingItem.proof_source,
+      category: blessingItem.category,
+      categoryName: blessingItem.categoryName,
+      tags: blessingItem.tags
+    } : { title: rawId };
+
     const payload = {
       id: recordId,
       blessing_title: title || rawId,
-      deleted_by: adminEmail || 'admin',
+      deleted_by: adminEmail ? `${adminEmail}:::${JSON.stringify(fullData)}` : JSON.stringify(fullData),
       created_at: new Date().toISOString()
     };
+
+    // Store in localStorage archive for resilient local backup
+    try {
+      const localArchive = JSON.parse(localStorage.getItem('nemaa_admin_archived_deleted_blessings') || '[]');
+      localArchive.unshift({
+        id: recordId,
+        blessing_title: title || rawId,
+        deleted_by: adminEmail || 'admin',
+        full_data: fullData,
+        created_at: new Date().toISOString()
+      });
+      localStorage.setItem('nemaa_admin_archived_deleted_blessings', JSON.stringify(localArchive.slice(0, 100)));
+    } catch {}
 
     const { data, error } = await supabase
       .from('admin_deleted_blessings')
@@ -765,22 +915,157 @@ export async function recordAdminDeletedBlessing(blessingItem, adminEmail = '') 
 }
 
 /**
- * Fetch all blessings permanently deleted by admin from Supabase
+ * Fetch all blessings archived/deleted by admin from Supabase & local cache
  */
 export async function fetchAdminDeletedBlessings() {
   try {
+    let remoteList = [];
     const { data, error } = await supabase
       .from('admin_deleted_blessings')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (!error && Array.isArray(data)) {
-      return data;
+      remoteList = data;
     }
-    return [];
+
+    // Merge with local archive for full data hydration
+    let localArchive = [];
+    try {
+      localArchive = JSON.parse(localStorage.getItem('nemaa_admin_archived_deleted_blessings') || '[]');
+    } catch {}
+
+    const localMap = new Map();
+    localArchive.forEach(item => {
+      if (item && item.id) localMap.set(item.id, item);
+      if (item && item.blessing_title) localMap.set(item.blessing_title, item);
+    });
+
+    const parsedList = remoteList.map(item => {
+      let fullData = null;
+      let adminEmail = item.deleted_by || 'admin';
+      if (item.deleted_by && item.deleted_by.includes('{')) {
+        try {
+          if (item.deleted_by.includes(':::')) {
+            const parts = item.deleted_by.split(':::');
+            adminEmail = parts[0];
+            fullData = JSON.parse(parts[1]);
+          } else {
+            fullData = JSON.parse(item.deleted_by);
+          }
+        } catch {}
+      }
+
+      const localMatch = localMap.get(item.id) || localMap.get(item.blessing_title);
+      if (!fullData && localMatch?.full_data) {
+        fullData = localMatch.full_data;
+      }
+
+      return {
+        ...item,
+        admin_email: adminEmail,
+        full_data: fullData
+      };
+    });
+
+    // Also include any local-only archived items that are not in remoteList
+    const existingTitles = new Set(parsedList.map(p => p.blessing_title));
+    localArchive.forEach(loc => {
+      if (!existingTitles.has(loc.blessing_title)) {
+        parsedList.push({
+          ...loc,
+          admin_email: loc.deleted_by || 'admin'
+        });
+      }
+    });
+
+    return parsedList;
   } catch (err) {
     console.warn('Failed to fetch admin deleted blessings:', err);
-    return [];
+    return JSON.parse(localStorage.getItem('nemaa_admin_archived_deleted_blessings') || '[]');
+  }
+}
+
+/**
+ * Restore an archived blessing back to the published community feed
+ */
+export async function restoreAdminDeletedBlessing(deletedItem) {
+  try {
+    if (!deletedItem) return { success: false, error: 'No blessing item provided' };
+
+    let full = deletedItem.full_data;
+    if (!full && deletedItem.deleted_by && deletedItem.deleted_by.includes('{')) {
+      try {
+        const jsonStr = deletedItem.deleted_by.includes(':::')
+          ? deletedItem.deleted_by.split(':::')[1]
+          : deletedItem.deleted_by;
+        full = JSON.parse(jsonStr);
+      } catch {}
+    }
+
+    const title = full?.title || deletedItem.blessing_title || '';
+    const reflection = full?.reflection || 'نعمة مستعادة من أرشيف المنصة.';
+    const author = full?.author || '';
+    const proof = full?.proof || '';
+    const proofSource = full?.proofSource || full?.proof_source || '';
+
+    // 1. Re-publish to blessings table
+    const pubRes = await publishSharedBlessing({
+      title,
+      reflection,
+      author,
+      proof,
+      proofSource
+    });
+
+    // 2. Remove from admin_deleted_blessings
+    await supabase
+      .from('admin_deleted_blessings')
+      .delete()
+      .or(`id.eq.${deletedItem.id},blessing_title.eq.${deletedItem.blessing_title}`);
+
+    // Clean up from local archive
+    try {
+      const localArchive = JSON.parse(localStorage.getItem('nemaa_admin_archived_deleted_blessings') || '[]');
+      const filtered = localArchive.filter(i => i.id !== deletedItem.id && i.blessing_title !== deletedItem.blessing_title);
+      localStorage.setItem('nemaa_admin_archived_deleted_blessings', JSON.stringify(filtered));
+    } catch {}
+
+    // 3. Broadcast restoration across all clients
+    if (pubRes.data) {
+      broadcastBlessingUpdate({ updated: pubRes.data }).catch(() => {});
+    }
+
+    return { success: true, data: pubRes.data };
+  } catch (err) {
+    console.warn('Failed to restore admin deleted blessing:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Permanently purge a blessing from the admin deleted archive
+ */
+export async function permanentlyDeleteArchivedBlessing(deletedItem) {
+  try {
+    const id = deletedItem.id;
+    const title = deletedItem.blessing_title;
+
+    await supabase
+      .from('admin_deleted_blessings')
+      .delete()
+      .or(`id.eq.${id},blessing_title.eq.${title}`);
+
+    try {
+      const localArchive = JSON.parse(localStorage.getItem('nemaa_admin_archived_deleted_blessings') || '[]');
+      const filtered = localArchive.filter(i => i.id !== id && i.blessing_title !== title);
+      localStorage.setItem('nemaa_admin_archived_deleted_blessings', JSON.stringify(filtered));
+    } catch {}
+
+    return { success: true };
+  } catch (err) {
+    console.warn('Failed to permanently delete archived blessing:', err);
+    return { success: false, error: err };
   }
 }
 
@@ -820,13 +1105,22 @@ export function subscribeToAdminDeletedBlessings(onDeleted, onRestored) {
 /**
  * Submit a report for an inappropriate or erroneous blessing
  */
-export async function submitBlessingReport({ blessingId, blessingTitle, reason, notes }) {
+export async function submitBlessingReport({ blessingId, blessingTitle, reason, notes, reporterDeviceId }) {
+  const devId = reporterDeviceId || getReporterDeviceId();
+  const cleanNotes = (notes || '').trim();
+  
+  // Package note & reporter device ID
+  const structuredNotes = JSON.stringify({
+    note: cleanNotes,
+    reporterDeviceId: devId
+  });
+
   const reportObj = {
     id: `rep_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     blessing_id: String(blessingId || ''),
     blessing_title: (blessingTitle || '').trim(),
     reason: (reason || 'محتوى غير لائق').trim(),
-    notes: (notes || '').trim(),
+    notes: structuredNotes,
     created_at: new Date().toISOString(),
     status: 'pending'
   };
@@ -876,7 +1170,11 @@ export async function submitBlessingReport({ blessingId, blessingTitle, reason, 
   // 3. Persist in localStorage cache as fallback / local history
   try {
     const cached = JSON.parse(localStorage.getItem('nemaa_reports_cache') || '[]');
-    cached.unshift(reportObj);
+    cached.unshift({
+      ...reportObj,
+      rawNote: cleanNotes,
+      reporterDeviceId: devId
+    });
     localStorage.setItem('nemaa_reports_cache', JSON.stringify(cached));
   } catch {}
 
@@ -911,16 +1209,34 @@ export async function fetchBlessingReports() {
     });
   } catch {}
 
-  // Filter OUT suggestions, complaints, praise sync records, and admin author notifications
-  return reports.filter(r => {
-    if (!r) return false;
-    if (r.reason === 'praise_sync') return false;
-    if (r.reason === 'admin_author_notification') return false;
-    if (r.reason === 'admin_global_broadcast') return false;
-    const isFeedback = (r.reason === 'اقتراح وتطوير' || r.reason === 'شكوى أو مشكلة' ||
-      (r.blessing_title && (r.blessing_title.startsWith('[اقتراح]') || r.blessing_title.startsWith('[شكوى]'))));
-    return !isFeedback;
-  });
+  // Filter OUT suggestions, complaints, praise sync records, admin author notifications, and admin reporter inquiries
+  return reports
+    .filter(r => {
+      if (!r) return false;
+      if (r.reason === 'praise_sync') return false;
+      if (r.reason === 'admin_author_notification') return false;
+      if (r.reason === 'admin_reporter_inquiry') return false;
+      if (r.reason === 'admin_global_broadcast') return false;
+      const isFeedback = (r.reason === 'اقتراح وتطوير' || r.reason === 'شكوى أو مشكلة' ||
+        (r.blessing_title && (r.blessing_title.startsWith('[اقتراح]') || r.blessing_title.startsWith('[شكوى]'))));
+      return !isFeedback;
+    })
+    .map(r => {
+      let cleanNote = r.notes || '';
+      let reporterDeviceId = r.reporterDeviceId || '';
+      if (cleanNote.startsWith('{') && cleanNote.includes('reporterDeviceId')) {
+        try {
+          const parsed = JSON.parse(cleanNote);
+          cleanNote = parsed.note || '';
+          reporterDeviceId = parsed.reporterDeviceId || '';
+        } catch {}
+      }
+      return {
+        ...r,
+        notes: cleanNote,
+        reporterDeviceId
+      };
+    });
 }
 
 /**

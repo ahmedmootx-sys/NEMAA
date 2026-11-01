@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Flag, AlertTriangle, CheckCircle2, Send, ShieldAlert } from 'lucide-react';
-import { submitBlessingReport } from '../supabaseClient';
+import { submitBlessingReport, getReporterDeviceId } from '../supabaseClient';
 
 export default function ReportModal({ isOpen, onClose, blessing, lang = 'ar' }) {
   const [reason, setReason] = useState('inappropriate');
@@ -28,7 +28,8 @@ export default function ReportModal({ isOpen, onClose, blessing, lang = 'ar' }) 
         blessingId: blessing.id,
         blessingTitle: blessing.title,
         reason: selectedReasonLabel,
-        notes: notes.trim()
+        notes: notes.trim(),
+        reporterDeviceId: getReporterDeviceId()
       });
       setIsSubmitted(true);
       setTimeout(() => {

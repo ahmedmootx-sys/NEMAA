@@ -279,15 +279,15 @@ export async function renderBlessingCard(blessing, options = {}) {
 
     const proofFontFamily = blessing.proofType === 'quran' ? '"Amiri Quran", "Amiri", serif' : '"Amiri", serif';
 
-    // Iterative fit test to guarantee ZERO overlap and readable font size
-    for (let attempt = 0; attempt < 5; attempt++) {
-      titleFontSize = Math.round(baseTitleSize * scale);
-      titleLineHeight = Math.round(baseTitleLH * scale);
-      refFontSize = Math.round(baseRefSize * scale);
-      refLineHeight = Math.round(baseRefLH * scale);
-      proofFontSize = Math.round(baseProofSize * scale);
-      proofLineHeight = Math.round(baseProofLH * scale);
-      proofSourceFontSize = Math.max(13, Math.round((isSquare ? 14 : 22) * scale));
+    // Iterative fit test to guarantee ZERO overflow and responsive scaling
+    for (let attempt = 0; attempt < 12; attempt++) {
+      titleFontSize = Math.max(isSquare ? 20 : 26, Math.round(baseTitleSize * scale));
+      titleLineHeight = Math.round(titleFontSize * (isSquare ? 1.4 : 1.5));
+      refFontSize = Math.max(isSquare ? 15 : 18, Math.round(baseRefSize * scale));
+      refLineHeight = Math.round(refFontSize * (isSquare ? 1.55 : 1.7));
+      proofFontSize = Math.max(isSquare ? 13 : 16, Math.round(baseProofSize * scale));
+      proofLineHeight = Math.round(proofFontSize * 1.5);
+      proofSourceFontSize = Math.max(11, Math.round((isSquare ? 14 : 20) * scale));
 
       ctx.font = `bold ${titleFontSize}px "Cairo", -apple-system, sans-serif`;
       titleLines = splitTextIntoLines(ctx, titleText, textMaxWidth);
@@ -301,20 +301,26 @@ export async function renderBlessingCard(blessing, options = {}) {
         proofLines = splitTextIntoLines(ctx, proofText, textMaxWidth - (isSquare ? 60 : 120));
       }
 
-      gapTitleRef = Math.round((isSquare ? 20 : 40) * scale);
-      gapRefProof = Math.round((isSquare ? 14 : 40) * scale);
-      boxPaddingTop = Math.round((isSquare ? 14 : 32) * scale);
-      boxPaddingBottom = Math.round((isSquare ? 12 : 28) * scale);
+      gapTitleRef = Math.max(10, Math.round((isSquare ? 18 : 36) * scale));
+      gapRefProof = Math.max(10, Math.round((isSquare ? 12 : 32) * scale));
+      boxPaddingTop = Math.max(10, Math.round((isSquare ? 12 : 28) * scale));
+      boxPaddingBottom = Math.max(8, Math.round((isSquare ? 10 : 24) * scale));
       const hasSource = Boolean(blessing.proofSource);
-      sourceSpace = hasSource ? Math.round((isSquare ? 22 : 40) * scale) : 0;
+      sourceSpace = hasSource ? Math.round((isSquare ? 20 : 36) * scale) : 0;
       boxHeight = proofLines.length > 0 ? (boxPaddingTop + (proofLines.length * proofLineHeight) + sourceSpace + boxPaddingBottom) : 0;
 
-      const totalRequiredH = (titleLines.length * titleLineHeight) + gapTitleRef + (refLines.length * refLineHeight) + (boxHeight > 0 ? (gapRefProof + boxHeight) : 0);
+      // Scholar citation space
+      const hasScholar = Boolean(blessing.author || blessing.source);
+      const scholarAuthorFontSize = Math.max(13, Math.round((isSquare ? 17 : 24) * scale));
+      const scholarSourceFontSize = Math.max(11, Math.round((isSquare ? 13 : 18) * scale));
+      const scholarSpace = hasScholar ? (Math.round((isSquare ? 12 : 24) * scale) + scholarAuthorFontSize + (blessing.source ? scholarSourceFontSize + 4 : 0)) : 0;
 
-      if (totalRequiredH <= availableHeight || scale <= 0.72) {
+      const totalRequiredH = (titleLines.length * titleLineHeight) + gapTitleRef + (refLines.length * refLineHeight) + (boxHeight > 0 ? (gapRefProof + boxHeight) : 0) + scholarSpace;
+
+      if (totalRequiredH <= availableHeight || scale <= 0.45) {
         break;
       }
-      scale = Math.max(0.72, (availableHeight / totalRequiredH) * 0.95);
+      scale = Math.max(0.42, (availableHeight / totalRequiredH) * 0.96);
     }
 
     // Starting Y coordinates
@@ -373,6 +379,30 @@ export async function renderBlessingCard(blessing, options = {}) {
         ctx.font = `${proofSourceFontSize}px "Cairo", sans-serif`;
         ctx.fillStyle = theme.proofSource;
         ctx.fillText(`— ${blessing.proofSource}`, width / 2, proofCurrentY);
+      }
+    }
+
+    // Render Scholar Author and Source Citation if present
+    if (blessing.author || blessing.source) {
+      currentY += Math.max(8, Math.round((isSquare ? 14 : 26) * scale));
+      if (blessing.author) {
+        const scholarAuthorFontSize = Math.max(13, Math.round((isSquare ? 17 : 24) * scale));
+        ctx.font = `bold ${scholarAuthorFontSize}px "Cairo", "Aref Ruqaa", serif`;
+        ctx.fillStyle = theme.diamond || theme.title;
+        const authorPrefix = blessing.category === 'scholars_gems' ? '— درر الإمام ' : '— بقلم: ';
+        const authorSuffix = (blessing.category === 'scholars_gems' && !blessing.author.includes('رحمه الله')) ? ' رحمه الله' : '';
+        ctx.fillText(`${authorPrefix}${blessing.author}${authorSuffix}`, width / 2, currentY);
+        currentY += Math.round(scholarAuthorFontSize * 1.4);
+      }
+      if (blessing.source) {
+        const scholarSourceFontSize = Math.max(11, Math.round((isSquare ? 13 : 18) * scale));
+        ctx.font = `500 ${scholarSourceFontSize}px "Tajawal", "Cairo", sans-serif`;
+        ctx.fillStyle = theme.slogan || theme.proofSource;
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.fillText(`المصدر: ${blessing.source}`, width / 2, currentY);
+        ctx.restore();
+        currentY += Math.round(scholarSourceFontSize * 1.3);
       }
     }
 

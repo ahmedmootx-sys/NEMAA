@@ -4,8 +4,11 @@
  * استدلالات مباشرة غير متكلفة، وبلاغة روحية متنوعة دون تكرار في السرد
  */
 
+import scholarGems from './seed_blessings.json';
+
 export const CATEGORIES = [
   { id: 'all', label: 'كافة النعم', icon: null, count: 0 },
+  { id: 'scholars_gems', label: 'درر وتدبرات السلف', icon: null, count: 0 },
   { id: 'shared', label: 'نعم متشارَكة', icon: null, count: 0 },
   { id: 'spiritual', label: 'نعم إيمانية وروحية', icon: null, count: 0 },
   { id: 'hidden', label: 'نعم باطنة وخفية', icon: null, count: 0 },
@@ -27,7 +30,10 @@ export const GRATITUDE_PHRASES = [
   'الحمد لله الذي أطعمنا وسقانا وكفانا وآوانا',
 ];
 
+export const SCHOLARS_GEMS = scholarGems;
+
 export const INITIAL_BLESSINGS = [
+  ...scholarGems,
   {
     "id": 1,
     "title": "نعمة الهداية إلى الإسلام والإيمان",
