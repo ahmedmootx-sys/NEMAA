@@ -42,7 +42,12 @@ import {
   fetchLatestAdminBroadcast,
   subscribeToAdminGlobalBroadcasts,
   subscribeToLiveBlessingRestorations,
-  getReporterDeviceId
+  getReporterDeviceId,
+  supabase,
+  getCurrentUser,
+  syncUserCloudBlessings,
+  saveBlessingToUserCloud,
+  removeBlessingFromUserCloud
 } from './supabaseClient';
 import confetti from 'canvas-confetti';
 import { audioEngine } from './utils/audioEngine';
@@ -51,6 +56,7 @@ import AppGuideModal from './components/AppGuideModal';
 import ReportModal from './components/ReportModal';
 import AdminScreen from './components/AdminScreen';
 import SettingsScreen from './components/SettingsScreen';
+import AuthModal from './components/AuthModal';
 import AppMissionModal from './components/AppMissionModal';
 import FeedbackModal from './components/FeedbackModal';
 import UserNotificationsDrawer from './components/UserNotificationsDrawer';
@@ -96,6 +102,10 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMissionOpen, setIsMissionOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
+  // Persistent User Cloud Account & Authentication State (حساب المستخدم السحابي الدائم)
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   // Admin Global Broadcast Announcement State
   const [activeAdminBroadcast, setActiveAdminBroadcast] = useState(null);
@@ -231,6 +241,65 @@ export default function App() {
       localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(myPublishedBlessings));
     } catch {}
   }, [myPublishedBlessings]);
+
+  // Synchronize authenticated user and restore their cloud blessings
+  useEffect(() => {
+    let isMounted = true;
+    getCurrentUser().then(user => {
+      if (!isMounted) return;
+      setCurrentUser(user);
+      if (user) {
+        syncUserCloudBlessings(user).then(cloudBlessings => {
+          if (!isMounted || !Array.isArray(cloudBlessings) || cloudBlessings.length === 0) return;
+          setMyPublishedBlessings(prev => {
+            const map = new Map();
+            prev.forEach(b => map.set((b.title || b.id || '').trim().toLowerCase(), b));
+            cloudBlessings.forEach(b => {
+              const key = (b.title || b.id || '').trim().toLowerCase();
+              if (key && !map.has(key)) map.set(key, b);
+            });
+            return Array.from(map.values());
+          });
+        });
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
+      const user = session?.user || null;
+      setCurrentUser(user);
+      if (user) {
+        const cloudBlessings = await syncUserCloudBlessings(user);
+        if (isMounted && Array.isArray(cloudBlessings) && cloudBlessings.length > 0) {
+          setMyPublishedBlessings(prev => {
+            const map = new Map();
+            prev.forEach(b => map.set((b.title || b.id || '').trim().toLowerCase(), b));
+            cloudBlessings.forEach(b => {
+              const key = (b.title || b.id || '').trim().toLowerCase();
+              if (key && !map.has(key)) map.set(key, b);
+            });
+            return Array.from(map.values());
+          });
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setCurrentUser(null);
+      setToastMessage(currentLang === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully');
+      setTimeout(() => setToastMessage(''), 3500);
+    } catch (err) {
+      console.warn('Sign out error:', err);
+    }
+  };
 
   // User-Customized / Rephrased Blessings State (Edits to existing blessings)
   const [customizedBlessings, setCustomizedBlessings] = useState(() => {
@@ -1520,6 +1589,9 @@ export default function App() {
     setCurrentIndex(0);
     setAnimatingKey(Date.now());
 
+    // Save to user cloud account if authenticated
+    saveBlessingToUserCloud(fullBlessing).catch(() => {});
+
     // Show friendly success toast notification
     const successMsg = meta.successMessage || (currentLang === 'ar' ? 'تمت إضافة نعمتك بنجاح وستظهر للجميع!' : 'Your blessing has been published successfully!');
     setToastMessage(successMsg);
@@ -1581,6 +1653,9 @@ export default function App() {
     try {
       await deleteSharedBlessing(blessing);
     } catch {}
+
+    // 5. Remove from user cloud account if authenticated
+    removeBlessingFromUserCloud(blessing.id, blessing.title).catch(() => {});
 
     setToastMessage(currentLang === 'ar' ? 'تم حذف النعمة بنجاح' : 'Blessing deleted successfully');
     setTimeout(() => setToastMessage(''), 3500);
@@ -2332,6 +2407,22 @@ export default function App() {
           setToastMessage(msg);
           setTimeout(() => setToastMessage(''), 5500);
         }}
+        currentUser={currentUser}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onSignOut={handleSignOut}
+      />
+
+      {/* Permanent User Identity & Cloud Sync Modal (تسجيل الدخول وربط النعم بالسحاب) */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onAuthSuccess={(user) => {
+          setCurrentUser(user);
+          setIsAuthOpen(false);
+          setToastMessage(currentLang === 'ar' ? 'أهلاً بك! تم حفظ نعمك وربطها بحسابك الدائم ✨' : 'Welcome! Your published blessings are now permanently synced.');
+          setTimeout(() => setToastMessage(''), 4500);
+        }}
+        lang={currentLang}
       />
 
       {/* App Mission & Purpose Modal (رسالة وهدف منصة نِعْمَة) */}

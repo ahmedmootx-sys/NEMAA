@@ -116,7 +116,7 @@ export async function getPushSubscriptionState() {
  * CRITICAL: Runs Notification.requestPermission() synchronously during the user click event
  * to satisfy browser user gesture requirements, then non-blockingly registers OneSignal & ServiceWorker.
  */
-export async function requestPushPermission(preferredTimeSlot = 'morning', customTime = '') {
+export async function requestPushPermission(preferredTimeSlot = 'random', customTime = '') {
   // 1. Check iOS requirement: must be installed to Home Screen (PWA mode)
   if (isIOS() && !isStandalone()) {
     return {
@@ -198,6 +198,9 @@ async function syncOneSignalOptIn(timeSlot, customTime = '') {
       const applyTags = (user) => {
         if (user?.addTag) {
           user.addTag('reminder_time', timeSlot);
+          if (timeSlot === 'random') {
+            user.addTag('reminder_window', 'daytime_9_to_20');
+          }
           if (customTime) {
             user.addTag('reminder_custom_time', customTime);
           }
@@ -269,6 +272,9 @@ export async function updateReminderTimeSlot(timeSlot, customTime = '') {
     const applyTags = async (user) => {
       if (user?.addTag) {
         await user.addTag('reminder_time', timeSlot);
+        if (timeSlot === 'random') {
+          await user.addTag('reminder_window', 'daytime_9_to_20');
+        }
         if (customTime) {
           await user.addTag('reminder_custom_time', customTime);
         }

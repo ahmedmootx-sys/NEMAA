@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -12,11 +12,14 @@ import {
   Wand2, 
   Check, 
   ChevronDown, 
-  ChevronUp 
+  ChevronUp,
+  CheckCheck,
+  RotateCcw
 } from 'lucide-react';
 import { publishSharedBlessing } from '../supabaseClient';
 import { validateBlessingContent } from '../utils/contentValidator';
 import { BLESSING_INSPIRATIONS, enhanceReflectionDraft } from '../utils/blessingAssistant';
+import { proofreadBlessing } from '../utils/arabicSpellChecker';
 
 export default function AddBlessingModal({ 
   isOpen, 
@@ -24,14 +27,46 @@ export default function AddBlessingModal({
   onBlessingPublished,
   lang = 'ar' 
 }) {
-  const [title, setTitle] = useState('');
-  const [reflection, setReflection] = useState('');
-  const [author, setAuthor] = useState('');
-  const [proof, setProof] = useState('');
-  const [proofSource, setProofSource] = useState('');
-  const [showExtraFields, setShowExtraFields] = useState(false);
+  const [title, setTitle] = useState(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      return d.title || '';
+    } catch { return ''; }
+  });
+  const [reflection, setReflection] = useState(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      return d.reflection || '';
+    } catch { return ''; }
+  });
+  const [author, setAuthor] = useState(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      if (d.author) return d.author;
+      return localStorage.getItem('nemaa_author_name') || '';
+    } catch { return ''; }
+  });
+  const [proof, setProof] = useState(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      return d.proof || '';
+    } catch { return ''; }
+  });
+  const [proofSource, setProofSource] = useState(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      return d.proofSource || '';
+    } catch { return ''; }
+  });
+  const [showExtraFields, setShowExtraFields] = useState(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      return Boolean(d.proof || d.proofSource || d.showExtraFields);
+    } catch { return false; }
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [isSpellChecking, setIsSpellChecking] = useState(false);
 
   // Writing Assistant States
   const [showInspirations, setShowInspirations] = useState(false);
@@ -74,9 +109,68 @@ export default function AddBlessingModal({
         setShowExtraFields(true);
       }
       setIsEnhancing(false);
-      setAssistantNotice(lang === 'ar' ? '✨ تم إثراء وصياغة التدبّر واقتراح الاستدلال بنجاح!' : '✨ Reflection enhanced & quote suggested!');
+      setAssistantNotice(lang === 'ar' ? 'تم إثراء وصياغة التدبّر واقتراح الاستدلال بنجاح' : 'Reflection enhanced & quote suggested');
       setTimeout(() => setAssistantNotice(''), 3500);
     }, 450);
+  };
+
+  // Auto-save draft on every keystroke
+  useEffect(() => {
+    if (!title && !reflection && !proof && !proofSource) return;
+    try {
+      localStorage.setItem('nemaa_publish_draft', JSON.stringify({
+        title,
+        reflection,
+        author,
+        proof,
+        proofSource,
+        showExtraFields
+      }));
+    } catch {}
+  }, [title, reflection, author, proof, proofSource, showExtraFields]);
+
+  // Clear current draft
+  const handleClearDraft = () => {
+    setTitle('');
+    setReflection('');
+    setProof('');
+    setProofSource('');
+    try {
+      localStorage.removeItem('nemaa_publish_draft');
+    } catch {}
+    setAssistantNotice(lang === 'ar' ? 'تم تفريغ المسودة والبدء من جديد' : 'Draft cleared');
+    setTimeout(() => setAssistantNotice(''), 3000);
+  };
+
+  // Smart Arabic spell-check and proofreading
+  const handleSpellCheck = () => {
+    if (!title.trim() && !reflection.trim()) {
+      setError(lang === 'ar' ? 'يرجى كتابة عنوان أو نص النعمة أولاً لإجراء التدقيق الإملائي' : 'Please enter title or reflection first');
+      return;
+    }
+
+    setIsSpellChecking(true);
+    setError('');
+
+    const res = proofreadBlessing({ title, reflection });
+    setTitle(res.title);
+    setReflection(res.reflection);
+    setIsSpellChecking(false);
+
+    if (res.hasChanges) {
+      setAssistantNotice(
+        lang === 'ar' 
+          ? `تم التدقيق اللغوي وتصحيح ${res.changesCount} موضع بنجاح (همزات، تاء مربوطة، وضبط صياغة)` 
+          : `Proofreading complete: ${res.changesCount} corrections applied`
+      );
+    } else {
+      setAssistantNotice(
+        lang === 'ar' 
+          ? 'ما شاء الله! النص مدقق لغوياً وخالٍ من الأخطاء الإملائية' 
+          : 'Excellent! No spelling mistakes found'
+      );
+    }
+    setTimeout(() => setAssistantNotice(''), 4500);
   };
 
   const handleSubmit = async (e) => {
@@ -128,6 +222,7 @@ export default function AddBlessingModal({
         setProofSource('');
         setShowExtraFields(false);
         setError('');
+        try { localStorage.removeItem('nemaa_publish_draft'); } catch {}
         onClose();
       } else if (result.isRlsError) {
         const fallbackObj = {
@@ -156,6 +251,7 @@ export default function AddBlessingModal({
         setProof('');
         setProofSource('');
         setShowExtraFields(false);
+        try { localStorage.removeItem('nemaa_publish_draft'); } catch {}
         onClose();
       } else {
         const rawErr = result.error?.message || '';
@@ -319,6 +415,43 @@ export default function AddBlessingModal({
         </div>
 
         <form onSubmit={handleSubmit} className="publish-modal-form">
+          {/* Draft indicator if user has active text */}
+          {(title || reflection || proof) && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: 'rgba(212, 175, 55, 0.08)',
+              border: '1px solid rgba(212, 175, 55, 0.25)',
+              marginBottom: '10px',
+              fontSize: '11.5px',
+              color: 'var(--color-primary)'
+            }}>
+              <span>{lang === 'ar' ? 'يتم حفظ كتابتك تلقائياً حتى لا تضيع عند التنقل بين التطبيقات.' : 'Your draft is automatically saved as you write.'}</span>
+              <button
+                type="button"
+                onClick={handleClearDraft}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 4px'
+                }}
+                title={lang === 'ar' ? 'تفريغ المسودة' : 'Clear draft'}
+              >
+                <RotateCcw size={11} />
+                <span>{lang === 'ar' ? 'تفريغ' : 'Clear'}</span>
+              </button>
+            </div>
+          )}
+
           {/* Title */}
           <div className="form-group">
             <label className="form-label">
@@ -342,40 +475,67 @@ export default function AddBlessingModal({
 
           {/* Reflection */}
           <div className="form-group">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
               <label className="form-label" style={{ margin: 0 }}>
                 <span>{lang === 'ar' ? 'التدبّر واستشعار النعمة' : 'Reflection & Contemplation'}</span>
                 <span className="required-star">*</span>
               </label>
 
-              {/* Assistant Tool 2: Reflection Enhancer Button */}
-              <button
-                type="button"
-                onClick={handleEnhanceReflection}
-                disabled={isEnhancing || isSubmitting}
-                style={{
-                  background: 'linear-gradient(135deg, rgba(212,175,55,0.18) 0%, rgba(44,74,62,0.1) 100%)',
-                  border: '1px solid var(--color-gold)',
-                  borderRadius: 'var(--radius-full)',
-                  padding: '4px 10px',
-                  color: 'var(--color-primary)',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  cursor: isEnhancing ? 'wait' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-              >
-                <Wand2 size={13} color="var(--color-gold)" />
-                <span>{isEnhancing ? (lang === 'ar' ? 'جاري الصياغة...' : 'Enhancing...') : (lang === 'ar' ? '✨ إكمال وصياغة التدبّر' : '✨ Enhance with AI Assistant')}</span>
-              </button>
+              {/* Assistant Tools: Spell Checker & AI Enhancer */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={handleSpellCheck}
+                  disabled={isSpellChecking || isSubmitting || (!title.trim() && !reflection.trim())}
+                  title={lang === 'ar' ? 'تدقيق الهمزات والتاء المربوطة والأخطاء الإملائية' : 'Spell check and grammar proofreading'}
+                  style={{
+                    background: 'rgba(212, 175, 55, 0.12)',
+                    border: '1px solid var(--color-gold)',
+                    borderRadius: 'var(--radius-full)',
+                    padding: '4px 10px',
+                    color: 'var(--color-primary)',
+                    fontSize: '11.5px',
+                    fontWeight: '700',
+                    cursor: (isSpellChecking || (!title.trim() && !reflection.trim())) ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    opacity: (!title.trim() && !reflection.trim()) ? 0.6 : 1,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <CheckCheck size={13} color="var(--color-gold)" />
+                  <span>{isSpellChecking ? (lang === 'ar' ? 'جاري التدقيق...' : 'Checking...') : (lang === 'ar' ? 'تدقيق وتصحيح إملائي' : 'Proofread')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleEnhanceReflection}
+                  disabled={isEnhancing || isSubmitting}
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(212,175,55,0.18) 0%, rgba(44,74,62,0.1) 100%)',
+                    border: '1px solid var(--color-gold)',
+                    borderRadius: 'var(--radius-full)',
+                    padding: '4px 10px',
+                    color: 'var(--color-primary)',
+                    fontSize: '11.5px',
+                    fontWeight: '700',
+                    cursor: isEnhancing ? 'wait' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Wand2 size={13} color="var(--color-gold)" />
+                  <span>{isEnhancing ? (lang === 'ar' ? 'جاري الصياغة...' : 'Enhancing...') : (lang === 'ar' ? 'إكمال وصياغة التدبّر' : 'Enhance with AI')}</span>
+                </button>
+              </div>
             </div>
 
             <textarea
               className="form-textarea"
               style={{ minHeight: '120px' }}
-              placeholder={lang === 'ar' ? 'اكتب تأملك ومشاعرك حول هذه النعمة.. أو اضغط على «✨ إكمال وصياغة التدبّر» ليساعدك المساعد في كتابتها.' : 'Share your feelings, or tap Enhance to generate eloquent thoughts.'}
+              placeholder={lang === 'ar' ? 'اكتب تأملك ومشاعرك حول هذه النعمة.. أو اضغط على «تدقيق وتصحيح إملائي» لمراجعة كتابتك قبل النشر.' : 'Share your feelings, or tap Proofread to fix spelling mistakes before publishing.'}
               value={reflection}
               onChange={e => setReflection(e.target.value)}
               disabled={isSubmitting}

@@ -311,20 +311,31 @@ export async function renderBlessingCard(blessing, options = {}) {
 
       // Scholar citation space
       const hasScholar = Boolean(blessing.author || blessing.source);
-      const scholarAuthorFontSize = Math.max(13, Math.round((isSquare ? 17 : 24) * scale));
+      const scholarAuthorFontSize = Math.max(12, Math.round((isSquare ? 16 : 24) * scale));
       const scholarSourceFontSize = Math.max(11, Math.round((isSquare ? 13 : 18) * scale));
-      const scholarSpace = hasScholar ? (Math.round((isSquare ? 12 : 24) * scale) + scholarAuthorFontSize + (blessing.source ? scholarSourceFontSize + 4 : 0)) : 0;
+      const gapAfterBox = (boxHeight > 0 && hasScholar) ? Math.max(10, Math.round((isSquare ? 14 : 26) * scale)) : 0;
+      const scholarSpace = hasScholar ? (gapAfterBox + scholarAuthorFontSize + (blessing.source ? (scholarSourceFontSize + 6) : 0)) : 0;
 
       const totalRequiredH = (titleLines.length * titleLineHeight) + gapTitleRef + (refLines.length * refLineHeight) + (boxHeight > 0 ? (gapRefProof + boxHeight) : 0) + scholarSpace;
 
-      if (totalRequiredH <= availableHeight || scale <= 0.45) {
+      if (totalRequiredH <= availableHeight || scale <= 0.38) {
         break;
       }
-      scale = Math.max(0.42, (availableHeight / totalRequiredH) * 0.96);
+      scale = Math.max(0.35, (availableHeight / totalRequiredH) * 0.94);
     }
 
+    // Vertically balance content inside usable area
+    const scholarAuthorFontSize = Math.max(12, Math.round((isSquare ? 16 : 24) * scale));
+    const scholarSourceFontSize = Math.max(11, Math.round((isSquare ? 13 : 18) * scale));
+    const hasScholar = Boolean(blessing.author || blessing.source);
+    const gapAfterBox = (boxHeight > 0 && hasScholar) ? Math.max(10, Math.round((isSquare ? 14 : 26) * scale)) : 0;
+    const scholarSpace = hasScholar ? (gapAfterBox + scholarAuthorFontSize + (blessing.source ? (scholarSourceFontSize + 6) : 0)) : 0;
+    const totalContentH = (titleLines.length * titleLineHeight) + gapTitleRef + (refLines.length * refLineHeight) + (boxHeight > 0 ? (gapRefProof + boxHeight) : 0) + scholarSpace;
+    const unusedVerticalSpace = Math.max(0, availableHeight - totalContentH);
+    const verticalOffset = Math.round(unusedVerticalSpace * (isSquare ? 0.35 : 0.38));
+
     // Starting Y coordinates
-    let currentY = startY;
+    let currentY = startY + verticalOffset;
 
     // Render Title Lines
     ctx.font = `bold ${titleFontSize}px "Cairo", -apple-system, sans-serif`;
@@ -380,13 +391,15 @@ export async function renderBlessingCard(blessing, options = {}) {
         ctx.fillStyle = theme.proofSource;
         ctx.fillText(`— ${blessing.proofSource}`, width / 2, proofCurrentY);
       }
+
+      // Crucial: advance currentY beyond the proof box so following text never collides!
+      currentY = boxY + boxHeight;
     }
 
     // Render Scholar Author and Source Citation if present
     if (blessing.author || blessing.source) {
-      currentY += Math.max(8, Math.round((isSquare ? 14 : 26) * scale));
+      currentY += (boxHeight > 0 ? gapAfterBox : Math.max(10, Math.round((isSquare ? 14 : 26) * scale)));
       if (blessing.author) {
-        const scholarAuthorFontSize = Math.max(13, Math.round((isSquare ? 17 : 24) * scale));
         ctx.font = `bold ${scholarAuthorFontSize}px "Cairo", "Aref Ruqaa", serif`;
         ctx.fillStyle = theme.diamond || theme.title;
         const authorPrefix = blessing.category === 'scholars_gems' ? '— درر الإمام ' : '— بقلم: ';
@@ -395,7 +408,6 @@ export async function renderBlessingCard(blessing, options = {}) {
         currentY += Math.round(scholarAuthorFontSize * 1.4);
       }
       if (blessing.source) {
-        const scholarSourceFontSize = Math.max(11, Math.round((isSquare ? 13 : 18) * scale));
         ctx.font = `500 ${scholarSourceFontSize}px "Tajawal", "Cairo", sans-serif`;
         ctx.fillStyle = theme.slogan || theme.proofSource;
         ctx.save();

@@ -145,10 +145,109 @@ export async function publishSharedBlessing({ title, reflection, author, proof, 
   }
 
   const savedRecord = Array.isArray(data) && data[0] ? data[0] : { ...extendedPayload, id: Date.now() };
+  const formatted = formatSharedBlessing(savedRecord, Date.now());
+
+  // Automatically preserve blessing in user's cloud account if authenticated
+  saveBlessingToUserCloud(formatted).catch(() => {});
+
   return {
     success: true,
-    data: formatSharedBlessing(savedRecord, Date.now())
+    data: formatted
   };
+}
+
+/**
+ * Get current authenticated user safely
+ */
+export async function getCurrentUser() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sync and restore published blessings from the user's Supabase cloud account
+ */
+export async function syncUserCloudBlessings(user) {
+  if (!user) return [];
+  try {
+    const cloudBlessings = user.user_metadata?.my_blessings || [];
+    if (Array.isArray(cloudBlessings) && cloudBlessings.length > 0) {
+      return cloudBlessings.map(b => formatSharedBlessing(b));
+    }
+  } catch (err) {
+    console.warn('syncUserCloudBlessings notice:', err);
+  }
+  return [];
+}
+
+/**
+ * Save a newly published or edited blessing to the user's persistent Supabase cloud account
+ */
+export async function saveBlessingToUserCloud(blessing) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const existing = Array.isArray(user.user_metadata?.my_blessings)
+      ? user.user_metadata.my_blessings
+      : [];
+
+    const cleanTitle = (blessing.title || '').trim();
+    const updated = [
+      {
+        id: blessing.id || `cl_${Date.now()}`,
+        title: cleanTitle,
+        reflection: (blessing.reflection || '').trim(),
+        author: (blessing.author || '').trim(),
+        proof: (blessing.proof || '').trim(),
+        proofSource: (blessing.proofSource || blessing.proof_source || '').trim(),
+        category: blessing.category || 'shared',
+        categoryName: blessing.categoryName || 'نعم متشارَكة',
+        isShared: true,
+        timestamp: Date.now()
+      },
+      ...existing.filter(b => (b.title || '').trim() !== cleanTitle)
+    ];
+
+    await supabase.auth.updateUser({
+      data: { my_blessings: updated }
+    });
+    return true;
+  } catch (err) {
+    console.warn('saveBlessingToUserCloud notice:', err);
+    return false;
+  }
+}
+
+/**
+ * Remove a blessing from user's persistent cloud account
+ */
+export async function removeBlessingFromUserCloud(blessingOrTitle) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const existing = Array.isArray(user.user_metadata?.my_blessings)
+      ? user.user_metadata.my_blessings
+      : [];
+
+    const targetTitle = typeof blessingOrTitle === 'string'
+      ? blessingOrTitle.trim()
+      : (blessingOrTitle?.title || '').trim();
+
+    const filtered = existing.filter(b => (b.title || '').trim() !== targetTitle);
+    await supabase.auth.updateUser({
+      data: { my_blessings: filtered }
+    });
+    return true;
+  } catch (err) {
+    console.warn('removeBlessingFromUserCloud notice:', err);
+    return false;
+  }
 }
 
 /**
@@ -216,6 +315,7 @@ export async function deleteSharedBlessing(blessingOrId) {
 
     // Broadcast deletion in real time to all connected devices immediately
     broadcastBlessingDeletion({ title, id: blessingId }).catch(() => {});
+    removeBlessingFromUserCloud(title || blessingOrId).catch(() => {});
 
     if (success) {
       return { success: true, deletedCount };
