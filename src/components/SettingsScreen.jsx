@@ -21,7 +21,11 @@ import {
   Check,
   Bell,
   Clock,
-  Send
+  Send,
+  Sunrise,
+  Sunset,
+  SunMedium,
+  Sliders
 } from 'lucide-react';
 import {
   getPushSubscriptionState,
@@ -67,9 +71,28 @@ export default function SettingsScreen({
   const [preferredSlot, setPreferredSlot] = useState(() => {
     return localStorage.getItem('nemaa_push_preferred_slot') || 'morning';
   });
+  const [customTime, setCustomTime] = useState(() => {
+    return localStorage.getItem('nemaa_push_custom_time') || '09:00';
+  });
   const [isPushLoading, setIsPushLoading] = useState(false);
   const [isTestingPush, setIsTestingPush] = useState(false);
   const [localToast, setLocalToast] = useState('');
+
+  const formatArabicTime = (timeStr) => {
+    if (!timeStr) return '';
+    const [hStr, mStr] = timeStr.split(':');
+    let h = parseInt(hStr, 10);
+    const m = mStr || '00';
+    if (isNaN(h)) return timeStr;
+    const isPM = h >= 12;
+    const period = isPM ? (isRtl ? 'مساءً' : 'PM') : (isRtl ? 'صباحاً' : 'AM');
+    if (h === 0) {
+      h = 12;
+    } else if (h > 12) {
+      h -= 12;
+    }
+    return `${h}:${m} ${period}`;
+  };
 
   const triggerToast = (msg) => {
     setLocalToast(msg);
@@ -113,10 +136,10 @@ export default function SettingsScreen({
 
     setIsPushLoading(true);
     try {
-      const res = await requestPushPermission(preferredSlot);
+      const res = await requestPushPermission(preferredSlot, preferredSlot === 'custom' ? customTime : '');
       if (res.success) {
         setIsPushActive(true);
-        triggerToast(isRtl ? 'تم تفعيل رسائل الطمأنينة بنجاح ✨ ستصلك نفحات الحمد اليومية' : 'Daily reminders enabled successfully ✨');
+        triggerToast(isRtl ? 'تم تفعيل رسائل الطمأنينة بنجاح — ستصلك نفحات الحمد اليومية' : 'Daily reminders enabled successfully');
       } else if (res.reason === 'ios_pwa_required') {
         triggerToast(res.message || 'لتفعيل الإشعارات على آيفون، يرجى إضافة التطبيق للشاشة الرئيسية أولاً');
       } else if (res.reason === 'permission_denied') {
@@ -131,16 +154,19 @@ export default function SettingsScreen({
     }
   };
 
-  const handleSelectTimeSlot = async (slot) => {
+  const handleSelectTimeSlot = async (slot, customVal) => {
     setPreferredSlot(slot);
-    await updateReminderTimeSlot(slot);
-    triggerToast(
-      slot === 'morning' 
-        ? (isRtl ? 'تم ضبط التذكير: أذكار الصباح (~ 8:00 ص) ✨' : 'Morning reminder selected')
-        : slot === 'afternoon'
-        ? (isRtl ? 'تم ضبط التذكير: بعد العصر (~ 4:30 م) ✨' : 'Afternoon reminder selected')
-        : (isRtl ? 'تم ضبط التذكير: المساء قبل النوم (~ 10:00 م) ✨' : 'Evening reminder selected')
-    );
+    const targetCustom = customVal || customTime;
+    await updateReminderTimeSlot(slot, slot === 'custom' ? targetCustom : '');
+
+    let label = '';
+    if (slot === 'morning') label = isRtl ? 'أذكار الصباح (08:00 ص)' : 'Morning (8:00 AM)';
+    else if (slot === 'noon') label = isRtl ? 'الضحى والظهيرة (12:30 م)' : 'Forenoon (12:30 PM)';
+    else if (slot === 'afternoon') label = isRtl ? 'بعد العصر (04:30 م)' : 'Afternoon (4:30 PM)';
+    else if (slot === 'evening') label = isRtl ? 'المساء قبل النوم (10:00 م)' : 'Evening (10:00 PM)';
+    else if (slot === 'custom') label = isRtl ? `وقت مخصص (${formatArabicTime(targetCustom)})` : `Custom time (${targetCustom})`;
+
+    triggerToast(isRtl ? `تم ضبط التذكير: ${label}` : `Reminder time set to: ${label}`);
   };
 
   const handleSendTest = async () => {
@@ -149,7 +175,7 @@ export default function SettingsScreen({
     try {
       const ok = await sendLocalTestNotification(currentLang);
       if (ok) {
-        triggerToast(isRtl ? 'تم إرسال إشعار تجريبي بنجاح إلى جهازك 🔔' : 'Test notification sent successfully 🔔');
+        triggerToast(isRtl ? 'تم إرسال إشعار تجريبي بنجاح إلى جهازك' : 'Test notification sent successfully');
       } else {
         if (!isPushActive) {
           triggerToast(isRtl ? 'يرجى تفعيل رسائل الطمأنينة أولاً لتلقي الإشعارات' : 'Please enable daily reminders first');
@@ -611,7 +637,7 @@ export default function SettingsScreen({
                   </div>
                   <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.4' }}>
                     {isPushActive 
-                      ? (isRtl ? 'مُفعّلة — ستصلك نفحات وتأملات تذكيرية هادئة حتى والتطبيق مغلق ✨' : 'Active — daily peaceful blessings enabled ✨')
+                      ? (isRtl ? 'مُفعّلة — ستصلك نفحات وتأملات تذكيرية هادئة حتى والتطبيق مغلق' : 'Active — daily peaceful blessings enabled')
                       : (isRtl ? 'تلقّ نفحات تدبرية هادئة لترطيب اللسان بالحمد في أوقاتك المفضلة' : 'Receive peaceful daily reminders to give thanks')}
                   </div>
                 </div>
@@ -663,7 +689,7 @@ export default function SettingsScreen({
             {isPushActive && (
               <div style={{
                 padding: '16px 18px',
-                background: 'rgba(212, 175, 55, 0.04)',
+                background: 'rgba(212, 175, 55, 0.03)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '14px'
@@ -673,53 +699,171 @@ export default function SettingsScreen({
                     fontSize: '13px',
                     fontWeight: '700',
                     color: 'var(--text-heading)',
-                    marginBottom: '8px',
+                    marginBottom: '10px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px'
+                    justifyContent: 'space-between'
                   }}>
-                    <Clock size={14} color="var(--color-gold)" />
-                    <span>{isRtl ? 'الوقت المفضّل لوصول النعمة والتذكير:' : 'Preferred Reminder Time:'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={14} color="var(--color-gold)" />
+                      <span>{isRtl ? 'الوقت المفضّل لوصول النعمة والتذكير:' : 'Preferred Reminder Time:'}</span>
+                    </div>
+                    {preferredSlot === 'custom' && (
+                      <span style={{
+                        fontSize: '11.5px',
+                        fontWeight: '700',
+                        color: 'var(--color-gold)',
+                        background: 'rgba(212,175,55,0.12)',
+                        padding: '2px 8px',
+                        borderRadius: '6px'
+                      }}>
+                        {formatArabicTime(customTime)}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Time Slot Chips */}
+                  {/* Symmetrical 2x2 Grid for Presets */}
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                    gap: '8px'
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '10px'
                   }}>
                     {[
-                      { id: 'morning', label: isRtl ? 'أذكار الصباح' : 'Morning', sub: isRtl ? '~ 8:00 ص' : '8:00 AM' },
-                      { id: 'afternoon', label: isRtl ? 'بعد العصر' : 'Afternoon', sub: isRtl ? '~ 4:30 م' : '4:30 PM' },
-                      { id: 'evening', label: isRtl ? 'المساء قبل النوم' : 'Evening', sub: isRtl ? '~ 10:00 م' : '10:00 PM' }
+                      { id: 'morning', label: isRtl ? 'أذكار الصباح' : 'Morning', sub: isRtl ? '08:00 ص' : '08:00 AM', Icon: Sunrise },
+                      { id: 'noon', label: isRtl ? 'الضحى والظهيرة' : 'Forenoon', sub: isRtl ? '12:30 م' : '12:30 PM', Icon: SunMedium },
+                      { id: 'afternoon', label: isRtl ? 'بعد العصر' : 'Afternoon', sub: isRtl ? '04:30 م' : '04:30 PM', Icon: Sunset },
+                      { id: 'evening', label: isRtl ? 'المساء قبل النوم' : 'Evening', sub: isRtl ? '10:00 م' : '10:00 PM', Icon: Moon }
                     ].map(slot => {
                       const isSelected = preferredSlot === slot.id;
+                      const SlotIcon = slot.Icon;
                       return (
                         <button
                           key={slot.id}
                           type="button"
                           onClick={() => handleSelectTimeSlot(slot.id)}
                           style={{
-                            padding: '10px 12px',
-                            borderRadius: '12px',
+                            padding: '12px 10px',
+                            borderRadius: '14px',
                             border: isSelected ? '1.5px solid var(--color-gold)' : '1px solid var(--border-subtle)',
                             background: isSelected ? 'var(--surface-card)' : 'var(--surface-sunken)',
                             color: isSelected ? 'var(--color-primary)' : 'var(--text-main)',
-                            fontWeight: isSelected ? '800' : '500',
+                            fontWeight: isSelected ? '800' : '600',
                             cursor: 'pointer',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            gap: '2px',
+                            justifyContent: 'center',
+                            gap: '4px',
                             boxShadow: isSelected ? '0 3px 12px rgba(212,175,55,0.15)' : 'none',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            position: 'relative'
                           }}
                         >
-                          <span style={{ fontSize: '13px' }}>{slot.label}</span>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: isSelected ? 'var(--color-gold)' : 'var(--text-muted)'
+                          }}>
+                            <SlotIcon size={16} />
+                            <span style={{ fontSize: '13px', fontWeight: isSelected ? '800' : '700' }}>{slot.label}</span>
+                          </div>
                           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{slot.sub}</span>
+                          {isSelected && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '7px',
+                              left: isRtl ? '8px' : 'auto',
+                              right: isRtl ? 'auto' : '8px',
+                              color: 'var(--color-gold)',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}>
+                              <Check size={13} />
+                            </div>
+                          )}
                         </button>
                       );
                     })}
+                  </div>
+
+                  {/* Custom Exact Time Picker (حرية اختيار أي وقت) */}
+                  <div
+                    onClick={() => handleSelectTimeSlot('custom', customTime)}
+                    style={{
+                      marginTop: '10px',
+                      padding: '12px 14px',
+                      borderRadius: '14px',
+                      border: preferredSlot === 'custom' ? '1.5px solid var(--color-gold)' : '1px solid var(--border-subtle)',
+                      background: preferredSlot === 'custom' ? 'var(--surface-card)' : 'var(--surface-sunken)',
+                      boxShadow: preferredSlot === 'custom' ? '0 3px 12px rgba(212,175,55,0.14)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '10px',
+                        background: preferredSlot === 'custom' ? 'rgba(212,175,55,0.18)' : 'var(--surface-sunken)',
+                        color: preferredSlot === 'custom' ? 'var(--color-gold)' : 'var(--text-muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Sliders size={16} />
+                      </div>
+                      <div>
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: preferredSlot === 'custom' ? '800' : '700',
+                          color: preferredSlot === 'custom' ? 'var(--color-primary)' : 'var(--text-heading)'
+                        }}>
+                          {isRtl ? 'وقت مخصص من اختيارك' : 'Custom Specific Time'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {preferredSlot === 'custom'
+                            ? (isRtl ? `مضبوط على: ${formatArabicTime(customTime)}` : `Set to: ${customTime}`)
+                            : (isRtl ? 'حدد أي ساعة ودقيقة تناسبك خلال اليوم' : 'Pick any exact minute of the day')}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <input
+                        type="time"
+                        value={customTime}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          setCustomTime(val);
+                          handleSelectTimeSlot('custom', val);
+                        }}
+                        aria-label={isRtl ? 'اختر الوقت المخصص' : 'Choose custom time'}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-subtle)',
+                          background: 'var(--surface-card)',
+                          color: 'var(--text-heading)',
+                          fontFamily: 'inherit',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          outline: 'none',
+                          direction: 'ltr'
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -728,7 +872,7 @@ export default function SettingsScreen({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingTop: '6px',
+                  paddingTop: '8px',
                   borderTop: '1px dashed var(--border-subtle)'
                 }}>
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -754,7 +898,7 @@ export default function SettingsScreen({
                     }}
                   >
                     <Send size={13} color="var(--color-gold)" />
-                    <span>{isRtl ? (isTestingPush ? 'جاري الإرسال...' : 'إرسال إشعار تجريبي 🔔') : 'Send Test Notification'}</span>
+                    <span>{isRtl ? (isTestingPush ? 'جاري الإرسال...' : 'إرسال إشعار تجريبي') : (isTestingPush ? 'Sending...' : 'Send Test Notification')}</span>
                   </button>
                 </div>
               </div>

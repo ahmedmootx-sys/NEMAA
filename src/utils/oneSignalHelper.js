@@ -131,7 +131,7 @@ export async function requestPushPermission(preferredTimeSlot = 'morning') {
     return {
       success: false,
       reason: 'permission_denied',
-      message: 'تم حظر الإشعارات سابقاً في إعدادات المتصفح. يُرجى تفعيلها من إعدادات الموقع أو الضغط على رمز القفل 🔒 بجانب الرابط'
+      message: 'تم حظر الإشعارات سابقاً في إعدادات المتصفح. يُرجى تفعيلها من إعدادات الموقع أو الضغط على رمز القفل بجانب الرابط'
     };
   }
 
@@ -158,6 +158,9 @@ export async function requestPushPermission(preferredTimeSlot = 'morning') {
   // 5. Permission is GRANTED! Record state locally immediately
   localStorage.setItem('nemaa_push_notifications_enabled', 'true');
   localStorage.setItem('nemaa_push_preferred_slot', preferredTimeSlot);
+  if (customTime) {
+    localStorage.setItem('nemaa_push_custom_time', customTime);
+  }
 
   // 6. Ensure ServiceWorker registration for push background processing
   try {
@@ -167,7 +170,7 @@ export async function requestPushPermission(preferredTimeSlot = 'morning') {
   } catch {}
 
   // 7. Non-blockingly sync with OneSignal if available (with strict timeout)
-  syncOneSignalOptIn(preferredTimeSlot).catch(() => {});
+  syncOneSignalOptIn(preferredTimeSlot, customTime).catch(() => {});
 
   return {
     success: true,
@@ -178,18 +181,25 @@ export async function requestPushPermission(preferredTimeSlot = 'morning') {
 /**
  * Non-blocking helper to notify OneSignal of optIn and tags
  */
-async function syncOneSignalOptIn(timeSlot) {
+async function syncOneSignalOptIn(timeSlot, customTime = '') {
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(false), 2000); // 2s max safety timeout
 
     try {
+      const applyTags = (user) => {
+        if (user?.addTag) {
+          user.addTag('reminder_time', timeSlot);
+          if (customTime) {
+            user.addTag('reminder_custom_time', customTime);
+          }
+          user.addTag('language', 'ar');
+        }
+      };
+
       // Direct instance
       if (window.OneSignal?.User?.PushSubscription) {
         window.OneSignal.User.PushSubscription.optIn().catch(() => {});
-        if (window.OneSignal.User.addTag) {
-          window.OneSignal.User.addTag('reminder_time', timeSlot);
-          window.OneSignal.User.addTag('language', 'ar');
-        }
+        applyTags(window.OneSignal.User);
         clearTimeout(timer);
         resolve(true);
         return;
@@ -202,10 +212,7 @@ async function syncOneSignalOptIn(timeSlot) {
           if (OneSignal.User?.PushSubscription?.optIn) {
             await OneSignal.User.PushSubscription.optIn();
           }
-          if (OneSignal.User?.addTag) {
-            await OneSignal.User.addTag('reminder_time', timeSlot);
-            await OneSignal.User.addTag('language', 'ar');
-          }
+          applyTags(OneSignal.User);
         } catch {}
         clearTimeout(timer);
         resolve(true);
@@ -243,18 +250,28 @@ export async function unsubscribePush() {
 /**
  * Update user's preferred daily reminder slot tag
  */
-export async function updateReminderTimeSlot(timeSlot) {
+export async function updateReminderTimeSlot(timeSlot, customTime = '') {
   localStorage.setItem('nemaa_push_preferred_slot', timeSlot);
+  if (customTime) {
+    localStorage.setItem('nemaa_push_custom_time', customTime);
+  }
 
   try {
-    if (window.OneSignal?.User?.addTag) {
-      await window.OneSignal.User.addTag('reminder_time', timeSlot);
+    const applyTags = async (user) => {
+      if (user?.addTag) {
+        await user.addTag('reminder_time', timeSlot);
+        if (customTime) {
+          await user.addTag('reminder_custom_time', customTime);
+        }
+      }
+    };
+
+    if (window.OneSignal?.User) {
+      await applyTags(window.OneSignal.User);
     } else if (window.OneSignalDeferred) {
       window.OneSignalDeferred.push(async function(OneSignal) {
         try {
-          if (OneSignal.User?.addTag) {
-            await OneSignal.User.addTag('reminder_time', timeSlot);
-          }
+          await applyTags(OneSignal.User);
         } catch {}
       });
     }
@@ -271,7 +288,7 @@ export async function sendLocalTestNotification(lang = 'ar') {
     return false;
   }
 
-  const title = lang === 'ar' ? 'نِعْمَة | تَذَكَّرْ لِتَشْكُرْ ✨' : 'Nemaa | Remember to Give Thanks ✨';
+  const title = lang === 'ar' ? 'نِعْمَة | تَذَكَّرْ لِتَشْكُرْ' : 'Nemaa | Remember to Give Thanks';
   const body = lang === 'ar' 
     ? '«وَإِن تَعُدُّوا نِعْمَةَ اللَّهِ لَا تُحْصُوهَا» — رطّب لسانك الآن بذكر الله وحمده.'
     : '"And if you should count the favor of Allah, you could not enumerate them." — Remember Allah and praise Him.';
