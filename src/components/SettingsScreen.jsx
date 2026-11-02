@@ -160,10 +160,10 @@ export default function SettingsScreen({
     await updateReminderTimeSlot(slot, slot === 'custom' ? targetCustom : '');
 
     let label = '';
-    if (slot === 'morning') label = isRtl ? 'أذكار الصباح (08:00 ص)' : 'Morning (8:00 AM)';
-    else if (slot === 'noon') label = isRtl ? 'الضحى والظهيرة (12:30 م)' : 'Forenoon (12:30 PM)';
-    else if (slot === 'afternoon') label = isRtl ? 'بعد العصر (04:30 م)' : 'Afternoon (4:30 PM)';
-    else if (slot === 'evening') label = isRtl ? 'المساء قبل النوم (10:00 م)' : 'Evening (10:00 PM)';
+    if (slot === 'morning') label = isRtl ? 'الصباح الباكر (08:00 ص)' : 'Early Morning (8:00 AM)';
+    else if (slot === 'midday') label = isRtl ? 'منتصف النهار (01:00 م)' : 'Midday (1:00 PM)';
+    else if (slot === 'evening') label = isRtl ? 'أول المساء (06:00 م)' : 'Early Evening (6:00 PM)';
+    else if (slot === 'night') label = isRtl ? 'قبل النوم (10:30 م)' : 'Before Bed (10:30 PM)';
     else if (slot === 'custom') label = isRtl ? `وقت مخصص (${formatArabicTime(targetCustom)})` : `Custom time (${targetCustom})`;
 
     triggerToast(isRtl ? `تم ضبط التذكير: ${label}` : `Reminder time set to: ${label}`);
@@ -705,12 +705,12 @@ export default function SettingsScreen({
                     justifyContent: 'space-between'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Clock size={14} color="var(--color-gold)" />
+                      <Clock size={12} color="var(--color-gold)" />
                       <span>{isRtl ? 'الوقت المفضّل لوصول النعمة والتذكير:' : 'Preferred Reminder Time:'}</span>
                     </div>
                     {preferredSlot === 'custom' && (
                       <span style={{
-                        fontSize: '11.5px',
+                        fontSize: '11px',
                         fontWeight: '700',
                         color: 'var(--color-gold)',
                         background: 'rgba(212,175,55,0.12)',
@@ -726,13 +726,13 @@ export default function SettingsScreen({
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(2, 1fr)',
-                    gap: '10px'
+                    gap: '8px'
                   }}>
                     {[
-                      { id: 'morning', label: isRtl ? 'أذكار الصباح' : 'Morning', sub: isRtl ? '08:00 ص' : '08:00 AM', Icon: Sunrise },
-                      { id: 'noon', label: isRtl ? 'الضحى والظهيرة' : 'Forenoon', sub: isRtl ? '12:30 م' : '12:30 PM', Icon: SunMedium },
-                      { id: 'afternoon', label: isRtl ? 'بعد العصر' : 'Afternoon', sub: isRtl ? '04:30 م' : '04:30 PM', Icon: Sunset },
-                      { id: 'evening', label: isRtl ? 'المساء قبل النوم' : 'Evening', sub: isRtl ? '10:00 م' : '10:00 PM', Icon: Moon }
+                      { id: 'morning', label: isRtl ? 'الصباح الباكر' : 'Early Morning', sub: isRtl ? '08:00 ص' : '08:00 AM', Icon: Sunrise },
+                      { id: 'midday', label: isRtl ? 'منتصف النهار' : 'Midday', sub: isRtl ? '01:00 م' : '01:00 PM', Icon: SunMedium },
+                      { id: 'evening', label: isRtl ? 'أول المساء' : 'Early Evening', sub: isRtl ? '06:00 م' : '06:00 PM', Icon: Sunset },
+                      { id: 'night', label: isRtl ? 'قبل النوم' : 'Before Bed', sub: isRtl ? '10:30 م' : '10:30 PM', Icon: Moon }
                     ].map(slot => {
                       const isSelected = preferredSlot === slot.id;
                       const SlotIcon = slot.Icon;
@@ -742,8 +742,8 @@ export default function SettingsScreen({
                           type="button"
                           onClick={() => handleSelectTimeSlot(slot.id)}
                           style={{
-                            padding: '12px 10px',
-                            borderRadius: '14px',
+                            padding: '10px 8px',
+                            borderRadius: '12px',
                             border: isSelected ? '1.5px solid var(--color-gold)' : '1px solid var(--border-subtle)',
                             background: isSelected ? 'var(--surface-card)' : 'var(--surface-sunken)',
                             color: isSelected ? 'var(--color-primary)' : 'var(--text-main)',
@@ -753,7 +753,7 @@ export default function SettingsScreen({
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '4px',
+                            gap: '3px',
                             boxShadow: isSelected ? '0 3px 12px rgba(212,175,55,0.15)' : 'none',
                             transition: 'all 0.2s ease',
                             position: 'relative'
@@ -762,24 +762,24 @@ export default function SettingsScreen({
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
+                            gap: '5px',
                             color: isSelected ? 'var(--color-gold)' : 'var(--text-muted)'
                           }}>
-                            <SlotIcon size={16} />
-                            <span style={{ fontSize: '13px', fontWeight: isSelected ? '800' : '700' }}>{slot.label}</span>
+                            <SlotIcon size={13} />
+                            <span style={{ fontSize: '12.5px', fontWeight: isSelected ? '800' : '700' }}>{slot.label}</span>
                           </div>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{slot.sub}</span>
+                          <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>{slot.sub}</span>
                           {isSelected && (
                             <div style={{
                               position: 'absolute',
-                              top: '7px',
-                              left: isRtl ? '8px' : 'auto',
-                              right: isRtl ? 'auto' : '8px',
+                              top: '6px',
+                              left: isRtl ? '6px' : 'auto',
+                              right: isRtl ? 'auto' : '6px',
                               color: 'var(--color-gold)',
                               display: 'flex',
                               alignItems: 'center'
                             }}>
-                              <Check size={13} />
+                              <Check size={11} />
                             </div>
                           )}
                         </button>
@@ -791,25 +791,25 @@ export default function SettingsScreen({
                   <div
                     onClick={() => handleSelectTimeSlot('custom', customTime)}
                     style={{
-                      marginTop: '10px',
-                      padding: '12px 14px',
-                      borderRadius: '14px',
+                      marginTop: '8px',
+                      padding: '10px 12px',
+                      borderRadius: '12px',
                       border: preferredSlot === 'custom' ? '1.5px solid var(--color-gold)' : '1px solid var(--border-subtle)',
                       background: preferredSlot === 'custom' ? 'var(--surface-card)' : 'var(--surface-sunken)',
                       boxShadow: preferredSlot === 'custom' ? '0 3px 12px rgba(212,175,55,0.14)' : 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      gap: '12px',
+                      gap: '10px',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{
-                        width: '34px',
-                        height: '34px',
-                        borderRadius: '10px',
+                        width: '26px',
+                        height: '26px',
+                        borderRadius: '8px',
                         background: preferredSlot === 'custom' ? 'rgba(212,175,55,0.18)' : 'var(--surface-sunken)',
                         color: preferredSlot === 'custom' ? 'var(--color-gold)' : 'var(--text-muted)',
                         display: 'flex',
@@ -817,17 +817,17 @@ export default function SettingsScreen({
                         justifyContent: 'center',
                         flexShrink: 0
                       }}>
-                        <Sliders size={16} />
+                        <Sliders size={13} />
                       </div>
                       <div>
                         <div style={{
-                          fontSize: '13px',
+                          fontSize: '12.5px',
                           fontWeight: preferredSlot === 'custom' ? '800' : '700',
                           color: preferredSlot === 'custom' ? 'var(--color-primary)' : 'var(--text-heading)'
                         }}>
                           {isRtl ? 'وقت مخصص من اختيارك' : 'Custom Specific Time'}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
                           {preferredSlot === 'custom'
                             ? (isRtl ? `مضبوط على: ${formatArabicTime(customTime)}` : `Set to: ${customTime}`)
                             : (isRtl ? 'حدد أي ساعة ودقيقة تناسبك خلال اليوم' : 'Pick any exact minute of the day')}
@@ -850,13 +850,13 @@ export default function SettingsScreen({
                         }}
                         aria-label={isRtl ? 'اختر الوقت المخصص' : 'Choose custom time'}
                         style={{
-                          padding: '6px 10px',
+                          padding: '5px 8px',
                           borderRadius: '8px',
                           border: '1px solid var(--border-subtle)',
                           background: 'var(--surface-card)',
                           color: 'var(--text-heading)',
                           fontFamily: 'inherit',
-                          fontSize: '13px',
+                          fontSize: '12px',
                           fontWeight: '700',
                           cursor: 'pointer',
                           outline: 'none',
@@ -883,7 +883,7 @@ export default function SettingsScreen({
                     onClick={handleSendTest}
                     disabled={isTestingPush}
                     style={{
-                      padding: '7px 14px',
+                      padding: '6px 12px',
                       borderRadius: '10px',
                       border: '1px solid var(--color-gold)',
                       background: 'rgba(212,175,55,0.1)',
@@ -893,11 +893,11 @@ export default function SettingsScreen({
                       cursor: isTestingPush ? 'wait' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
+                      gap: '5px',
                       transition: 'all 0.2s'
                     }}
                   >
-                    <Send size={13} color="var(--color-gold)" />
+                    <Send size={12} color="var(--color-gold)" />
                     <span>{isRtl ? (isTestingPush ? 'جاري الإرسال...' : 'إرسال إشعار تجريبي') : (isTestingPush ? 'Sending...' : 'Send Test Notification')}</span>
                   </button>
                 </div>

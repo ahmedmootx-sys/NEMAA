@@ -78,7 +78,8 @@ export async function getPushSubscriptionState() {
   }
 
   const nativePerm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
-  const localSaved = localStorage.getItem('nemaa_push_notifications_enabled') === 'true';
+  const localSavedRaw = localStorage.getItem('nemaa_push_notifications_enabled');
+  const localSaved = localSavedRaw === 'true';
 
   // Immediate synchronous status
   const baseState = {
@@ -87,6 +88,14 @@ export async function getPushSubscriptionState() {
     permission: nativePerm,
     isIOSNonStandalone: ios && !standalone
   };
+
+  // If explicitly disabled by user in settings, respect their choice
+  if (localSavedRaw === 'false') {
+    return {
+      ...baseState,
+      isSubscribed: false
+    };
+  }
 
   // If window.OneSignal is already loaded, read its state without blocking
   try {
@@ -107,7 +116,7 @@ export async function getPushSubscriptionState() {
  * CRITICAL: Runs Notification.requestPermission() synchronously during the user click event
  * to satisfy browser user gesture requirements, then non-blockingly registers OneSignal & ServiceWorker.
  */
-export async function requestPushPermission(preferredTimeSlot = 'morning') {
+export async function requestPushPermission(preferredTimeSlot = 'morning', customTime = '') {
   // 1. Check iOS requirement: must be installed to Home Screen (PWA mode)
   if (isIOS() && !isStandalone()) {
     return {
