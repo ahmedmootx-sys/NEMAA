@@ -1,5 +1,6 @@
 /**
  * OneSignal Web Push Helper for Nemaa (نِعْمَة)
+ * Robust, user-gesture compliant, and resilient against ad-blockers and deferred queues
  */
 
 export const ONESIGNAL_APP_ID = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ONESIGNAL_APP_ID)
@@ -26,7 +27,7 @@ export function isStandalone() {
 // Check if Push Notifications are supported by the current environment
 export function isPushSupported() {
   if (typeof window === 'undefined') return false;
-  return 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+  return 'Notification' in window && 'serviceWorker' in navigator;
 }
 
 /**
@@ -34,7 +35,7 @@ export function isPushSupported() {
  * Strictly NO automatic prompt on page load
  */
 export function initOneSignal() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !isPushSupported()) return;
 
   try {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -60,6 +61,7 @@ export function initOneSignal() {
 
 /**
  * Get current push notification subscription status
+ * Checks native browser permissions + local storage immediately, with non-blocking OneSignal check
  */
 export async function getPushSubscriptionState() {
   const supported = isPushSupported();
@@ -75,55 +77,38 @@ export async function getPushSubscriptionState() {
     };
   }
 
-  return new Promise((resolve) => {
-    try {
-      if (typeof window === 'undefined' || !window.OneSignalDeferred) {
-        const nativePerm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
-        resolve({
-          isSupported: true,
-          isSubscribed: nativePerm === 'granted',
-          permission: nativePerm,
-          isIOSNonStandalone: ios && !standalone
-        });
-        return;
-      }
+  const nativePerm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+  const localSaved = localStorage.getItem('nemaa_push_notifications_enabled') === 'true';
 
-      window.OneSignalDeferred.push(async function(OneSignal) {
-        try {
-          const isPushEnabled = OneSignal.User?.PushSubscription?.optedIn ?? false;
-          const perm = OneSignal.Notifications?.permission ? 'granted' : (Notification.permission || 'default');
-          resolve({
-            isSupported: true,
-            isSubscribed: Boolean(isPushEnabled),
-            permission: perm,
-            isIOSNonStandalone: ios && !standalone
-          });
-        } catch {
-          const nativePerm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
-          resolve({
-            isSupported: true,
-            isSubscribed: nativePerm === 'granted',
-            permission: nativePerm,
-            isIOSNonStandalone: ios && !standalone
-          });
-        }
-      });
-    } catch {
-      resolve({
-        isSupported: true,
-        isSubscribed: false,
-        permission: 'default',
-        isIOSNonStandalone: ios && !standalone
-      });
+  // Immediate synchronous status
+  const baseState = {
+    isSupported: true,
+    isSubscribed: nativePerm === 'granted' && localSaved,
+    permission: nativePerm,
+    isIOSNonStandalone: ios && !standalone
+  };
+
+  // If window.OneSignal is already loaded, read its state without blocking
+  try {
+    if (window.OneSignal?.User?.PushSubscription) {
+      const isPushEnabled = window.OneSignal.User.PushSubscription.optedIn ?? false;
+      return {
+        ...baseState,
+        isSubscribed: Boolean(isPushEnabled) || baseState.isSubscribed
+      };
     }
-  });
+  } catch {}
+
+  return baseState;
 }
 
 /**
  * Request Push Permission gracefully when user clicks toggle
+ * CRITICAL: Runs Notification.requestPermission() synchronously during the user click event
+ * to satisfy browser user gesture requirements, then non-blockingly registers OneSignal & ServiceWorker.
  */
 export async function requestPushPermission(preferredTimeSlot = 'morning') {
-  // Check iOS requirement first: must be installed to Home Screen
+  // 1. Check iOS requirement: must be installed to Home Screen (PWA mode)
   if (isIOS() && !isStandalone()) {
     return {
       success: false,
@@ -132,6 +117,7 @@ export async function requestPushPermission(preferredTimeSlot = 'morning') {
     };
   }
 
+  // 2. Check general browser support
   if (!isPushSupported()) {
     return {
       success: false,
@@ -140,58 +126,93 @@ export async function requestPushPermission(preferredTimeSlot = 'morning') {
     };
   }
 
-  return new Promise((resolve) => {
+  // 3. Check if already blocked in browser site settings
+  if (Notification.permission === 'denied') {
+    return {
+      success: false,
+      reason: 'permission_denied',
+      message: 'تم حظر الإشعارات سابقاً في إعدادات المتصفح. يُرجى تفعيلها من إعدادات الموقع أو الضغط على رمز القفل 🔒 بجانب الرابط'
+    };
+  }
+
+  // 4. Trigger native permission prompt directly within the click event gesture
+  let granted = Notification.permission === 'granted';
+
+  if (!granted) {
     try {
+      const result = await Notification.requestPermission();
+      granted = result === 'granted';
+    } catch (err) {
+      console.warn('Native Notification.requestPermission error:', err);
+    }
+  }
+
+  if (!granted) {
+    return {
+      success: false,
+      reason: 'permission_denied',
+      message: 'تم رفض إذن الإشعارات'
+    };
+  }
+
+  // 5. Permission is GRANTED! Record state locally immediately
+  localStorage.setItem('nemaa_push_notifications_enabled', 'true');
+  localStorage.setItem('nemaa_push_preferred_slot', preferredTimeSlot);
+
+  // 6. Ensure ServiceWorker registration for push background processing
+  try {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./OneSignalSDKWorker.js', { scope: './' }).catch(() => {});
+    }
+  } catch {}
+
+  // 7. Non-blockingly sync with OneSignal if available (with strict timeout)
+  syncOneSignalOptIn(preferredTimeSlot).catch(() => {});
+
+  return {
+    success: true,
+    permission: 'granted'
+  };
+}
+
+/**
+ * Non-blocking helper to notify OneSignal of optIn and tags
+ */
+async function syncOneSignalOptIn(timeSlot) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), 2000); // 2s max safety timeout
+
+    try {
+      // Direct instance
+      if (window.OneSignal?.User?.PushSubscription) {
+        window.OneSignal.User.PushSubscription.optIn().catch(() => {});
+        if (window.OneSignal.User.addTag) {
+          window.OneSignal.User.addTag('reminder_time', timeSlot);
+          window.OneSignal.User.addTag('language', 'ar');
+        }
+        clearTimeout(timer);
+        resolve(true);
+        return;
+      }
+
+      // Deferred queue
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       window.OneSignalDeferred.push(async function(OneSignal) {
         try {
-          // Request permission
-          if (OneSignal.Notifications?.requestPermission) {
-            await OneSignal.Notifications.requestPermission();
-          }
-
-          // Opt in push subscription
           if (OneSignal.User?.PushSubscription?.optIn) {
             await OneSignal.User.PushSubscription.optIn();
           }
-
-          // Tag preferred time slot (morning, afternoon, evening)
           if (OneSignal.User?.addTag) {
-            await OneSignal.User.addTag('reminder_time', preferredTimeSlot);
+            await OneSignal.User.addTag('reminder_time', timeSlot);
             await OneSignal.User.addTag('language', 'ar');
           }
-
-          const isGranted = (OneSignal.Notifications?.permission) || (Notification.permission === 'granted');
-          if (isGranted) {
-            localStorage.setItem('nemaa_push_notifications_enabled', 'true');
-            localStorage.setItem('nemaa_push_preferred_slot', preferredTimeSlot);
-            resolve({ success: true, permission: 'granted' });
-          } else {
-            resolve({
-              success: false,
-              reason: 'permission_denied',
-              message: 'تم رفض إذن الإشعارات من إعدادات المتصفح'
-            });
-          }
-        } catch (err) {
-          console.warn('[OneSignal] request permission error:', err);
-          // Native fallback
-          try {
-            const perm = await Notification.requestPermission();
-            if (perm === 'granted') {
-              localStorage.setItem('nemaa_push_notifications_enabled', 'true');
-              localStorage.setItem('nemaa_push_preferred_slot', preferredTimeSlot);
-              resolve({ success: true, permission: 'granted' });
-            } else {
-              resolve({ success: false, reason: 'permission_denied' });
-            }
-          } catch (e) {
-            resolve({ success: false, reason: 'error', error: e });
-          }
-        }
+        } catch {}
+        clearTimeout(timer);
+        resolve(true);
       });
-    } catch (err) {
-      resolve({ success: false, reason: 'error', error: err });
+    } catch {
+      clearTimeout(timer);
+      resolve(false);
     }
   });
 }
@@ -201,24 +222,22 @@ export async function requestPushPermission(preferredTimeSlot = 'morning') {
  */
 export async function unsubscribePush() {
   localStorage.setItem('nemaa_push_notifications_enabled', 'false');
-  return new Promise((resolve) => {
-    try {
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+  try {
+    if (window.OneSignal?.User?.PushSubscription?.optOut) {
+      await window.OneSignal.User.PushSubscription.optOut();
+    } else if (window.OneSignalDeferred) {
       window.OneSignalDeferred.push(async function(OneSignal) {
         try {
           if (OneSignal.User?.PushSubscription?.optOut) {
             await OneSignal.User.PushSubscription.optOut();
           }
-          resolve({ success: true });
-        } catch (err) {
-          console.warn('[OneSignal] optOut error:', err);
-          resolve({ success: true });
-        }
+        } catch {}
       });
-    } catch {
-      resolve({ success: true });
     }
-  });
+  } catch {}
+
+  return { success: true };
 }
 
 /**
@@ -226,23 +245,22 @@ export async function unsubscribePush() {
  */
 export async function updateReminderTimeSlot(timeSlot) {
   localStorage.setItem('nemaa_push_preferred_slot', timeSlot);
-  return new Promise((resolve) => {
-    try {
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+  try {
+    if (window.OneSignal?.User?.addTag) {
+      await window.OneSignal.User.addTag('reminder_time', timeSlot);
+    } else if (window.OneSignalDeferred) {
       window.OneSignalDeferred.push(async function(OneSignal) {
         try {
           if (OneSignal.User?.addTag) {
             await OneSignal.User.addTag('reminder_time', timeSlot);
           }
-          resolve(true);
-        } catch {
-          resolve(false);
-        }
+        } catch {}
       });
-    } catch {
-      resolve(false);
     }
-  });
+  } catch {}
+
+  return true;
 }
 
 /**

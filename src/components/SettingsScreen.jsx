@@ -120,9 +120,9 @@ export default function SettingsScreen({
       } else if (res.reason === 'ios_pwa_required') {
         triggerToast(res.message || 'لتفعيل الإشعارات على آيفون، يرجى إضافة التطبيق للشاشة الرئيسية أولاً');
       } else if (res.reason === 'permission_denied') {
-        triggerToast(isRtl ? 'تم رفض إذن الإشعارات من إعدادات المتصفح. يمكنك السماح بها من إعدادات الموقع' : 'Push permission was denied in browser settings');
+        triggerToast(res.message || (isRtl ? 'تم رفض إذن الإشعارات من إعدادات المتصفح. يمكنك السماح بها من إعدادات الموقع' : 'Push permission was denied in browser settings'));
       } else {
-        triggerToast(isRtl ? (res.message || 'تعذر تفعيل الإشعارات حالياً') : 'Could not enable notifications');
+        triggerToast(res.message || (isRtl ? 'تعذر تفعيل الإشعارات حالياً' : 'Could not enable notifications'));
       }
     } catch {
       triggerToast(isRtl ? 'حدث خطأ أثناء طلب الإذن' : 'Error requesting permission');
@@ -577,13 +577,18 @@ export default function SettingsScreen({
             overflow: 'hidden'
           }}>
             {/* Main Toggle Row */}
-            <div style={{
-              padding: '18px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottom: isPushActive ? '1px solid var(--border-subtle)' : 'none'
-            }}>
+            <div 
+              onClick={handleTogglePush}
+              style={{
+                padding: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: isPushActive ? '1px solid var(--border-subtle)' : 'none',
+                cursor: isPushLoading ? 'wait' : 'pointer',
+                userSelect: 'none'
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, paddingRight: isRtl ? 0 : '10px', paddingLeft: isRtl ? '10px' : 0 }}>
                 <div style={{
                   width: '42px',
@@ -617,7 +622,10 @@ export default function SettingsScreen({
                 type="button"
                 role="switch"
                 aria-checked={isPushActive}
-                onClick={handleTogglePush}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTogglePush();
+                }}
                 disabled={isPushLoading}
                 aria-label={isRtl ? 'تفعيل أو إيقاف رسائل الطمأنينة' : 'Toggle Daily Reminders'}
                 style={{
