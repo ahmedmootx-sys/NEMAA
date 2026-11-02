@@ -1,0 +1,26 @@
+name: NEMAA Daily Blessing Push Notification
+
+on:
+  schedule:
+    # Runs everyday at 06:00 UTC (09:00 AM Mecca/Cairo time)
+    - cron: '0 6 * * *'
+  # Allows triggering manually anytime from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  send-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Send Daily Blessing Push via OneSignal
+        env:
+          ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
+          ONESIGNAL_REST_API_KEY: ${{ secrets.ONESIGNAL_REST_API_KEY }}
+        run: node scripts/send-daily-push.mjs
