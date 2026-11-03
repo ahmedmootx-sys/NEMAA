@@ -27,8 +27,10 @@ import {
   Megaphone,
   Archive,
   RotateCcw,
-  HelpCircle
+  HelpCircle,
+  Bell
 } from 'lucide-react';
+import { ONESIGNAL_APP_ID } from '../utils/oneSignalHelper';
 import { 
   adminLogin, 
   adminLogout, 
@@ -113,6 +115,83 @@ export default function AdminScreen({
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [isPublishingBroadcast, setIsPublishingBroadcast] = useState(false);
   const [activeBroadcastInfo, setActiveBroadcastInfo] = useState(null);
+
+  // OneSignal Web Push Broadcast State (إرسال إشعار فوري لجميع الهواتف المشتركة)
+  const [oneSignalRestKey, setOneSignalRestKey] = useState(() => {
+    try {
+      return localStorage.getItem('nemaa_onesignal_rest_key') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [pushTitle, setPushTitle] = useState('نِعْمَة | تَذَكَّرْ لِتَشْكُرْ');
+  const [pushBody, setPushBody] = useState('«وَإِن تَعُدُّوا نِعْمَةَ اللَّهِ لَا تُحْصُوهَا» — رطّب لسانك الآن بحمد الله والثناء عليه.');
+  const [isSendingPush, setIsSendingPush] = useState(false);
+  const [pushResult, setPushResult] = useState(null);
+
+  const handleSendOneSignalPush = async (e) => {
+    e.preventDefault();
+    const cleanKey = (oneSignalRestKey || '').trim();
+    const cleanBody = (pushBody || '').trim();
+    const cleanTitle = (pushTitle || '').trim() || 'نِعْمَة | تَذَكَّرْ لِتَشْكُرْ';
+
+    if (!cleanKey) {
+      alert(isRtl ? 'يرجى إدخال REST API Key الخاص بتطبيقك في OneSignal' : 'Please enter OneSignal REST API Key');
+      return;
+    }
+    if (!cleanBody) {
+      alert(isRtl ? 'يرجى كتابة نص الإشعار' : 'Please enter push message');
+      return;
+    }
+
+    setIsSendingPush(true);
+    setPushResult(null);
+
+    try {
+      try {
+        localStorage.setItem('nemaa_onesignal_rest_key', cleanKey);
+      } catch {}
+
+      const res = await fetch('https://onesignal.com/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${cleanKey}`
+        },
+        body: JSON.stringify({
+          app_id: ONESIGNAL_APP_ID,
+          included_segments: ['Total Subscriptions'],
+          headings: { ar: cleanTitle, en: cleanTitle },
+          contents: { ar: cleanBody, en: cleanBody },
+          url: 'https://ahmedmootx-sys.github.io/NEMAA/'
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.id) {
+        setPushResult({
+          success: true,
+          recipients: data.recipients !== undefined ? data.recipients : 1,
+          id: data.id
+        });
+        setStatusNotice(isRtl ? 'تم إرسال إشعار الدفع السحابي لهواتف المشتركين بنجاح 🔔' : 'Push notification dispatched successfully!');
+        setTimeout(() => setStatusNotice(''), 4500);
+      } else {
+        const errorText = data.errors ? (Array.isArray(data.errors) ? data.errors.join(', ') : JSON.stringify(data.errors)) : (data.message || 'فشل الإرسال');
+        setPushResult({
+          success: false,
+          error: errorText
+        });
+      }
+    } catch (err) {
+      setPushResult({
+        success: false,
+        error: err.message || 'خطأ في الاتصال بسيرفر OneSignal'
+      });
+    } finally {
+      setIsSendingPush(false);
+    }
+  };
 
   async function loadBroadcastData() {
     try {
@@ -2173,6 +2252,170 @@ export default function AdminScreen({
                 >
                   <Megaphone size={16} />
                   <span>{isPublishingBroadcast ? (isRtl ? 'جاري الإذاعة والنشر...' : 'Broadcasting...') : (isRtl ? '📢 نشر وإذاعة للجميع فوراً' : 'Broadcast to All Now')}</span>
+                </button>
+              </form>
+
+              {/* OneSignal Web Push Broadcast Card (إرسال إشعار فوري لجميع الهواتف المشتركة) */}
+              <form onSubmit={handleSendOneSignalPush} style={{
+                background: 'var(--surface-card)',
+                border: '1.5px solid rgba(212, 175, 55, 0.35)',
+                borderRadius: '18px',
+                padding: '18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '10px',
+                      background: 'rgba(212, 175, 55, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--color-gold)'
+                    }}>
+                      <Bell size={17} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: 'var(--text-heading)' }}>
+                        {isRtl ? 'إرسال إشعار Push فوري لجميع هواتف المشتركين (OneSignal)' : 'Instant Web Push to All Subscribed Phones'}
+                      </h4>
+                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {isRtl ? 'يصل هذا الإشعار لهواتف المستخدمين فوراً حتى وتطبيقاتهم مغلقة تماماً.' : 'Delivered immediately to phones even when app is closed.'}
+                      </p>
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    background: 'rgba(44, 74, 62, 0.08)',
+                    color: 'var(--color-primary)',
+                    fontWeight: '700'
+                  }}>
+                    OneSignal Web Push
+                  </span>
+                </div>
+
+                {/* REST API KEY input */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '5px', color: 'var(--text-main)' }}>
+                    {isRtl ? 'مفتاح OneSignal REST API Key:' : 'OneSignal REST API Key:'}
+                  </label>
+                  <input
+                    type="password"
+                    value={oneSignalRestKey}
+                    onChange={e => setOneSignalRestKey(e.target.value)}
+                    placeholder="os_v2_app_... أو المفتاح من OneSignal Settings -> Keys & IDs"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid var(--border-subtle)',
+                      background: 'var(--surface-sunken)',
+                      color: 'var(--text-main)',
+                      fontSize: '12.5px',
+                      fontFamily: 'monospace',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
+                    {isRtl ? 'تجد هذا المفتاح في حسابك بـ OneSignal في: Settings ⬅️ Keys & IDs ⬅️ REST API Key (يُحفظ بأمان في متصفحك فقط)' : 'Find it in OneSignal: Settings -> Keys & IDs -> REST API Key'}
+                  </span>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '5px', color: 'var(--text-main)' }}>
+                    {isRtl ? 'عنوان الإشعار:' : 'Notification Title:'}
+                  </label>
+                  <input
+                    type="text"
+                    value={pushTitle}
+                    onChange={e => setPushTitle(e.target.value)}
+                    placeholder="نِعْمَة | تَذَكَّرْ لِتَشْكُرْ"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid var(--border-subtle)',
+                      background: 'var(--surface-sunken)',
+                      color: 'var(--text-main)',
+                      fontSize: '13px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                {/* Message Body */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '5px', color: 'var(--text-main)' }}>
+                    {isRtl ? 'نص النعمة والتذكير:' : 'Notification Body:'}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={pushBody}
+                    onChange={e => setPushBody(e.target.value)}
+                    placeholder={isRtl ? 'اكتب نص النعمة أو التذكير الذي تريده أن يظهر على شاشة القفل...' : 'Message to display on lock screen...'}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid var(--border-subtle)',
+                      background: 'var(--surface-sunken)',
+                      color: 'var(--text-main)',
+                      fontSize: '13px',
+                      lineHeight: '1.6',
+                      boxSizing: 'border-box',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                {/* Result Feedback Banner */}
+                {pushResult && (
+                  <div style={{
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    background: pushResult.success ? 'rgba(72, 187, 120, 0.12)' : 'rgba(229, 62, 62, 0.12)',
+                    border: `1px solid ${pushResult.success ? 'rgba(72, 187, 120, 0.35)' : 'rgba(229, 62, 62, 0.35)'}`,
+                    color: pushResult.success ? '#22543d' : '#742a2a',
+                    fontSize: '12.5px',
+                    fontWeight: '700',
+                    lineHeight: '1.5'
+                  }}>
+                    {pushResult.success 
+                      ? (isRtl ? `🎉 تم إرسال الإشعار بنجاح! تم استهداف (${pushResult.recipients}) جهاز مشترك.` : `Successfully sent to ${pushResult.recipients} devices!`)
+                      : (isRtl ? `⚠️ تعذر الإرسال: ${pushResult.error}` : `Failed: ${pushResult.error}`)}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSendingPush || !pushBody.trim()}
+                  className="form-submit-btn"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '11px',
+                    borderRadius: '12px',
+                    fontSize: '13.5px',
+                    fontWeight: '800',
+                    cursor: (isSendingPush || !pushBody.trim()) ? 'not-allowed' : 'pointer',
+                    opacity: (isSendingPush || !pushBody.trim()) ? 0.6 : 1,
+                    background: 'linear-gradient(135deg, var(--color-gold) 0%, #b8972f 100%)',
+                    color: '#0d241b',
+                    boxShadow: '0 3px 12px rgba(212, 175, 55, 0.28)'
+                  }}
+                >
+                  <Bell size={16} />
+                  <span>{isSendingPush ? (isRtl ? 'جاري الإرسال عبر خوادم OneSignal...' : 'Dispatching...') : (isRtl ? '🚀 إرسال إشعار فوري لجميع الهواتف المشتركة' : 'Send Push Notification Now')}</span>
                 </button>
               </form>
             </div>
