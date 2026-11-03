@@ -5,9 +5,7 @@
 
 export const ONESIGNAL_APP_ID = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_ONESIGNAL_APP_ID)
   ? import.meta.env.VITE_ONESIGNAL_APP_ID
-  : (typeof atob !== 'undefined'
-      ? atob('b3NfdjJfYXBwX3I1bWVsd2JuZ3pmd25ibXduNmx3ZHB5MnU3M3lpdHhxcG5tdTI2dTdmMmttd2x2MnV3aXZqN3g1eHl1a2N1aXVxZ2ppd3VqNDN2Z3JuZXhweDZqYjduYmhrb212ZTdvd3o3amFjcHk=')
-      : '');
+  : '8f5845d8-2d36-4b66-8596-6f9761bf1aa7';
 
 // Detect iOS devices (iPhone, iPad, iPod)
 export function isIOS() {
@@ -37,6 +35,10 @@ export function isPushSupported() {
 export function initOneSignal() {
   if (typeof window === 'undefined' || !isPushSupported()) return;
 
+  const isGhPages = window.location.pathname.includes('/NEMAA');
+  const swPath = isGhPages ? 'NEMAA/OneSignalSDKWorker.js' : 'OneSignalSDKWorker.js';
+  const swScope = isGhPages ? '/NEMAA/' : '/';
+
   try {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async function(OneSignal) {
@@ -47,8 +49,8 @@ export function initOneSignal() {
             enable: false // Never show floating bell — custom serene UI in Settings only
           },
           allowLocalhostAsSecureOrigin: true,
-          serviceWorkerParam: { scope: './' },
-          serviceWorkerPath: './OneSignalSDKWorker.js'
+          serviceWorkerParam: { scope: swScope },
+          serviceWorkerPath: swPath
         });
       } catch (err) {
         console.warn('[OneSignal] Init notice:', err);
@@ -174,7 +176,10 @@ export async function requestPushPermission(preferredTimeSlot = 'random', custom
   // 6. Ensure ServiceWorker registration for push background processing
   try {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./OneSignalSDKWorker.js', { scope: './' }).catch(() => {});
+      const isGhPages = window.location.pathname.includes('/NEMAA');
+      const swUrl = isGhPages ? '/NEMAA/OneSignalSDKWorker.js' : './OneSignalSDKWorker.js';
+      const scopeUrl = isGhPages ? '/NEMAA/' : './';
+      navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).catch(() => {});
     }
   } catch {}
 

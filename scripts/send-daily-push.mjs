@@ -53,10 +53,7 @@ const diff = now - startOfYear;
 const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
 const selectedBlessing = blessingsPool[dayOfYear % blessingsPool.length];
 
-const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID || Buffer.from(
-  'b3NfdjJfYXBwX3I1bWVsd2JuZ3pmd25ibXduNmx3ZHB5MnU3M3lpdHhxcG5tdTI2dTdmMmttd2x2MnV3aXZqN3g1eHl1a2N1aXVxZ2ppd3VqNDN2Z3JuZXhweDZqYjduYmhrb212ZTdvd3o3amFjcHk=',
-  'base64'
-).toString('utf8');
+const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID || '8f5845d8-2d36-4b66-8596-6f9761bf1aa7';
 
 const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
 
