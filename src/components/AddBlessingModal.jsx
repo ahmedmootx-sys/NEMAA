@@ -74,8 +74,6 @@ export default function AddBlessingModal({
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [assistantNotice, setAssistantNotice] = useState('');
 
-  if (!isOpen) return null;
-
   // Handle selecting an inspired blessing idea
   const handleSelectInspiration = (item) => {
     setTitle(item.title);
@@ -128,6 +126,9 @@ export default function AddBlessingModal({
       }));
     } catch {}
   }, [title, reflection, author, proof, proofSource, showExtraFields]);
+
+  // Must come AFTER every hook (React rules of hooks): returning earlier crashes the app when the modal opens
+  if (!isOpen) return null;
 
   // Clear current draft
   const handleClearDraft = () => {
