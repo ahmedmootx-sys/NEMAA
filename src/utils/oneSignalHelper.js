@@ -35,7 +35,7 @@ export function isPushSupported() {
 export function initOneSignal() {
   if (typeof window === 'undefined' || !isPushSupported()) return;
 
-  const isGhPages = window.location.pathname.includes('/NEMAA');
+  const isGhPages = window.location.pathname.toLowerCase().includes('/nemaa');
   const swPath = isGhPages ? 'NEMAA/OneSignalSDKWorker.js' : 'OneSignalSDKWorker.js';
   const swScope = isGhPages ? '/NEMAA/' : '/';
 
@@ -147,11 +147,15 @@ export async function requestPushPermission(preferredTimeSlot = 'random', custom
   }
 
   // 4. Trigger native permission prompt directly within the click event gesture
-  let granted = Notification.permission === 'granted';
+  let granted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
 
-  if (!granted) {
+  if (!granted && typeof Notification !== 'undefined' && typeof Notification.requestPermission === 'function') {
     try {
-      const result = await Notification.requestPermission();
+      // Use Promise.race with a 4s timeout so it never hangs indefinitely
+      const result = await Promise.race([
+        Notification.requestPermission(),
+        new Promise(r => setTimeout(() => r('timeout'), 4000))
+      ]);
       granted = result === 'granted';
     } catch (err) {
       console.warn('Native Notification.requestPermission error:', err);
@@ -162,7 +166,7 @@ export async function requestPushPermission(preferredTimeSlot = 'random', custom
     return {
       success: false,
       reason: 'permission_denied',
-      message: 'تم رفض إذن الإشعارات'
+      message: 'تم رفض إذن الإشعارات أو إلغاؤه'
     };
   }
 
@@ -176,7 +180,7 @@ export async function requestPushPermission(preferredTimeSlot = 'random', custom
   // 6. Ensure ServiceWorker registration for push background processing
   try {
     if ('serviceWorker' in navigator) {
-      const isGhPages = window.location.pathname.includes('/NEMAA');
+      const isGhPages = window.location.pathname.toLowerCase().includes('/nemaa');
       const swUrl = isGhPages ? '/NEMAA/OneSignalSDKWorker.js' : './OneSignalSDKWorker.js';
       const scopeUrl = isGhPages ? '/NEMAA/' : './';
       navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).catch(() => {});

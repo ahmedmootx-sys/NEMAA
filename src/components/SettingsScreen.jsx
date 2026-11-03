@@ -23,13 +23,10 @@ import {
   Bell,
   Clock,
   Send,
-  Sunrise,
-  Sunset,
-  SunMedium,
-  Sliders,
   LogIn,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import {
   getPushSubscriptionState,
@@ -84,6 +81,7 @@ export default function SettingsScreen({
   const [isPushLoading, setIsPushLoading] = useState(false);
   const [isTestingPush, setIsTestingPush] = useState(false);
   const [localToast, setLocalToast] = useState('');
+  const [permissionBlockedNotice, setPermissionBlockedNotice] = useState(false);
 
   const formatArabicTime = (timeStr) => {
     if (!timeStr) return '';
@@ -116,47 +114,79 @@ export default function SettingsScreen({
       if (state.isSubscribed) {
         setIsPushActive(true);
       }
+      if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+        setPermissionBlockedNotice(true);
+      }
     }
     checkState();
   }, [isOpen]);
 
   const handleTogglePush = async () => {
-    if (isPushLoading) return;
+    // If stuck loading, force release on tap
+    if (isPushLoading) {
+      setIsPushLoading(false);
+      return;
+    }
 
+    setPermissionBlockedNotice(false);
+
+    // 1. If currently active, turn OFF
     if (isPushActive) {
       setIsPushLoading(true);
+      const safetyTimer = setTimeout(() => setIsPushLoading(false), 2000);
       try {
-        await unsubscribePush();
+        await Promise.race([
+          unsubscribePush(),
+          new Promise(r => setTimeout(r, 1500))
+        ]);
         setIsPushActive(false);
         triggerToast(isRtl ? 'تم إيقاف رسائل التذكير' : 'Daily reminders turned off');
       } finally {
+        clearTimeout(safetyTimer);
         setIsPushLoading(false);
       }
       return;
     }
 
-    // Checking iOS limitation
+    // 2. Checking iOS limitation
     if (isIOS() && !isStandalone()) {
-      triggerToast('لتفعيل الإشعارات على آيفون، يرجى إضافة التطبيق للشاشة الرئيسية أولاً');
+      triggerToast(isRtl ? 'لتفعيل الإشعارات على آيفون، يرجى إضافة التطبيق للشاشة الرئيسية أولاً' : 'On iOS, please add app to Home Screen first');
       return;
     }
 
+    // 3. Check if browser has permanently blocked notifications
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+      setPermissionBlockedNotice(true);
+      triggerToast(isRtl ? 'الإشعارات محظورة في متصفحك. انظر التعليمات لفك الحظر ⚠️' : 'Notifications are blocked in your browser settings');
+      return;
+    }
+
+    // 4. Request Push Permission with hard 3.5s timeout (NEVER gets stuck)
     setIsPushLoading(true);
+    const safetyTimer = setTimeout(() => setIsPushLoading(false), 3500);
+
     try {
-      const res = await requestPushPermission(preferredSlot, preferredSlot === 'custom' ? customTime : '');
-      if (res.success) {
+      const res = await Promise.race([
+        requestPushPermission(preferredSlot, preferredSlot === 'custom' ? customTime : ''),
+        new Promise(r => setTimeout(() => r({ success: false, reason: 'timeout' }), 3000))
+      ]);
+
+      if (res && res.success) {
         setIsPushActive(true);
-        triggerToast(isRtl ? 'تم تفعيل رسائل الطمأنينة بنجاح — ستصلك نفحات الحمد اليومية' : 'Daily reminders enabled successfully');
-      } else if (res.reason === 'ios_pwa_required') {
-        triggerToast(res.message || 'لتفعيل الإشعارات على آيفون، يرجى إضافة التطبيق للشاشة الرئيسية أولاً');
-      } else if (res.reason === 'permission_denied') {
-        triggerToast(res.message || (isRtl ? 'تم رفض إذن الإشعارات من إعدادات المتصفح. يمكنك السماح بها من إعدادات الموقع' : 'Push permission was denied in browser settings'));
+        setPermissionBlockedNotice(false);
+        triggerToast(isRtl ? 'تم تفعيل رسائل الطمأنينة بنجاح — ستصلك نفحات الحمد اليومية ✨' : 'Daily reminders enabled successfully ✨');
+      } else if (res && res.reason === 'permission_denied') {
+        setPermissionBlockedNotice(true);
+        triggerToast(res.message || (isRtl ? 'الإشعارات محظورة في متصفحك. يرجى السماح بها من إعدادات الموقع' : 'Push permission was denied in browser settings'));
+      } else if (res && res.reason === 'ios_pwa_required') {
+        triggerToast(res.message || (isRtl ? 'لتفعيل الإشعارات على آيفون، يرجى إضافة التطبيق للشاشة الرئيسية أولاً' : 'On iOS, please add to Home Screen first'));
       } else {
-        triggerToast(res.message || (isRtl ? 'تعذر تفعيل الإشعارات حالياً' : 'Could not enable notifications'));
+        triggerToast(isRtl ? 'تعذر إكمال طلب الإذن، يرجى إعادة المحاولة' : 'Could not complete request, please try again');
       }
     } catch {
       triggerToast(isRtl ? 'حدث خطأ أثناء طلب الإذن' : 'Error requesting permission');
     } finally {
+      clearTimeout(safetyTimer);
       setIsPushLoading(false);
     }
   };
@@ -823,6 +853,36 @@ export default function SettingsScreen({
                 }} />
               </button>
             </div>
+
+            {/* Browser Permission Blocked Helper Banner */}
+            {permissionBlockedNotice && (
+              <div style={{
+                margin: '0 16px 16px',
+                padding: '14px 16px',
+                borderRadius: '14px',
+                background: 'rgba(229, 62, 62, 0.08)',
+                border: '1.5px solid rgba(229, 62, 62, 0.3)',
+                fontSize: '12.5px',
+                lineHeight: '1.6',
+                color: 'var(--text-main)',
+                animation: 'fadeIn 0.2s ease-out'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '800', color: '#C53030', marginBottom: '6px' }}>
+                  <AlertCircle size={16} />
+                  <span>{isRtl ? 'الإشعارات محظورة في متصفحك لهذا الموقع' : 'Notifications are blocked in your browser'}</span>
+                </div>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {isRtl 
+                    ? 'المتصفح يمنع طلب الإذن تلقائياً لأنك اخترت رفض/حظر سابقاً. لفك الحظر وتفعيل الإشعارات بثوانٍ:'
+                    : 'The browser blocked permission prompts. To unblock:'}
+                </p>
+                <ol style={{ margin: 0, paddingRight: isRtl ? '18px' : 0, paddingLeft: isRtl ? 0 : '18px', fontSize: '12px', color: 'var(--text-main)' }}>
+                  <li>{isRtl ? 'اضغط على أيقونة الإعدادات 🎚️ أو القفل 🔒 في أعلى المتصفح بجوار رابط الموقع.' : 'Tap the settings or lock icon next to the URL.'}</li>
+                  <li>{isRtl ? 'اضغط على «الأذونات» (Permissions) ثم «الإشعارات» (Notifications).' : 'Go to Permissions -> Notifications.'}</li>
+                  <li>{isRtl ? 'اختر «سماح» (Allow)، ثم أعد الضغط على زر التفعيل هنا وسيعمل فوراً!' : 'Choose Allow, then tap the toggle here.'}</li>
+                </ol>
+              </div>
+            )}
 
             {/* Sub-Panel: Reminder Time Preference & Test Notification (shown when active) */}
             {isPushActive && (
