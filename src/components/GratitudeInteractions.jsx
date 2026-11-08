@@ -4,7 +4,7 @@ import {
   RefreshCw, 
   ChevronRight, 
   ChevronLeft, 
-  Download, 
+ 
   Share2, 
   Copy, 
   Check, 
@@ -177,7 +177,7 @@ export default function GratitudeInteractions({
       {/* Community Publish Button (انشر نِعمة على نِعْمَة) */}
       <button
         type="button"
-        id="btn-publish-blessing-trigger"
+        id="btn-publish-blessing-inline"
         className="btn-publish-blessing-trigger"
         onClick={onOpenPublishModal}
         title={lang === 'ar' ? 'انشر نِعمة استشعرتها مع جميع زوار المنصة لتُؤجر على تذكيرهم' : 'Publish a blessing to all visitors worldwide'}

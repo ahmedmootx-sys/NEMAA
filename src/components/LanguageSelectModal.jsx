@@ -1,4 +1,4 @@
-import { Globe, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { TRANSLATIONS } from '../i18n/translations';
 
 export default function LanguageSelectModal({ isOpen, onClose, currentLang, onSelectLang }) {

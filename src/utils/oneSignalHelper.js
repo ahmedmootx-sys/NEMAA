@@ -29,15 +29,40 @@ export function isPushSupported() {
 }
 
 /**
+ * مسار عامل الخدمة ونطاقه نسبةً إلى مجلد التطبيق الحالي
+ * (مثلاً /NEMAA/ على GitHub Pages أو / على نطاق مخصص).
+ */
+export function getServiceWorkerLocation() {
+  let scope = '/';
+  try {
+    scope = new URL('./', document.baseURI).pathname || '/';
+  } catch {}
+  return { swPath: scope.replace(/^\//, '') + 'sw.js', swScope: scope };
+}
+
+/**
+ * يقرّب وقتاً مخصصاً "HH:MM" إلى أقرب ربع ساعة ("07:52" → "07:45" أو "08:00").
+ * الإشعار اليومي يُرسَل لكل ربع ساعة على حدة (96 شريحة)، فيحتاج كل مستخدم وسماً بهذا الشكل.
+ */
+export function snapToQuarterHour(timeStr) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(timeStr || ''));
+  if (!m) return '';
+  const total = (Number(m[1]) * 60 + Number(m[2]) + 7) ; // +7 → التقريب لأقرب 15 دقيقة
+  const snapped = (Math.floor(total / 15) * 15) % (24 * 60);
+  if (!Number.isFinite(snapped)) return '';
+  return `${String(Math.floor(snapped / 60)).padStart(2, '0')}:${String(snapped % 60).padStart(2, '0')}`;
+}
+
+/**
  * Initialize OneSignal SDK safely in deferred queue
  * Strictly NO automatic prompt on page load
  */
 export function initOneSignal() {
   if (typeof window === 'undefined' || !isPushSupported()) return;
 
-  const isGhPages = window.location.pathname.toLowerCase().includes('/nemaa');
-  const swPath = isGhPages ? 'NEMAA/OneSignalSDKWorker.js' : 'OneSignalSDKWorker.js';
-  const swScope = isGhPages ? '/NEMAA/' : '/';
+  // عامل الخدمة الواحد (sw.js) يحتوي على عامل OneSignal، فنُسجّله هو لا ملفاً منفصلاً
+  // يتنافس معه على نفس النطاق. المسار يُشتق من عنوان الصفحة فيصلح على أي نطاق أو مجلد.
+  const { swPath, swScope } = getServiceWorkerLocation();
 
   try {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -177,15 +202,8 @@ export async function requestPushPermission(preferredTimeSlot = 'random', custom
     localStorage.setItem('nemaa_push_custom_time', customTime);
   }
 
-  // 6. Ensure ServiceWorker registration for push background processing
-  try {
-    if ('serviceWorker' in navigator) {
-      const isGhPages = window.location.pathname.toLowerCase().includes('/nemaa');
-      const swUrl = isGhPages ? '/NEMAA/OneSignalSDKWorker.js' : './OneSignalSDKWorker.js';
-      const scopeUrl = isGhPages ? '/NEMAA/' : './';
-      navigator.serviceWorker.register(swUrl, { scope: scopeUrl }).catch(() => {});
-    }
-  } catch {}
+  // 6. (حُذف التسجيل اليدوي لعامل OneSignal: كان يستبدل عامل التطبيق sw.js على نفس النطاق.
+  //     التسجيل يتم مرة واحدة من main.jsx، وOneSignal يستخدم نفس الملف.)
 
   // 7. Non-blockingly sync with OneSignal if available (with strict timeout)
   syncOneSignalOptIn(preferredTimeSlot, customTime).catch(() => {});
@@ -212,6 +230,8 @@ async function syncOneSignalOptIn(timeSlot, customTime = '') {
           }
           if (customTime) {
             user.addTag('reminder_custom_time', customTime);
+            const slot = snapToQuarterHour(customTime);
+            if (slot) user.addTag('reminder_custom_slot', slot);
           }
           user.addTag('language', 'ar');
         }
@@ -286,6 +306,8 @@ export async function updateReminderTimeSlot(timeSlot, customTime = '') {
         }
         if (customTime) {
           await user.addTag('reminder_custom_time', customTime);
+          const slot = snapToQuarterHour(customTime);
+          if (slot) await user.addTag('reminder_custom_slot', slot);
         }
       }
     };

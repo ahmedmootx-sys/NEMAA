@@ -4,7 +4,6 @@
  * Supports 4 aesthetic themes and 2 aspect ratios (Story 9:16 and Square 1:1)
  * Uses high-res Canvas with dynamic line wrapping, font loading guards, and zero-overlap layout.
  */
-import html2canvas from 'html2canvas';
 
 export const THEME_CONFIGS = {
   olive: {
@@ -434,6 +433,8 @@ export async function renderBlessingCard(blessing, options = {}) {
     console.error('Canvas export failed, falling back to DOM...', err);
     const element = document.getElementById('blessing-card-exportable');
     if (element) {
+      // تُحمَّل المكتبة عند أول تصدير فقط (لا تثقل فتح التطبيق)
+      const { default: html2canvas } = await import('html2canvas');
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,

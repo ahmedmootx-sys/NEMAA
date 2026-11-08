@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, ChevronRight, ChevronLeft, X, Check, Compass } from 'lucide-react';
+import { ChevronRight, ChevronLeft, X, Check, Compass } from 'lucide-react';
 
 export const TOUR_STEPS = [
   {

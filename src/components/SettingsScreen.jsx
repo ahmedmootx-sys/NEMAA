@@ -1036,6 +1036,14 @@ export default function SettingsScreen({
                   </div>
                 </div>
 
+                {preferredSlot === 'custom' && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.7 }}>
+                    {isRtl
+                      ? 'يصلك التذكير في أقرب ربع ساعة للوقت الذي اخترته (مثلاً 07:52 ← 07:45).'
+                      : 'Your reminder arrives at the nearest quarter hour to the time you chose (e.g. 07:52 → 07:45).'}
+                  </div>
+                )}
+
                 {/* Instant Test Push Button */}
                 <div style={{
                   display: 'flex',

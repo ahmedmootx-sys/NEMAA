@@ -13,10 +13,9 @@ import {
   HeartHandshake,
   PenTool,
   Globe,
-  Trash2,
+
   User,
   Flag,
-  Edit3
 } from 'lucide-react';
 import { subscribeToVoiceChanges, speakArabic, stopSpeaking } from '../utils/speechHelper';
 import { getBlessingGratitudeDua } from '../utils/duaHelper';

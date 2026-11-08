@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, 
-  Bell, 
+ 
   BellRing, 
-  Check, 
+ 
   Clock, 
-  Sparkles, 
+ 
   AlertCircle,
   Send
 } from 'lucide-react';

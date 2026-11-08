@@ -23,7 +23,7 @@ import {
   AlertCircle,
   X,
   Send,
-  Mail,
+
   Megaphone,
   Archive,
   RotateCcw,
@@ -51,7 +51,8 @@ import {
   restoreAdminDeletedBlessing,
   permanentlyDeleteArchivedBlessing,
   adminSendReporterInquiry,
-  cleanOrphanedNotificationsFromReports
+  cleanOrphanedNotificationsFromReports,
+  explainBackendError
 } from '../supabaseClient';
 import EditSharedBlessingModal from './EditSharedBlessingModal';
 
@@ -118,8 +119,11 @@ export default function AdminScreen({
 
   // OneSignal Web Push Broadcast State (إرسال إشعار فوري لجميع الهواتف المشتركة)
   const [oneSignalRestKey, setOneSignalRestKey] = useState(() => {
+    // مفتاح OneSignal السري: يُحفظ لجلسة التبويب فقط (sessionStorage) بدل التخزين الدائم،
+    // ونمسح أي نسخة قديمة كانت محفوظة بشكل دائم في هذا المتصفح.
     try {
-      return localStorage.getItem('nemaa_onesignal_rest_key') || '';
+      try { localStorage.removeItem('nemaa_onesignal_rest_key'); } catch {}
+      return sessionStorage.getItem('nemaa_onesignal_rest_key') || '';
     } catch {
       return '';
     }
@@ -149,7 +153,7 @@ export default function AdminScreen({
 
     try {
       try {
-        localStorage.setItem('nemaa_onesignal_rest_key', cleanKey);
+        sessionStorage.setItem('nemaa_onesignal_rest_key', cleanKey);
       } catch {}
 
       const res = await fetch('https://onesignal.com/api/v1/notifications', {
@@ -218,6 +222,9 @@ export default function AdminScreen({
         setBroadcastTitle('');
         setStatusNotice(isRtl ? 'تم نشر الرسالة وإذاعتها بنجاح لجميع مستخدمي المنصة ✨' : 'Announcement broadcasted to all users successfully ✨');
         setTimeout(() => setStatusNotice(''), 4500);
+      } else {
+        setStatusNotice(res?.error?.message || (isRtl ? 'تعذر نشر الإعلان' : 'Failed to publish the announcement'));
+        setTimeout(() => setStatusNotice(''), 6000);
       }
     } catch (err) {
       console.warn('Error broadcasting announcement:', err);
@@ -440,8 +447,10 @@ export default function AdminScreen({
 
     try {
       // 1. Delete from Supabase & record in admin_deleted_blessings
-      await recordAdminDeletedBlessing(blessing, currentUser?.email || 'admin');
-      await deleteSharedBlessing(blessing);
+      const archiveRes = await recordAdminDeletedBlessing(blessing, currentUser?.email || 'admin');
+      if (!archiveRes.success) throw new Error(explainBackendError(archiveRes.reason, lang));
+      const deleteRes = await deleteSharedBlessing(blessing);
+      if (!deleteRes.success) throw new Error(explainBackendError(deleteRes.reason, lang));
 
       if (onDeleteBlessing) {
         onDeleteBlessing(blessing);
@@ -460,8 +469,8 @@ export default function AdminScreen({
       setTimeout(() => setStatusNotice(''), 4000);
     } catch (err) {
       console.warn('Failed to delete blessing:', err);
-      setStatusNotice(isRtl ? 'حدث خطأ أثناء محاولة الحذف' : 'Failed to delete blessing');
-      setTimeout(() => setStatusNotice(''), 4000);
+      setStatusNotice(err?.message || (isRtl ? 'حدث خطأ أثناء محاولة الحذف' : 'Failed to delete blessing'));
+      setTimeout(() => setStatusNotice(''), 6000);
     }
   };
 
@@ -516,8 +525,8 @@ export default function AdminScreen({
       setTimeout(() => setStatusNotice(''), 4000);
     } catch (err) {
       console.warn('Error saving blessing edit:', err);
-      setStatusNotice(isRtl ? 'حدث خطأ أثناء حفظ التعديل' : 'Failed to save changes');
-      setTimeout(() => setStatusNotice(''), 4000);
+      setStatusNotice(err?.message || (isRtl ? 'حدث خطأ أثناء حفظ التعديل' : 'Failed to save changes'));
+      setTimeout(() => setStatusNotice(''), 6000);
     }
   };
 
@@ -581,8 +590,8 @@ export default function AdminScreen({
         setMessageRecipientBlessing(null);
         setAuthorMessageText('');
       } else {
-        setStatusNotice(isRtl ? 'تعذر إرسال الإشعار، يرجى المحاولة ثانية' : 'Failed to send notification');
-        setTimeout(() => setStatusNotice(''), 4000);
+        setStatusNotice(res?.error?.message || (isRtl ? 'تعذر إرسال الإشعار، يرجى المحاولة ثانية' : 'Failed to send notification'));
+        setTimeout(() => setStatusNotice(''), 6000);
       }
     } catch (err) {
       console.warn('Error sending author notification:', err);

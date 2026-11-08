@@ -39,8 +39,9 @@ export default function AuthModal({
       return;
     }
 
-    if (mode !== 'magiclink' && (!password || password.length < 6)) {
-      setErrorMsg(isRtl ? 'كلمة المرور يجب أن لا تقل عن 6 أحرف' : 'Password must be at least 6 characters');
+    const minLen = mode === 'signup' ? 8 : 6; // الحسابات القديمة بكلمة 6-7 أحرف تبقى قادرة على الدخول
+    if (mode !== 'magiclink' && (!password || password.length < minLen)) {
+      setErrorMsg(isRtl ? `كلمة المرور يجب أن لا تقل عن ${minLen} أحرف` : `Password must be at least ${minLen} characters`);
       return;
     }
 
@@ -96,7 +97,17 @@ export default function AuthModal({
       } else if (msg.includes('User already registered')) {
         msg = isRtl ? 'هذا البريد مسجل مسبقاً، يرجى اختيار تسجيل الدخول' : 'Email already registered. Please sign in';
       } else if (msg.includes('Password should be at least')) {
-        msg = isRtl ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' : 'Password must be at least 6 characters';
+        msg = isRtl ? 'كلمة المرور قصيرة جداً، اختر كلمة أطول' : 'Password is too short, choose a longer one';
+      } else if (/Email not confirmed/i.test(msg)) {
+        msg = isRtl ? 'لم يتم تأكيد بريدك بعد. افتح رسالة التأكيد في بريدك ثم أعد المحاولة' : 'Your email is not confirmed yet. Open the confirmation email and try again';
+      } else if (/rate limit|too many requests|over_email_send_rate_limit|security purposes/i.test(msg)) {
+        msg = isRtl ? 'محاولات كثيرة خلال وقت قصير. انتظر دقائق ثم أعد المحاولة' : 'Too many attempts. Please wait a few minutes and try again';
+      } else if (/Failed to fetch|NetworkError|network|timeout/i.test(msg)) {
+        msg = isRtl ? 'تعذّر الاتصال بالإنترنت. تحقق من اتصالك وأعد المحاولة' : 'Network problem. Check your connection and try again';
+      } else if (/Signups not allowed|signup.*disabled/i.test(msg)) {
+        msg = isRtl ? 'إنشاء الحسابات الجديدة متوقف مؤقتاً' : 'New sign-ups are temporarily disabled';
+      } else if (/weak|pwned|easy to guess/i.test(msg)) {
+        msg = isRtl ? 'كلمة المرور ضعيفة أو شائعة. اختر كلمة أقوى' : 'That password is too weak or common. Choose a stronger one';
       }
       setErrorMsg(msg);
     } finally {

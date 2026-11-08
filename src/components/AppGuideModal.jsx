@@ -9,15 +9,15 @@ import {
   Maximize2, 
   PenTool, 
   Share2, 
-  Download, 
+ 
   Globe, 
   HeartHandshake, 
-  Headphones, 
+ 
   RefreshCw,
   QrCode,
-  CheckCircle2,
-  Trash2,
-  BookOpen,
+
+
+
   Settings,
   MessageSquare
 } from 'lucide-react';

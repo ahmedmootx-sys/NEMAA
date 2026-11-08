@@ -13,6 +13,10 @@ if (fs.existsSync(indexPath)) {
   html = html.replace(/<script type="module" crossorigin src="[./assets/]*index-.*?\.js"><\/script>/g, '<script type="module" src="/src/main.jsx"></script>');
   // Remove compiled css link if present
   html = html.replace(/<link rel="stylesheet" crossorigin href="[./assets/]*index-.*?\.css">/g, '');
+  // Remove stale <link rel="modulepreload"> tags left by previous builds. Vite treats them as extra
+  // entry files (so old hashed chunks keep getting rebuilt and the list grows with every build),
+  // and links to files that no longer exist cause 404s. Vite regenerates the correct ones itself.
+  html = html.replace(/[ \t]*<link rel="modulepreload"[^>]*>[ \t]*\r?\n?/g, '');
   // If no main.jsx script tag, add it before </head>
   if (!html.includes('/src/main.jsx')) {
     html = html.replace('</head>', '    <script type="module" src="/src/main.jsx"></script>\n  </head>');

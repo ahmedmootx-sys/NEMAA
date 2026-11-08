@@ -310,7 +310,7 @@ export default function ShareModal({
                 } catch {}
                 setIsExporting(false);
               }
-              window.open(`https://api.whatsapp.com/send?text=${encodedText}`, '_blank');
+              window.open(`https://api.whatsapp.com/send?text=${encodedText}`, '_blank', 'noopener,noreferrer');
             }}
             style={{
               display: 'flex',
@@ -346,7 +346,7 @@ export default function ShareModal({
                 } catch {}
                 setIsExporting(false);
               }
-              window.open(`https://t.me/share/url?url=${encodeURIComponent(currentUrl)}&text=${encodedText}`, '_blank');
+              window.open(`https://t.me/share/url?url=${encodeURIComponent(currentUrl)}&text=${encodedText}`, '_blank', 'noopener,noreferrer');
             }}
             style={{
               display: 'flex',

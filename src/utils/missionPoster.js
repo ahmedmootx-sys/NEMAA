@@ -3,7 +3,6 @@
  * Generates an ultra high-resolution 1080x1920 (9:16) Status/Story poster for WhatsApp & Instagram
  */
 
-import QRCode from 'qrcode';
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -323,6 +322,7 @@ export async function generateMissionPoster({ lang = 'ar' } = {}) {
 
   // Generate QR Code
   try {
+    const { default: QRCode } = await import('qrcode');
     const qrDataUrl = await QRCode.toDataURL(appUrl, {
       width: 170,
       margin: 1,

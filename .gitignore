@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# متغيرات بيئة وأسرار: لا تُرفع أبداً
+.env
+.env.*
+!.env.example

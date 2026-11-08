@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Send, Lightbulb, AlertCircle, MessageSquare, CheckCircle2 } from 'lucide-react';
-import { submitFeedback } from '../supabaseClient';
+import { submitFeedback, explainBackendError } from '../supabaseClient';
 
 export default function FeedbackModal({ isOpen, onClose, lang = 'ar' }) {
   const [type, setType] = useState('suggestion'); // 'suggestion' | 'complaint'
@@ -44,7 +44,7 @@ export default function FeedbackModal({ isOpen, onClose, lang = 'ar' }) {
           onClose();
         }, 2400);
       } else {
-        setErrorMsg(lang === 'ar' ? 'تعذر إرسال الرسالة، يرجى المحاولة لاحقاً' : 'Failed to submit, please try again');
+        setErrorMsg(explainBackendError(res.reason, lang));
       }
     } catch (err) {
       setErrorMsg(lang === 'ar' ? 'حدث خطأ أثناء الإرسال' : 'An error occurred during submission');

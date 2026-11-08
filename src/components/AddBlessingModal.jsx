@@ -10,16 +10,31 @@ import {
   Quote, 
   Lightbulb, 
   Wand2, 
-  Check, 
+ 
   ChevronDown, 
   ChevronUp,
   CheckCheck,
   RotateCcw
 } from 'lucide-react';
-import { publishSharedBlessing } from '../supabaseClient';
+import { publishSharedBlessing, explainBackendError } from '../supabaseClient';
 import { validateBlessingContent } from '../utils/contentValidator';
 import { BLESSING_INSPIRATIONS, enhanceReflectionDraft } from '../utils/blessingAssistant';
 import { proofreadBlessing } from '../utils/arabicSpellChecker';
+import { readStoredArray, readStoredObject } from '../utils/safeStorage';
+
+// مسودة النشر المحفوظة: كل حقل يُحوَّل إلى نص حتى لا تنهار الواجهة لو تلفت المسودة
+function readDraft() {
+  const d = readStoredObject('nemaa_publish_draft');
+  const str = (v) => (typeof v === 'string' ? v : '');
+  return {
+    title: str(d.title),
+    reflection: str(d.reflection),
+    author: str(d.author),
+    proof: str(d.proof),
+    proofSource: str(d.proofSource),
+    showExtraFields: d.showExtraFields === true
+  };
+}
 
 export default function AddBlessingModal({ 
   isOpen, 
@@ -29,38 +44,38 @@ export default function AddBlessingModal({
 }) {
   const [title, setTitle] = useState(() => {
     try {
-      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      const d = readDraft();
       return d.title || '';
     } catch { return ''; }
   });
   const [reflection, setReflection] = useState(() => {
     try {
-      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      const d = readDraft();
       return d.reflection || '';
     } catch { return ''; }
   });
   const [author, setAuthor] = useState(() => {
     try {
-      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      const d = readDraft();
       if (d.author) return d.author;
       return localStorage.getItem('nemaa_author_name') || '';
     } catch { return ''; }
   });
   const [proof, setProof] = useState(() => {
     try {
-      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      const d = readDraft();
       return d.proof || '';
     } catch { return ''; }
   });
   const [proofSource, setProofSource] = useState(() => {
     try {
-      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      const d = readDraft();
       return d.proofSource || '';
     } catch { return ''; }
   });
   const [showExtraFields, setShowExtraFields] = useState(() => {
     try {
-      const d = JSON.parse(localStorage.getItem('nemaa_publish_draft') || '{}');
+      const d = readDraft();
       return Boolean(d.proof || d.proofSource || d.showExtraFields);
     } catch { return false; }
   });
@@ -204,7 +219,7 @@ export default function AddBlessingModal({
           } catch {}
         }
         try {
-          const hist = JSON.parse(localStorage.getItem('nemaa_my_published_history') || '[]');
+          const hist = readStoredArray('nemaa_my_published_history', 'object');
           hist.unshift({ id: result.data?.id, title: title.trim(), author: trimmedAuthor, timestamp: Date.now() });
           localStorage.setItem('nemaa_my_published_history', JSON.stringify(hist.slice(0, 50)));
         } catch {}
@@ -225,44 +240,9 @@ export default function AddBlessingModal({
         setError('');
         try { localStorage.removeItem('nemaa_publish_draft'); } catch {}
         onClose();
-      } else if (result.isRlsError) {
-        const fallbackObj = {
-          id: `custom_${Date.now()}`,
-          title: title.trim(),
-          reflection: reflection.trim(),
-          author: author.trim(),
-          category: 'shared',
-          categoryName: 'نعم متشارَكة',
-          proof: proof.trim(),
-          proofSource: proofSource.trim(),
-          tags: ['نعمة_متشارَكة', 'مجتمع_نعمة'],
-          isShared: true,
-          createdAt: new Date().toISOString()
-        };
-
-        onBlessingPublished(fallbackObj, {
-          successMessage: lang === 'ar' 
-            ? 'تمت إضافة نعمتك بنجاح وستظهر للجميع!' 
-            : 'Your blessing has been published successfully!'
-        });
-
-        setTitle('');
-        setReflection('');
-        setAuthor('');
-        setProof('');
-        setProofSource('');
-        setShowExtraFields(false);
-        try { localStorage.removeItem('nemaa_publish_draft'); } catch {}
-        onClose();
       } else {
-        const rawErr = result.error?.message || '';
-        if (rawErr.includes('blessings_pkey') || rawErr.includes('duplicate key')) {
-          setError(lang === 'ar' 
-            ? 'هذه النعمة منشورة بالفعل بهذا العنوان في المنصة، يُرجى تمييز العنوان أو إضافة لمستك الخاصة'
-            : 'A blessing with this title already exists. Please choose a distinctive title.');
-        } else {
-          setError(rawErr || (lang === 'ar' ? 'تعذر النشر، يرجى المحاولة مرة أخرى' : 'Failed to publish, please try again'));
-        }
+        // The server refused (or could not be reached): say so — never show a fake "published" success
+        setError(explainBackendError(result.reason, lang));
       }
     } catch (err) {
       setError(err.message || (lang === 'ar' ? 'حدث خطأ غير متوقع أثناء النشر' : 'An unexpected error occurred'));

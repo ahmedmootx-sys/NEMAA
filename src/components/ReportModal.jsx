@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { X, Flag, AlertTriangle, CheckCircle2, Send, ShieldAlert } from 'lucide-react';
-import { submitBlessingReport, getReporterDeviceId } from '../supabaseClient';
+import { X, Flag, CheckCircle2, Send } from 'lucide-react';
+import { submitBlessingReport, getReporterDeviceId, explainBackendError } from '../supabaseClient';
 
 export default function ReportModal({ isOpen, onClose, blessing, lang = 'ar' }) {
   const [reason, setReason] = useState('inappropriate');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   if (!isOpen || !blessing) return null;
 
@@ -20,17 +21,22 @@ export default function ReportModal({ isOpen, onClose, blessing, lang = 'ar' }) 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setErrorMsg('');
 
     const selectedReasonLabel = REPORT_REASONS.find(r => r.id === reason)?.label || reason;
 
     try {
-      await submitBlessingReport({
+      const res = await submitBlessingReport({
         blessingId: blessing.id,
         blessingTitle: blessing.title,
         reason: selectedReasonLabel,
         notes: notes.trim(),
         reporterDeviceId: getReporterDeviceId()
       });
+      if (!res.success) {
+        setErrorMsg(explainBackendError(res.reason, lang));
+        return;
+      }
       setIsSubmitted(true);
       setTimeout(() => {
         setIsSubmitted(false);
@@ -40,11 +46,7 @@ export default function ReportModal({ isOpen, onClose, blessing, lang = 'ar' }) 
       }, 2500);
     } catch (err) {
       console.warn('Report submission note:', err);
-      setIsSubmitted(true);
-      setTimeout(() => {
-        setIsSubmitted(false);
-        onClose();
-      }, 2000);
+      setErrorMsg(explainBackendError('network', lang));
     } finally {
       setIsSubmitting(false);
     }
@@ -154,6 +156,12 @@ export default function ReportModal({ isOpen, onClose, blessing, lang = 'ar' }) 
                 ))}
               </div>
             </div>
+
+            {errorMsg && (
+              <div role="alert" style={{ marginBottom: '14px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(197, 48, 48, 0.1)', border: '1px solid rgba(197, 48, 48, 0.4)', color: '#C53030', fontSize: '13px', lineHeight: '1.6' }}>
+                {errorMsg}
+              </div>
+            )}
 
             {/* Optional Notes */}
             <div style={{ marginBottom: '20px' }}>

@@ -2,27 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, 
   BookOpen, 
-  Sparkles, 
+ 
   Check, 
   Trash2, 
   Calendar, 
   Flame, 
   HeartHandshake,
-  Send
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { audioEngine } from '../utils/audioEngine';
+import { readStoredArray } from '../utils/safeStorage';
 
 export default function GratitudeJournalDrawer({ isOpen, onClose }) {
   // Journal entries: array of { id, dateStr, dateKey, items: [string, string, string], createdAt }
-  const [entries, setEntries] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_gratitude_journal');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [entries, setEntries] = useState(() =>
+    readStoredArray('nemaa_gratitude_journal', 'object').map((e) => ({
+      ...e,
+      id: e.id ?? `${e.dateKey || 'entry'}_${e.createdAt || ''}`,
+      dateKey: typeof e.dateKey === 'string' ? e.dateKey : '',
+      items: Array.isArray(e.items) ? e.items.filter((x) => typeof x === 'string') : []
+    }))
+  );
 
   const [item1, setItem1] = useState('');
   const [item2, setItem2] = useState('');

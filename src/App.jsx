@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import Header from './components/Header';
 import CategoryFilter from './components/CategoryFilter';
 import BlessingCard from './components/BlessingCard';
@@ -27,41 +27,40 @@ import {
   subscribeToSharedBlessings, 
   deleteSharedBlessing, 
   updateSharedBlessing, 
-  incrementBlessingPraises, 
+ 
   simpleHash,
   recordAdminDeletedBlessing,
-  fetchAdminDeletedBlessings,
-  subscribeToAdminDeletedBlessings,
-  broadcastBlessingUpdate,
-  subscribeToLiveBlessingUpdates,
-  broadcastBlessingDeletion,
-  subscribeToLiveBlessingDeletions,
+  fetchHiddenBlessings,
+  subscribeToHiddenBlessings,
+  explainBackendError,
   fetchAuthorNotifications,
   dismissAuthorNotification,
   subscribeToAuthorNotifications,
   fetchLatestAdminBroadcast,
   subscribeToAdminGlobalBroadcasts,
-  subscribeToLiveBlessingRestorations,
-  getReporterDeviceId,
   supabase,
   getCurrentUser,
   syncUserCloudBlessings,
   saveBlessingToUserCloud,
-  removeBlessingFromUserCloud
+  removeBlessingFromUserCloud,
+  prepareForSignOut,
+  clearLocalOwnerData
 } from './supabaseClient';
 import confetti from 'canvas-confetti';
 import { audioEngine } from './utils/audioEngine';
 import OnboardingTour from './components/OnboardingTour';
 import AppGuideModal from './components/AppGuideModal';
 import ReportModal from './components/ReportModal';
-import AdminScreen from './components/AdminScreen';
-import SettingsScreen from './components/SettingsScreen';
+// شاشتان ثقيلتان لا يحتاجهما معظم الزوار عند الفتح: تُحمَّلان عند أول استخدام
+const AdminScreen = lazy(() => import('./components/AdminScreen'));
+const SettingsScreen = lazy(() => import('./components/SettingsScreen'));
 import AuthModal from './components/AuthModal';
 import AppMissionModal from './components/AppMissionModal';
 import FeedbackModal from './components/FeedbackModal';
 import UserNotificationsDrawer from './components/UserNotificationsDrawer';
 import AdminBroadcastModal from './components/AdminBroadcastModal';
 import { initOneSignal } from './utils/oneSignalHelper';
+import { readStoredArray, readStoredObject, isBlessingLike } from './utils/safeStorage';
 
 export default function App() {
   // Initialize OneSignal Web SDK quietly (strictly no prompt on load)
@@ -112,14 +111,9 @@ export default function App() {
 
   // User Notifications Inbox State (بريد الإشعارات وتنبيهات الإدارة)
   const [isNotificationsDrawerOpen, setIsNotificationsDrawerOpen] = useState(false);
-  const [userNotifications, setUserNotifications] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_user_notifications');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [userNotifications, setUserNotifications] = useState(() =>
+    readStoredArray('nemaa_user_notifications', 'object')
+  );
 
   const unreadNotificationsCount = useMemo(() => {
     return userNotifications.filter(n => n.status !== 'read').length;
@@ -154,34 +148,24 @@ export default function App() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
   // Admin permanently deleted blessing IDs (filtered out from entire app)
-  const [adminDeletedIds, setAdminDeletedIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_admin_deleted_ids');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [adminDeletedIds, setAdminDeletedIds] = useState(() =>
+    readStoredArray('nemaa_admin_deleted_ids', 'string')
+  );
 
   // Praises count tracking for each blessing (persisted locally and synced with Supabase)
   const [blessingPraises, setBlessingPraises] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_blessing_praises');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
+    const obj = readStoredObject('nemaa_blessing_praises');
+    const clean = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof v === 'number' && Number.isFinite(v) && v >= 0) clean[k] = v;
     }
+    return clean;
   });
 
   // User's own published blessings IDs (to allow deletion of what they shared)
-  const [myPublishedIds, setMyPublishedIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_my_published_ids');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [myPublishedIds, setMyPublishedIds] = useState(() =>
+    readStoredArray('nemaa_my_published_ids', 'string')
+  );
 
   // 2. Shared Blessings from Supabase
   const [sharedBlessings, setSharedBlessings] = useState(() => {
@@ -190,7 +174,7 @@ export default function App() {
       if (!saved) return [];
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed)) return [];
-      const valid = parsed.filter(b => b && (b.title || '').trim() && (b.reflection || '').trim());
+      const valid = parsed.filter(b => isBlessingLike(b) && b.title.trim() && typeof b.reflection === 'string' && b.reflection.trim());
       if (valid.length !== parsed.length) {
         localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(valid));
       }
@@ -207,7 +191,7 @@ export default function App() {
       if (!saved) return [];
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed)) return [];
-      const valid = parsed.filter(b => b && (b.title || '').trim() && (b.reflection || '').trim());
+      const valid = parsed.filter(b => isBlessingLike(b) && b.title.trim() && typeof b.reflection === 'string' && b.reflection.trim());
       if (valid.length !== parsed.length) {
         localStorage.setItem('nemaa_custom_blessings', JSON.stringify(valid));
       }
@@ -219,21 +203,9 @@ export default function App() {
 
   // Persistent User's Own Published Blessings (Preserves full ownership, praise counts & edits)
   const [myPublishedBlessings, setMyPublishedBlessings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_my_published_blessings');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      const custom = localStorage.getItem('nemaa_custom_blessings');
-      if (custom) {
-        const parsed = JSON.parse(custom);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      return [];
-    } catch {
-      return [];
-    }
+    const mine = readStoredArray('nemaa_my_published_blessings', 'blessing');
+    if (mine.length > 0) return mine;
+    return readStoredArray('nemaa_custom_blessings', 'blessing');
   });
 
   useEffect(() => {
@@ -292,9 +264,19 @@ export default function App() {
 
   const handleSignOut = async () => {
     try {
+      // نتأكد أولاً أن رموز ملكية نعمك محفوظة في حسابك، ثم نمسحها من هذا الجهاز بعد الخروج
+      // (حتى لا تنتقل نعمك إلى حساب من يسجّل دخوله بعدك على نفس الجهاز).
+      const safeToClear = await prepareForSignOut();
       await supabase.auth.signOut();
+      if (safeToClear) {
+        clearLocalOwnerData();
+        setMyPublishedBlessings([]);
+        setMyPublishedIds([]);
+      }
       setCurrentUser(null);
-      setToastMessage(currentLang === 'ar' ? 'تم تسجيل الخروج بنجاح' : 'Signed out successfully');
+      setToastMessage(currentLang === 'ar'
+        ? (safeToClear ? 'تم تسجيل الخروج. نعمك المنشورة محفوظة في حسابك وتعود عند الدخول' : 'تم تسجيل الخروج بنجاح')
+        : (safeToClear ? 'Signed out. Your published blessings stay safe in your account.' : 'Signed out successfully'));
       setTimeout(() => setToastMessage(''), 3500);
     } catch (err) {
       console.warn('Sign out error:', err);
@@ -303,12 +285,12 @@ export default function App() {
 
   // User-Customized / Rephrased Blessings State (Edits to existing blessings)
   const [customizedBlessings, setCustomizedBlessings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_customized_blessings');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
+    const obj = readStoredObject('nemaa_customized_blessings');
+    const clean = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) clean[k] = v;
     }
+    return clean;
   });
 
   // PWA Install Deferred Prompt
@@ -606,7 +588,7 @@ export default function App() {
 
     async function loadAdminDeleted() {
       try {
-        const remoteDeleted = await fetchAdminDeletedBlessings();
+        const remoteDeleted = await fetchHiddenBlessings();
         if (isMounted && Array.isArray(remoteDeleted)) {
           const identifiers = remoteDeleted.flatMap(d => [d.blessing_title, d.id]).filter(Boolean).map(s => String(s).trim());
           const idSet = new Set(identifiers.map(s => s.toLowerCase()));
@@ -739,11 +721,24 @@ export default function App() {
           } catch {}
           return updated;
         });
+
+        // Keep the author's own list in sync too (e.g. edited from another device or by an admin)
+        setMyPublishedBlessings(prev => {
+          const updated = prev.map(b => {
+            const isMatch = (oldRow && oldRow.title && b.title === oldRow.title) ||
+                            (b.title === updatedBlessing.title);
+            return isMatch ? { ...b, ...updatedBlessing, id: b.id } : b;
+          });
+          try {
+            localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
       }
     );
 
     // Realtime listener for blessings deleted by admin (applied instantly to all users)
-    const unsubscribeAdminDeleted = subscribeToAdminDeletedBlessings(
+    const unsubscribeAdminDeleted = subscribeToHiddenBlessings(
       (newDeleted) => {
         if (!isMounted || !newDeleted) return;
         const identifier = (newDeleted.blessing_title || newDeleted.id || '').trim();
@@ -813,225 +808,26 @@ export default function App() {
       }
     );
 
-    // Realtime broadcast listener for instant multi-device blessing deletion
-    const unsubscribeLiveDeletions = subscribeToLiveBlessingDeletions((payload) => {
-      if (!isMounted || !payload) return;
-      const delId = String(payload.id || '').trim().toLowerCase();
-      const delTitle = (payload.title || '').trim().toLowerCase();
-
-      // Record in adminDeletedIds
-      setAdminDeletedIds(prev => {
-        const identifiers = [];
-        if (payload.id) identifiers.push(payload.id);
-        if (payload.title) identifiers.push(payload.title);
-        const next = [...new Set([...prev, ...identifiers])];
-        try { localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(next)); } catch {}
-        return next;
-      });
-
-      const isMatch = (b) => {
-        if (!b) return false;
-        const bId = String(b.id || '').trim().toLowerCase();
-        const bTitle = (b.title || '').trim().toLowerCase();
-        return (delId && bId === delId) || (delTitle && bTitle === delTitle);
-      };
-
-      setSharedBlessings(prev => {
-        const next = prev.filter(b => !isMatch(b));
-        try { localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(next)); } catch {}
-        return next;
-      });
-
-      setMyPublishedBlessings(prev => {
-        const next = prev.filter(b => !isMatch(b));
-        try { localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next)); } catch {}
-        return next;
-      });
-
-      setCustomBlessings(prev => {
-        const next = prev.filter(b => !isMatch(b));
-        try { localStorage.setItem('nemaa_custom_blessings', JSON.stringify(next)); } catch {}
-        return next;
-      });
-
-      setCustomizedBlessings(prev => {
-        const next = { ...prev };
-        let changed = false;
-        if (payload.id && next[payload.id]) {
-          delete next[payload.id];
-          changed = true;
-        }
-        for (const k of Object.keys(next)) {
-          if (delTitle && (next[k]?.title || '').trim().toLowerCase() === delTitle) {
-            delete next[k];
-            changed = true;
-          }
-        }
-        if (changed) {
-          try { localStorage.setItem('nemaa_customized_blessings', JSON.stringify(next)); } catch {}
-        }
-        return next;
-      });
-
-      setMyPublishedIds(prev => {
-        const next = prev.filter(id => {
-          const s = String(id).trim().toLowerCase();
-          return s !== delId;
-        });
-        try { localStorage.setItem('nemaa_my_published_ids', JSON.stringify(next)); } catch {}
-        return next;
-      });
-    });
-
-    // Realtime broadcast listener for instant multi-device blessing restoration
-    const unsubscribeLiveRestorations = subscribeToLiveBlessingRestorations((payload) => {
-      if (!isMounted || !payload) return;
-      const cleanTitle = (payload.title || payload.blessing?.title || '').trim().toLowerCase();
-      const resId = String(payload.id || payload.blessing?.id || '').trim().toLowerCase();
-      const oldId = String(payload.oldId || '').trim().toLowerCase();
-
-      // 1. Remove from adminDeletedIds
-      setAdminDeletedIds(prev => {
-        const next = prev.filter(x => {
-          const s = String(x).trim().toLowerCase();
-          return s !== cleanTitle && s !== resId && s !== oldId;
-        });
-        try { localStorage.setItem('nemaa_admin_deleted_ids', JSON.stringify(next)); } catch {}
-        return next;
-      });
-
-      // 2. Put into sharedBlessings
-      const restoredItem = payload.blessing || {
-        id: payload.id,
-        title: payload.title,
-        author: payload.author,
-        isShared: true
-      };
-      setSharedBlessings(prev => {
-        if (prev.some(b => String(b.id).toLowerCase() === resId || (b.title || '').trim().toLowerCase() === cleanTitle)) {
-          return prev;
-        }
-        const next = [{ ...restoredItem, isShared: true, isCustomized: false }, ...prev];
-        try { localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(next)); } catch {}
-        return next;
-      });
-
-      // 3. Reconcile publisher ownership: check if current user is author
-      const authorName = (payload.author || payload.blessing?.author || '').trim().toLowerCase();
-      const storedAuthor = (localStorage.getItem('nemaa_author_name') || '').trim().toLowerCase();
-      let isAuthorMatch = Boolean(authorName && storedAuthor && authorName === storedAuthor && authorName !== 'محب للخير');
-
-      if (!isAuthorMatch) {
-        try {
-          const hist = JSON.parse(localStorage.getItem('nemaa_my_published_history') || '[]');
-          isAuthorMatch = hist.some(h => {
-            if (typeof h === 'string') return h.trim().toLowerCase() === cleanTitle;
-            if (h && typeof h === 'object') {
-              return (h.title && h.title.trim().toLowerCase() === cleanTitle) ||
-                     (h.id && String(h.id).toLowerCase() === oldId);
-            }
-            return false;
-          });
-        } catch {}
-      }
-
-      if (isAuthorMatch) {
-        setMyPublishedBlessings(prev => {
-          if (prev.some(b => String(b.id).toLowerCase() === resId || (b.title || '').trim().toLowerCase() === cleanTitle)) {
-            return prev;
-          }
-          const next = [{ ...restoredItem, isShared: true, isCustomized: false }, ...prev];
-          try { localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next)); } catch {}
-          return next;
-        });
-        setToastMessage(currentLangRef.current === 'ar' ? 'تمت استعادة نعمتك وعادت إلى المنصة وقائمة نعمك بنجاح ✨' : 'Your blessing was restored back to the platform ✨');
-        setTimeout(() => setToastMessage(''), 5500);
-      }
-    });
-
     return () => {
       isMounted = false;
       if (typeof unsubscribeBlessings === 'function') unsubscribeBlessings();
       if (typeof unsubscribeAdminDeleted === 'function') unsubscribeAdminDeleted();
-      if (typeof unsubscribeLiveDeletions === 'function') unsubscribeLiveDeletions();
-      if (typeof unsubscribeLiveRestorations === 'function') unsubscribeLiveRestorations();
-    };
-  }, []);
-
-  // Realtime subscription for instant blessing updates (including built-in & cleared proofs across all devices)
-  useEffect(() => {
-    const unsub = subscribeToLiveBlessingUpdates((updatedBlessing, oldBlessing) => {
-      if (!updatedBlessing) return;
-      const id = String(updatedBlessing.id || '');
-      const title = (updatedBlessing.title || '').trim();
-      const oldTitle = (oldBlessing?.title || '').trim();
-
-      // 1. NEVER pollute customizedBlessings with community blessings!
-      // If a local customization entry exists for this community blessing, remove it so it's clean for all users.
-      if (id) {
-        setCustomizedBlessings(prev => {
-          if (!prev[id]) return prev;
-          const next = { ...prev };
-          delete next[id];
-          try {
-            localStorage.setItem('nemaa_customized_blessings', JSON.stringify(next));
-          } catch {}
-          return next;
-        });
-      }
-
-      // 2. Update sharedBlessings (Community live update for everyone)
-      setSharedBlessings(prev => {
-        const next = prev.map(b => {
-          if ((id && String(b.id) === id) || (title && b.title === title) || (oldTitle && b.title === oldTitle)) {
-            return { ...b, ...updatedBlessing };
-          }
-          return b;
-        });
-        try {
-          localStorage.setItem('nemaa_shared_blessings_cache', JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-
-      // 3. Update myPublishedBlessings (Preserves author's published list)
-      setMyPublishedBlessings(prev => {
-        const next = prev.map(b => {
-          if ((id && String(b.id) === id) || (title && b.title === title) || (oldTitle && b.title === oldTitle)) {
-            return { ...b, ...updatedBlessing };
-          }
-          return b;
-        });
-        try {
-          localStorage.setItem('nemaa_my_published_blessings', JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-    });
-
-    return () => {
-      if (typeof unsub === 'function') unsub();
     };
   }, []);
 
   // Notifications fetching & real-time listening (Robust multi-tier matching)
   useEffect(() => {
     let isMounted = true;
-    const normalizeText = (str) => {
-      if (!str) return '';
-      return String(str)
-        .toLowerCase()
-        .replace(/[\u064B-\u065F\u0670]/g, '')
-        .replace(/[.,!؟،؛ـ«»"']/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    };
-
-    async function loadNotifications() {
+    async function loadNotifications(announce = false) {
       try {
-        const savedAuthor = localStorage.getItem('nemaa_author_name') || '';
-        const notifs = await fetchAuthorNotifications(myPublishedBlessings, savedAuthor);
+        const notifs = await fetchAuthorNotifications();
         if (!isMounted || !Array.isArray(notifs)) return;
+
+        const knownIds = new Set(
+          readStoredArray('nemaa_user_notifications', 'object').map(n => n.id)
+        );
+        const hasFresh = notifs.some(n => !knownIds.has(n.id));
+
         setUserNotifications(prev => {
           const merged = [...prev];
           for (const n of notifs) {
@@ -1044,6 +840,11 @@ export default function App() {
           } catch {}
           return merged;
         });
+
+        if (announce && hasFresh) {
+          setToastMessage(currentLangRef.current === 'ar' ? 'وصلتك رسالة جديدة من إدارة المنصة في بريد الإشعارات 🔔' : 'New notification from Admin in your inbox 🔔');
+          setTimeout(() => setToastMessage(''), 5000);
+        }
       } catch (err) {
         console.warn('Failed to load author notifications:', err);
       }
@@ -1051,112 +852,10 @@ export default function App() {
 
     loadNotifications();
 
-    const unsub = subscribeToAuthorNotifications((payload) => {
-      if (!isMounted || !payload) return;
-
-      // Check if this notification is an administrative inquiry to a reporter
-      if (payload.actionType === 'reporter_inquiry' || payload.type === 'reporter_inquiry') {
-        const myDevId = getReporterDeviceId();
-        const targetDevId = (payload.reporterDeviceId || '').trim();
-        const targetReportId = String(payload.reportId || '').trim();
-
-        let isMyReport = false;
-        try {
-          const submitted = JSON.parse(localStorage.getItem('nemaa_my_submitted_reports') || '[]');
-          if (Array.isArray(submitted)) {
-            isMyReport = submitted.some(s => 
-              (s && s.reportId && String(s.reportId) === targetReportId) ||
-              (s && s.id && String(s.id) === targetReportId)
-            );
-          }
-        } catch {}
-
-        const isTargetReporter = Boolean((targetDevId && targetDevId === myDevId) || isMyReport);
-        if (isTargetReporter) {
-          const inquiryItem = {
-            id: payload.id || `inq_${Date.now()}`,
-            type: 'reporter_inquiry',
-            actionType: 'reporter_inquiry',
-            blessingTitle: payload.blessingTitle || 'نعمة أبلغت عنها',
-            blessingId: payload.blessingId || '',
-            message: payload.message || '',
-            adminEmail: payload.adminEmail || 'إدارة منصة نِعْمَة',
-            authorName: 'المُبلّغ',
-            timestamp: payload.timestamp || Date.now(),
-            status: 'unread'
-          };
-
-          setUserNotifications(prev => {
-            if (prev.some(n => n.id === inquiryItem.id)) return prev;
-            const next = [inquiryItem, ...prev];
-            try { localStorage.setItem('nemaa_user_notifications', JSON.stringify(next)); } catch {}
-            return next;
-          });
-          setToastMessage(currentLangRef.current === 'ar' ? 'وصلك استفسار من إدارة المنصة بشأن بلاغك 🔔' : 'New inquiry from Admin regarding your report 🔔');
-          setTimeout(() => setToastMessage(''), 5500);
-        }
-        return; // Handled reporter inquiry, do not process as author notification
-      }
-
-      const myTitles = new Set((myPublishedBlessingsRef.current || []).map(b => (b.title || '').trim().toLowerCase()));
-      const myNormTitles = (myPublishedBlessingsRef.current || []).map(b => normalizeText(b.title)).filter(Boolean);
-      const myIds = new Set((myPublishedBlessingsRef.current || []).map(b => String(b.id || '').toLowerCase()));
-
-      // Include user's historical published titles from localStorage (reaches author even if blessing was removed)
-      try {
-        const hist = JSON.parse(localStorage.getItem('nemaa_my_published_history') || '[]');
-        if (Array.isArray(hist)) {
-          hist.forEach(h => {
-            if (typeof h === 'string') {
-              myTitles.add(h.trim().toLowerCase());
-              myNormTitles.push(normalizeText(h));
-            } else if (h && typeof h === 'object') {
-              if (h.id) myIds.add(String(h.id).toLowerCase());
-              if (h.title) {
-                myTitles.add(h.title.trim().toLowerCase());
-                myNormTitles.push(normalizeText(h.title));
-              }
-            }
-          });
-        }
-      } catch {}
-
-      // Collect author names
-      const authorSet = new Set();
-      (myPublishedBlessingsRef.current || []).forEach(b => {
-        if (b.author && b.author.trim() && b.author !== 'محب للخير') {
-          authorSet.add(b.author.trim().toLowerCase());
-        }
-      });
-      try {
-        const storedAuthor = localStorage.getItem('nemaa_author_name');
-        if (storedAuthor && storedAuthor.trim() && storedAuthor !== 'محب للخير') {
-          authorSet.add(storedAuthor.trim().toLowerCase());
-        }
-      } catch {}
-
-      const notifTitle = (payload.blessingTitle || '').trim().toLowerCase();
-      const notifNormTitle = normalizeText(payload.blessingTitle || '');
-      const notifId = String(payload.blessingId || '').toLowerCase();
-      const notifAuthor = (payload.authorName || '').trim().toLowerCase();
-
-      const idMatch = notifId && myIds.has(notifId);
-      const titleMatch = (notifTitle && myTitles.has(notifTitle)) ||
-        (notifNormTitle && myNormTitles.some(mnt => mnt === notifNormTitle || mnt.includes(notifNormTitle) || notifNormTitle.includes(mnt)));
-      const authorMatch = notifAuthor && authorSet.has(notifAuthor);
-
-      if (idMatch || titleMatch || authorMatch) {
-        setUserNotifications(prev => {
-          if (prev.some(n => n.id === payload.id)) return prev;
-          const next = [payload, ...prev];
-          try {
-            localStorage.setItem('nemaa_user_notifications', JSON.stringify(next));
-          } catch {}
-          return next;
-        });
-        setToastMessage(currentLangRef.current === 'ar' ? 'وصلتك رسالة جديدة من إدارة المنصة في بريد الإشعارات 🔔' : 'New notification from Admin in your inbox 🔔');
-        setTimeout(() => setToastMessage(''), 5000);
-      }
+    // The realtime message is only a "ping": the real content is always read from the server
+    const unsub = subscribeToAuthorNotifications(() => {
+      if (!isMounted) return;
+      loadNotifications(true);
     });
 
     return () => {
@@ -1350,8 +1049,7 @@ export default function App() {
   // 4. Current Blessing Navigation (Distinct Random blessing on every app open)
   const [currentIndex, setCurrentIndex] = useState(() => {
     try {
-      const saved = localStorage.getItem('nemaa_custom_blessings');
-      const customList = saved ? JSON.parse(saved) : [];
+      const customList = readStoredArray('nemaa_custom_blessings', 'blessing');
       const pool = [...customList, ...INITIAL_BLESSINGS];
       const lastSeenId = sessionStorage.getItem('nemaa_last_seen_blessing_id');
 
@@ -1428,14 +1126,9 @@ export default function App() {
   }, [filteredBlessings, currentIndex]);
 
   // 5. Favorites Management
-  const [favorites, setFavorites] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nemaa_favorites');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [favorites, setFavorites] = useState(() =>
+    readStoredArray('nemaa_favorites', 'primitive')
+  );
 
   const toggleFavorite = (id) => {
     setFavorites(prev => {
@@ -1476,6 +1169,9 @@ export default function App() {
       const saved = localStorage.getItem('nemaa_daily_stats');
       if (saved) {
         const parsed = JSON.parse(saved);
+        if (!parsed || typeof parsed !== 'object' || typeof parsed.count !== 'number' || !Number.isFinite(parsed.count)) {
+          throw new Error('invalid daily stats');
+        }
         if (parsed.date === todayStr) {
           return parsed;
         } else {
@@ -1622,6 +1318,14 @@ export default function App() {
     const strId = String(blessing.id);
     const title = (blessing.title || '').trim();
 
+    // 0. Delete on the server FIRST — never report success unless the server accepted it
+    const delRes = await deleteSharedBlessing(blessing);
+    if (!delRes.success) {
+      setToastMessage(explainBackendError(delRes.reason, currentLang));
+      setTimeout(() => setToastMessage(''), 7000);
+      return;
+    }
+
     // 1. Remove from myPublishedBlessings
     setMyPublishedBlessings(prev => {
       const updated = prev.filter(b => String(b.id) !== strId && b.title !== title);
@@ -1649,12 +1353,7 @@ export default function App() {
       return updated;
     });
 
-    // 4. Remote delete from Supabase
-    try {
-      await deleteSharedBlessing(blessing);
-    } catch {}
-
-    // 5. Remove from user cloud account if authenticated
+    // 4. Remove from user cloud account if authenticated
     removeBlessingFromUserCloud(blessing.id, blessing.title).catch(() => {});
 
     setToastMessage(currentLang === 'ar' ? 'تم حذف النعمة بنجاح' : 'Blessing deleted successfully');
@@ -1670,6 +1369,14 @@ export default function App() {
     if (!window.confirm(confirmPrompt)) return;
 
     const strId = String(blessing.id);
+
+    // Delete on the server FIRST — never report success unless the server accepted it
+    const delRes = await deleteSharedBlessing(blessing);
+    if (!delRes.success) {
+      setToastMessage(explainBackendError(delRes.reason, currentLang));
+      setTimeout(() => setToastMessage(''), 7000);
+      return;
+    }
 
     // Remove from local published IDs
     setMyPublishedIds(prev => {
@@ -1698,13 +1405,6 @@ export default function App() {
       return updated;
     });
 
-    // Call Supabase delete
-    try {
-      await deleteSharedBlessing(blessing);
-    } catch (err) {
-      console.warn('Error deleting shared blessing from Supabase:', err);
-    }
-
     const deletedMsg = currentLang === 'ar' ? 'تم حذف النعمة المنشورة بنجاح' : 'Published blessing deleted successfully';
     setToastMessage(deletedMsg);
     setTimeout(() => {
@@ -1719,6 +1419,21 @@ export default function App() {
     const strId = isObj ? String(blessingOrId.id) : String(blessingOrId);
     const title = isObj ? (blessingOrId.title || '').trim() : '';
     const reflection = isObj ? (blessingOrId.reflection || '').trim() : '';
+
+    // 0. Server first: archive (backup + hide for everyone), then delete. If either step is
+    //    refused we stop and say so — nothing is removed locally for a deletion that didn't happen.
+    const archiveRes = await recordAdminDeletedBlessing(blessingOrId, adminEmail);
+    if (!archiveRes.success) {
+      setToastMessage(explainBackendError(archiveRes.reason, currentLang));
+      setTimeout(() => setToastMessage(''), 7000);
+      return;
+    }
+    const remoteDelRes = await deleteSharedBlessing(blessingOrId);
+    if (!remoteDelRes.success) {
+      setToastMessage(explainBackendError(remoteDelRes.reason, currentLang));
+      setTimeout(() => setToastMessage(''), 7000);
+      return;
+    }
 
     // 1. Permanently register as deleted in adminDeletedIds (both ID and title)
     setAdminDeletedIds(prev => {
@@ -1796,21 +1511,6 @@ export default function App() {
       return updated;
     });
 
-    // 7. Remote delete from Supabase if shared
-    try {
-      await deleteSharedBlessing(blessingOrId);
-    } catch (err) {
-      console.warn('Admin remote delete error:', err);
-    }
-
-    // 8. Remote record in Supabase 'admin_deleted_blessings' table
-    // (This ensures all users on all devices have this blessing hidden)
-    try {
-      await recordAdminDeletedBlessing(blessingOrId, adminEmail);
-    } catch (err) {
-      console.warn('Admin record deleted error:', err);
-    }
-
     setToastMessage(currentLang === 'ar' ? 'تم حذف النعمة نهائياً وتطبيق ذلك لجميع المستخدمين' : 'Blessing permanently deleted for all users');
     setTimeout(() => setToastMessage(''), 4500);
 
@@ -1824,15 +1524,25 @@ export default function App() {
     const oldTitle = (oldBlessing.title || '').trim();
     const oldId = String(oldBlessing.id || '');
 
-    // 1. Update in Supabase remote
+    // Is this a community (shared) blessing? Only those live on the server;
+    // built-in blessings are customised locally on this device.
+    const isSharedBlessing = oldBlessing.isShared ||
+                             myPublishedIds.includes(oldId) ||
+                             String(oldId).startsWith('sb_') ||
+                             String(oldId).startsWith('pb_') ||
+                             String(oldId).startsWith('custom_');
+
+    // 1. Update on the server FIRST. If the server refuses we stop with a real error
+    //    (the edit modal / admin screen show it) instead of pretending the edit was saved.
     let updatedRemote = null;
-    try {
+    if (isSharedBlessing) {
       const res = await updateSharedBlessing(oldBlessing, newFields);
-      if (res && res.data) {
+      if (res && res.success && res.data) {
         updatedRemote = res.data;
+      } else if (!res || res.reason !== 'not_found') {
+        // 'not_found' = a purely local leftover that was never on the server → keep editing locally
+        throw new Error(explainBackendError(res && res.reason, currentLang));
       }
-    } catch (err) {
-      console.warn('Error updating blessing in Supabase:', err);
     }
 
     const cleanProof = newFields.proof !== undefined 
@@ -1852,9 +1562,6 @@ export default function App() {
       proof: cleanProof,
       proofSource: cleanProofSource
     };
-
-    // Broadcast instant update event to all connected devices in real time
-    broadcastBlessingUpdate({ updated: mergedUpdated, old: oldBlessing }).catch(() => {});
 
     // 2. Update in myPublishedBlessings (Preserves user's ownership permanently)
     setMyPublishedBlessings(prev => {
@@ -1900,17 +1607,11 @@ export default function App() {
 
     // 4. Handle customization vs shared blessing:
     // If it's a shared community blessing, clear any local customization key so it never displays "صياغتي الخاصة"
-    const isSharedBlessing = oldBlessing.isShared || 
-                             myPublishedIds.includes(oldId) || 
-                             String(oldId).startsWith('sb_') || 
-                             String(oldId).startsWith('pb_') ||
-                             String(oldId).startsWith('custom_');
-
     if (isSharedBlessing) {
       handleResetCustomization(oldBlessing.id);
       // Also update in historical published titles so author still matches if admin sends messages
       try {
-        const hist = JSON.parse(localStorage.getItem('nemaa_my_published_history') || '[]');
+        const hist = readStoredArray('nemaa_my_published_history', 'object');
         hist.unshift({ id: oldId, title: mergedUpdated.title, author: mergedUpdated.author, timestamp: Date.now() });
         localStorage.setItem('nemaa_my_published_history', JSON.stringify(hist.slice(0, 50)));
       } catch {}
@@ -2358,6 +2059,7 @@ export default function App() {
       />
 
       {/* Hidden Admin Management Modal */}
+      {isAdminModalOpen && (<Suspense fallback={null}>
       <AdminScreen
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
@@ -2372,8 +2074,10 @@ export default function App() {
         getBlessingPraises={getBlessingPraises}
         lang={currentLang}
       />
+      </Suspense>)}
 
       {/* Full-Screen Dedicated Settings View (صفحة الإعدادات الشاملة المستقلة) */}
+      {isSettingsOpen && (<Suspense fallback={null}>
       <SettingsScreen
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -2411,6 +2115,7 @@ export default function App() {
         onOpenAuth={() => setIsAuthOpen(true)}
         onSignOut={handleSignOut}
       />
+      </Suspense>)}
 
       {/* Permanent User Identity & Cloud Sync Modal (تسجيل الدخول وربط النعم بالسحاب) */}
       <AuthModal

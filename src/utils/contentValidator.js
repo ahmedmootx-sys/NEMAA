@@ -29,17 +29,43 @@ function isLatinGibberish(str) {
 }
 
 /**
+ * توحيد النص قبل الفحص: يُزيل التشكيل والتطويل (ـ) وعلامات المصحف ويوحّد الألف والياء والتاء المربوطة
+ * حتى لا تمرّ كلمة بذيئة بإضافة حركة أو مدّ. (النص السابق كان يحوّل التشكيل إلى مسافة فتفلت الكلمة.)
+ */
+export function normalizeForModeration(str) {
+  return (str || '')
+    .toLowerCase()
+    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/[^\u0621-\u064A\u0660-\u0669a-z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// الكلمات المفردة تُطابَق كلمةً كاملة (فلا تُحجب «كسوة» بسبب «كس»)، والعبارات تُطابَق كعبارة.
+const NORMALIZED_BLOCKLIST = PROFANITY_BLOCKLIST.map(normalizeForModeration).filter(Boolean);
+const BLOCKED_WORDS = new Set(NORMALIZED_BLOCKLIST.filter(w => !w.includes(' ')));
+const BLOCKED_PHRASES = NORMALIZED_BLOCKLIST.filter(w => w.includes(' '));
+
+/**
  * Checks if string contains any prohibited profanity word
  */
 function containsProfanity(str) {
   if (!str) return false;
-  const normalized = str
-    .toLowerCase()
-    .replace(/[^\u0621-\u064A\u0660-\u0669a-zA-Z\s]/g, ' ')
-    .replace(/\s+/g, ' ');
-
-  const words = normalized.split(' ');
-  return words.some(w => PROFANITY_BLOCKLIST.includes(w.trim()));
+  const normalized = normalizeForModeration(str);
+  // نسخة ثانية تدمج الحرف المكرّر 3 مرات فأكثر («كللللب» → «كلب»)
+  const collapsed = normalized.replace(/(.)\1{2,}/g, '$1');
+  for (const text of [normalized, collapsed]) {
+    const words = text.split(' ');
+    if (words.some(w => BLOCKED_WORDS.has(w))) return true;
+    const padded = ' ' + text + ' ';
+    if (BLOCKED_PHRASES.some(p => padded.includes(' ' + p + ' '))) return true;
+  }
+  return false;
 }
 
 /**

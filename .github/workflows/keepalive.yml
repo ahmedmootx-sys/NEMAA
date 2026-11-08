@@ -1,0 +1,25 @@
+name: Supabase Keep-Alive
+
+# مشروع Supabase المجاني يُوقَف تلقائياً بعد 7 أيام بلا نشاط، فيتوقف التطبيق عن العمل للجميع.
+# هذا الـ workflow يرسل طلب قراءة خفيفاً كل 3 أيام ليبقى المشروع نشطاً.
+# (يقرأ العنوان والمفتاح العام من src/supabaseClient.js؛ المفتاح عام أصلاً ومضمّن في التطبيق.)
+
+on:
+  schedule:
+    - cron: '17 3 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Ping Supabase
+        run: node scripts/keepalive.mjs

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sparkles, BookOpen, Heart, Check, Download, Share2, Loader2 } from 'lucide-react';
+import { X, Sparkles, Check, Download, Share2, Loader2 } from 'lucide-react';
 import { downloadMissionPoster, shareMissionPoster } from '../utils/missionPoster';
 
 export default function AppMissionModal({ isOpen, onClose, lang = 'ar' }) {
