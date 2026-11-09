@@ -2001,6 +2001,9 @@ export default function App() {
         onClose={() => setIsAddModalOpen(false)}
         onBlessingPublished={handleBlessingPublished}
         lang={currentLang}
+        isSignedIn={Boolean(currentUser)}
+        accountEmail={currentUser?.email || ''}
+        onOpenAccount={() => { setIsAddModalOpen(false); setIsSettingsOpen(true); }}
       />
 
       <SearchExploreModal

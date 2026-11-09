@@ -40,7 +40,10 @@ export default function AddBlessingModal({
   isOpen, 
   onClose, 
   onBlessingPublished,
-  lang = 'ar' 
+  lang = 'ar',
+  isSignedIn = false,
+  accountEmail = '',
+  onOpenAccount
 }) {
   const [title, setTitle] = useState(() => {
     try {
@@ -614,8 +617,61 @@ export default function AddBlessingModal({
             </div>
           )}
 
+          {/* ملكية النعمة: تنبيه واضح قبل النشر. الحساب اختياري، لكن بدونه يبقى حق التعديل والحذف في هذا المتصفح فقط */}
+          {isSignedIn ? (
+            <div
+              id="publish-account-ok"
+              style={{
+                margin: '4px 0 12px',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: 'var(--surface-sunken)',
+                border: '1px solid var(--border-subtle)',
+                fontSize: '12.5px',
+                lineHeight: 1.7
+              }}
+            >
+              {lang === 'ar'
+                ? `ستُحفظ ملكية هذه النعمة في حسابك${accountEmail ? ` (${accountEmail})` : ''}. أنت وحدك (ومشرف المنصة) من يستطيع تعديلها أو حذفها، من أي جهاز بعد تسجيل الدخول.`
+                : `Ownership of this blessing will be saved in your account${accountEmail ? ` (${accountEmail})` : ''}. Only you (and the platform admin) can edit or delete it, from any device after signing in.`}
+            </div>
+          ) : (
+            <div
+              id="publish-account-warning"
+              role="note"
+              style={{
+                margin: '4px 0 12px',
+                padding: '12px 14px',
+                borderRadius: '12px',
+                background: 'rgba(212, 175, 55, 0.12)',
+                border: '1px solid var(--color-gold)',
+                fontSize: '12.5px',
+                lineHeight: 1.7
+              }}
+            >
+              <strong>{lang === 'ar' ? 'أنت غير مسجَّل الدخول' : 'You are not signed in'}</strong>
+              <p style={{ margin: '4px 0 8px' }}>
+                {lang === 'ar'
+                  ? 'سننشر نعمتك، لكن حق تعديلها وحذفها سيبقى في هذا المتصفح فقط. إن مسحتَ بيانات المتصفح أو غيّرتَ الجهاز فلن تستطيع تعديلها. سجّل حساباً مجانياً لتُحفظ ملكيتها لك على كل أجهزتك.'
+                  : 'We will publish your blessing, but the right to edit or delete it stays in this browser only. If you clear browser data or switch device you will not be able to edit it. Create a free account to keep ownership on all your devices.'}
+              </p>
+              {typeof onOpenAccount === 'function' && (
+                <button
+                  type="button"
+                  id="btn-publish-open-account"
+                  className="btn-secondary"
+                  onClick={onOpenAccount}
+                  disabled={isSubmitting}
+                  style={{ fontSize: '12.5px', padding: '6px 12px' }}
+                >
+                  {lang === 'ar' ? 'سجّل حساباً الآن (مسودتك محفوظة)' : 'Create an account now (your draft is saved)'}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Prominent Publish Button */}
-          <button 
+          <button
             type="submit" 
             id="btn-publish-supabase"
             className="form-submit-btn publish-submit-btn"

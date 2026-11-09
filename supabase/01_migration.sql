@@ -340,6 +340,7 @@ declare
   v_title text := btrim(coalesce(p_title, ''));
   v_ref   text := btrim(coalesce(p_reflection, ''));
   v_row   public.blessings;
+  v_moved text;
 begin
   if not exists (select 1 from public.blessings where title = p_old_title) then
     raise exception 'not_found' using errcode = 'P0001';
@@ -362,6 +363,30 @@ begin
     proof_source = nullif(btrim(coalesce(p_proof_source, '')), '')
   where title = p_old_title
   returning * into v_row;
+
+  -- العنوان هو المفتاح الأساسي. عدّادات الحمد والبلاغات تُخزَّن بالعنوان دون مفتاح أجنبي،
+  -- فإن تغيّر العنوان تنتقل معه وإلا يتصفّر العدّاد ويتيتّم.
+  if v_row.title is distinct from p_old_title then
+    -- نفس قفل increment_praise وبترتيب ثابت للعنوانين حتى لا نتقاطع مع ضغطة حمد جارية ولا يحدث deadlock
+    perform pg_advisory_xact_lock(hashtext('praise:' || least(p_old_title, v_row.title)));
+    perform pg_advisory_xact_lock(hashtext('praise:' || greatest(p_old_title, v_row.title)));
+
+    select notes into v_moved from public.reports
+     where reason = 'praise_sync' and blessing_title = p_old_title;
+    if found then
+      delete from public.reports where reason = 'praise_sync' and blessing_title = p_old_title;
+      insert into public.reports (id, blessing_title, reason, notes, status, created_at)
+      values ('praise_' || substr(md5(v_row.title), 1, 12), v_row.title, 'praise_sync',
+              (case when v_moved ~ '^[0-9]+$' then v_moved::bigint else 0 end)::text, 'praise', now())
+      on conflict (id) do update set
+        reason = 'praise_sync', status = 'praise', blessing_title = excluded.blessing_title,
+        notes = ((case when public.reports.notes ~ '^[0-9]+$' and public.reports.reason = 'praise_sync'
+                       then public.reports.notes::bigint else 0 end) + excluded.notes::bigint)::text;
+    end if;
+    -- بلاغات الزوّار على النعمة تتبع عنوانها الجديد أيضاً
+    update public.reports set blessing_title = v_row.title
+     where blessing_title = p_old_title and reason <> 'praise_sync';
+  end if;
 
   return to_jsonb(v_row);
 end $$;

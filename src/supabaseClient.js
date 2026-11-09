@@ -476,7 +476,15 @@ export async function syncUserCloudBlessings(user) {
     }
 
     const stored = Array.isArray(rb.row?.my_blessings) ? rb.row.my_blessings : [];
-    let list = mergeBlessingLists(stored, legacy);
+
+    // نعم نشرها هذا الجهاز قبل تسجيل الدخول (أو قبل ظهور هذه الميزة): رموزها انضمّت للحساب أعلاه،
+    // فنضيف أيضاً قائمتها المحلية للنسخة السحابية كي تظهر في «نعمي المنشورة» على أي جهاز آخر.
+    // إضافة فقط: لا نستبدل ما في الحساب بنسخة محلية أقدم.
+    const knownTitles = new Set([...stored, ...legacy].map((b) => blessingTitleOf(b)));
+    const localOnly = readStoredArray('nemaa_my_published_blessings', 'blessing')
+      .filter((b) => (b.title || '').trim() && !knownTitles.has((b.title || '').trim()))
+      .map((b) => toCloudEntry(b));
+    let list = mergeBlessingLists(stored, legacy, localOnly);
 
     // نحذف من القائمة النعم التي لم تعد موجودة في الخادم (حذفها المؤلف أو المدير)
     const existing = await fetchExistingTitles();
