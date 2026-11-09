@@ -1007,7 +1007,17 @@ export default function App() {
   const getBlessingPraises = useCallback((blessing) => {
     if (!blessing) return 0;
     const strId = String(blessing.id);
-    if (blessingPraises[strId] !== undefined) {
+    const title = (blessing.title || '').trim();
+    const isCommunity = blessing.isShared || blessing.isCustom || strId.startsWith('sb_') || strId.startsWith('custom_') || strId.startsWith('pb_');
+    if (isCommunity) {
+      // الخادم يحفظ عدّاد الحمد بعنوان النعمة، لذلك نقرأ بالعنوان أيضاً (قبل ذلك كان يُقرأ بالمعرّف فقط
+      // فيظهر العدّاد صفراً في أي متصفح جديد). العدّاد لا ينقص أبداً فنأخذ الأكبر.
+      const byId = blessingPraises[strId];
+      const byTitle = title ? blessingPraises[title] : undefined;
+      if (byId !== undefined || byTitle !== undefined) {
+        return Math.max(Number(byId) || 0, Number(byTitle) || 0);
+      }
+    } else if (blessingPraises[strId] !== undefined) {
       return blessingPraises[strId];
     }
     if (typeof blessing.praisesCount === 'number') {
@@ -1227,7 +1237,20 @@ export default function App() {
         title,
         newCount,
         currentBlessing.author || ''
-      ).catch(() => {});
+      ).then((serverCount) => {
+        // نعم المجتمع: نعتمد رقم الخادم إن كان أكبر (متصفح جديد يبدأ من صفر محلياً بينما الخادم عنده العدد الحقيقي)
+        const isCommunity = currentBlessing.isShared || currentBlessing.isCustom || strId.startsWith('sb_') || strId.startsWith('custom_') || strId.startsWith('pb_');
+        if (!isCommunity || typeof serverCount !== 'number' || serverCount <= newCount) return;
+        setBlessingPraises(prev => {
+          const updated = { ...prev };
+          if (strId) updated[strId] = serverCount;
+          if (title) updated[title] = serverCount;
+          try {
+            localStorage.setItem('nemaa_blessing_praises', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }).catch(() => {});
     }
   };
 
