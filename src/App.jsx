@@ -62,6 +62,28 @@ import AdminBroadcastModal from './components/AdminBroadcastModal';
 import { initOneSignal } from './utils/oneSignalHelper';
 import { readStoredArray, readStoredObject, isBlessingLike } from './utils/safeStorage';
 
+
+// رسائل الإدارة: المسح يُسجَّل محلياً أولاً ثم يُحذف من الخادم، فإن فشل الحذف (شبكة) أُعيدت المحاولة عند الجلب التالي
+const PENDING_DISMISS_KEY = 'nemaa_pending_dismiss';
+function markPendingDismiss(ids) {
+  try {
+    const set = new Set(readStoredArray(PENDING_DISMISS_KEY, 'string'));
+    ids.forEach((id) => set.add(String(id)));
+    localStorage.setItem(PENDING_DISMISS_KEY, JSON.stringify([...set].slice(-200)));
+  } catch {}
+}
+function clearPendingDismiss(id) {
+  try {
+    const set = new Set(readStoredArray(PENDING_DISMISS_KEY, 'string'));
+    set.delete(String(id));
+    localStorage.setItem(PENDING_DISMISS_KEY, JSON.stringify([...set]));
+  } catch {}
+}
+async function dismissOnServer(id) {
+  const ok = await dismissAuthorNotification(id);
+  if (ok) clearPendingDismiss(id);
+  return ok;
+}
 export default function App() {
   // Initialize OneSignal Web SDK quietly (strictly no prompt on load)
   useEffect(() => {
@@ -821,24 +843,30 @@ export default function App() {
     async function loadNotifications(announce = false) {
       try {
         const notifs = await fetchAuthorNotifications();
+        // null = تعذّر الجلب: نُبقي ما نعرضه ولا نمسح شيئاً
         if (!isMounted || !Array.isArray(notifs)) return;
+
+        // رسائل مسحها المستخدم ولم يتأكد حذفها من الخادم (انقطاع شبكة مثلاً): نُخفيها ونعيد محاولة الحذف
+        const pending = new Set(readStoredArray(PENDING_DISMISS_KEY, 'string'));
+        const visible = [];
+        for (const n of notifs) {
+          if (pending.has(String(n.id))) dismissOnServer(n.id);
+          else visible.push(n);
+        }
 
         const knownIds = new Set(
           readStoredArray('nemaa_user_notifications', 'object').map(n => n.id)
         );
-        const hasFresh = notifs.some(n => !knownIds.has(n.id));
+        const hasFresh = visible.some(n => !knownIds.has(n.id));
 
+        // الخادم هو المرجع: ما حُذف من جهاز آخر أو من الإدارة يختفي هنا أيضاً (لا ندمج مع نسخة قديمة)
         setUserNotifications(prev => {
-          const merged = [...prev];
-          for (const n of notifs) {
-            if (!merged.some(m => m.id === n.id)) {
-              merged.unshift(n);
-            }
-          }
+          const prevById = new Map(prev.map(m => [m.id, m]));
+          const next = visible.map(n => ({ ...n, status: prevById.get(n.id)?.status || n.status }));
           try {
-            localStorage.setItem('nemaa_user_notifications', JSON.stringify(merged));
+            localStorage.setItem('nemaa_user_notifications', JSON.stringify(next));
           } catch {}
-          return merged;
+          return next;
         });
 
         if (announce && hasFresh) {
@@ -891,6 +919,7 @@ export default function App() {
   }, []);
 
   const handleDismissNotification = async (notifId) => {
+    markPendingDismiss([notifId]);
     setUserNotifications(prev => {
       const next = prev.filter(n => n.id !== notifId);
       try {
@@ -898,17 +927,18 @@ export default function App() {
       } catch {}
       return next;
     });
-    await dismissAuthorNotification(notifId);
+    await dismissOnServer(notifId);
   };
 
   const handleClearAllNotifications = async () => {
     const ids = userNotifications.map(n => n.id);
+    markPendingDismiss(ids);
     setUserNotifications([]);
     try {
       localStorage.removeItem('nemaa_user_notifications');
     } catch {}
     for (const id of ids) {
-      await dismissAuthorNotification(id);
+      await dismissOnServer(id);
     }
   };
 

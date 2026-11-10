@@ -816,13 +816,15 @@ export async function adminSendReporterInquiry({
 /**
  * Fetch this device's notifications (author messages + reporter inquiries) from the server.
  * The server matches them by owner-token hash, so nobody else can read them.
+ * Returns null when the fetch failed, [] when there is genuinely nothing.
  */
 export async function fetchAuthorNotifications() {
   try {
     const tokens = getNotificationTokens();
     if (tokens.length === 0) return [];
     const { data, error } = await supabase.rpc('get_my_notifications', { p_tokens: tokens });
-    if (error || !Array.isArray(data)) return [];
+    // null = تعذّر الجلب (شبكة/خادم): المستدعي لا يلمس نسخته المحلية. المصفوفة الفارغة = لا رسائل فعلاً
+    if (error || !Array.isArray(data)) return null;
     return data.map((r) => {
       const isInquiry = r.kind === 'reporter_inquiry';
       return {
@@ -840,7 +842,7 @@ export async function fetchAuthorNotifications() {
     });
   } catch (err) {
     console.warn('fetchAuthorNotifications error:', err);
-    return [];
+    return null;
   }
 }
 
