@@ -102,7 +102,9 @@ const tagMissing = (key) => ({ field: 'tag', key, relation: 'not_exists' });
 export function buildRequests(blessing, date, mode) {
   const message = buildMessage(blessing);
   if (mode !== 'slots') {
-    return [{ label: 'broadcast', body: { app_id: ONESIGNAL_APP_ID, included_segments: ['Subscribed Users'], ...message } }];
+    // الشريحة 'Total Subscriptions' هي التي نجح بها الإرسال الفعلي من لوحة الأدمن على هذا التطبيق (10 نوفمبر 2026)،
+    // بينما رجع 'Subscribed Users' بلا مستلمين رغم وجود جهاز مشترك. لذلك نعتمد الاسم المجرَّب.
+    return [{ label: 'broadcast', body: { app_id: ONESIGNAL_APP_ID, included_segments: ['Total Subscriptions'], ...message } }];
   }
 
   const timed = (time) => ({
@@ -142,6 +144,9 @@ export function buildRequests(blessing, date, mode) {
 const NO_RECIPIENTS = /not subscribed|no recipients|no subscribers|no (?:active )?(?:users|players|subscriptions)|all included/i;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// آخر ردّ «لا مستلمين» من OneSignal: نطبعه إن لم يُرسَل شيء، حتى لا يبقى السبب مخفياً خلف كلمة skipped
+let lastSkip = null;
+
 /** يُرجع 'sent' | 'skipped' (لا مستلمين لهذه الشريحة، وهذا طبيعي) | 'failed' */
 export async function sendOne(req, fetchImpl = fetch) {
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -163,7 +168,10 @@ export async function sendOne(req, fetchImpl = fetch) {
       if (data.errors) console.warn(`⚠️  [${req.label}] sent with warnings:`, errText);
       return 'sent';
     }
-    if (NO_RECIPIENTS.test(errText)) return 'skipped';
+    if (NO_RECIPIENTS.test(errText)) {
+      lastSkip = { label: req.label, text: errText };
+      return 'skipped';
+    }
     if (response.status === 429 || response.status >= 500) {
       const wait = Number(response.headers?.get?.('retry-after')) || attempt * 2;
       console.error(`⚠️  [${req.label}] HTTP ${response.status}, retrying in ${wait}s`);
@@ -217,7 +225,11 @@ async function main() {
   }
   console.log(`\nSummary: sent=${tally.sent} skipped(no recipients)=${tally.skipped} failed=${tally.failed}`);
   if (tally.failed > 0) process.exit(1);
-  if (tally.sent === 0) console.log('ℹ️  Nothing was sent: no subscribed recipients matched. This is normal when nobody is subscribed yet.');
+  if (tally.sent === 0) {
+    console.log('ℹ️  Nothing was sent: no subscribed recipients matched. This is normal when nobody is subscribed yet.');
+    if (lastSkip) console.log(`   OneSignal's last reply [${lastSkip.label}]: ${lastSkip.text}`);
+    if (MODE === 'broadcast') console.log('   If your OneSignal dashboard shows devices with status Subscribed, the segment name in this script does not match your app.');
+  }
 }
 
 // لا يعمل تلقائياً عند الاستيراد (للاختبار)
