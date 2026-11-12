@@ -107,10 +107,12 @@ export function buildRequests(blessing, date, mode) {
     return [{ label: 'broadcast', body: { app_id: ONESIGNAL_APP_ID, included_segments: ['Total Subscriptions'], ...message } }];
   }
 
+  // ملاحظة: لا نُرسل throttle_rate_per_minute إطلاقاً، حتى بالقيمة 0.
+  // وثائق OneSignal تقول اجعله 0 مع التسليم بحسب المنطقة الزمنية، لكن الخطة المجانية ترفض وجود الحقل نفسه
+  // (HTTP 400: "This app is not entitled to use throttling")، والتسليم بحسب المنطقة الزمنية متاح بدونه في الخطة المجانية.
   const timed = (time) => ({
     delayed_option: 'timezone',
-    delivery_time_of_day: time,
-    throttle_rate_per_minute: 0 // مطلوب من OneSignal مع التسليم بحسب المنطقة الزمنية
+    delivery_time_of_day: time
   });
   const reqs = [];
 
@@ -146,6 +148,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // آخر ردّ «لا مستلمين» من OneSignal: نطبعه إن لم يُرسَل شيء، حتى لا يبقى السبب مخفياً خلف كلمة skipped
 let lastSkip = null;
+// آخر رفض (HTTP 4xx) من OneSignal، لنكتشف الخطأ المنهجي (نفس الرفض لكل الطلبات) ونتوقف مبكراً
+let lastFail = null;
 
 /** يُرجع 'sent' | 'skipped' (لا مستلمين لهذه الشريحة، وهذا طبيعي) | 'failed' */
 export async function sendOne(req, fetchImpl = fetch) {
@@ -179,6 +183,7 @@ export async function sendOne(req, fetchImpl = fetch) {
       continue;
     }
     console.error(`❌ [${req.label}] OneSignal rejected the request (HTTP ${response.status}):`, JSON.stringify(data));
+    lastFail = { label: req.label, status: response.status, text: JSON.stringify(data) };
     return 'failed';
   }
   return 'failed';
@@ -217,10 +222,27 @@ async function main() {
   }
 
   const tally = { sent: 0, skipped: 0, failed: 0 };
+  let sameFailStreak = 0;
+  let prevFailText = null;
+  let attempted = 0;
   for (const r of requests) {
     const result = await sendOne(r);
+    attempted++;
     tally[result]++;
     if (result === 'sent') console.log(`✅ [${r.label}] dispatched`);
+    if (result === 'failed' && lastFail) {
+      sameFailStreak = lastFail.text === prevFailText ? sameFailStreak + 1 : 1;
+      prevFailText = lastFail.text;
+    } else {
+      sameFailStreak = 0;
+      prevFailText = null;
+    }
+    // نفس الرفض لأول 3 طلبات ولم ينجح أي شيء: العطل منهجي (إعداد/خطة/مفتاح)، فلا نغرق السجل بمئة سطر متطابقة
+    if (sameFailStreak >= 3 && tally.sent === 0 && tally.skipped === 0) {
+      console.error(`⛔ Stopping early: the first ${sameFailStreak} requests were all rejected with the same error, so the rest would fail too (${requests.length - attempted} request(s) not attempted).`);
+      console.error(`   OneSignal said: ${lastFail.text}`);
+      break;
+    }
     if (requests.length > 1) await sleep(250);
   }
   console.log(`\nSummary: sent=${tally.sent} skipped(no recipients)=${tally.skipped} failed=${tally.failed}`);
