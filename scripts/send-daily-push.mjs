@@ -12,6 +12,7 @@
  *   ONESIGNAL_API_URL  لتغيير العنوان في الاختبارات فقط.
  */
 import fs from 'fs';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -27,10 +28,33 @@ const MODE = (process.env.PUSH_MODE || 'broadcast').trim().toLowerCase() === 'sl
 const DRY_RUN = ['1', 'true', 'yes'].includes(String(process.env.DRY_RUN || '').toLowerCase());
 const SCHEDULE = (process.env.SCHEDULE || '').trim();
 
-// جدولان في الـ workflow: واحد للوضع العادي وواحد للوضع بحسب الوقت (يعمل بعد منتصف الليل UTC
-// حتى تكون أوقات اليوم المحلية كلها لم تفُت بعد في معظم المناطق).
+// جدولان في الـ workflow: واحد للوضع العادي وواحد للوضع بحسب الوقت.
+//
+// لماذا 21:17 UTC وليس 00:30؟ مع delayed_option=timezone يُسلِّم OneSignal كل مستخدم عند أول مرة تأتي فيها
+// الساعة المطلوبة بتوقيته **بعد استلام الطلب**؛ فإن كانت قد فاتت اليوم يؤجلها لليوم التالي ويبقى الإشعار
+// «قيد الإرسال/معلقاً» حتى 24 ساعة. وجدول 00:30 كان GitHub ينفّذه متأخراً (06:58 و 07:27 UTC)، أي بعد
+// 08:00 صباحاً بتوقيت مصر/السعودية، فتنتقل شريحة «صباحاً» لليوم التالي، ويتغير يوم التسليم بحسب مقدار التأخير
+// (يوم بلا إشعار ثم يوم بإشعارين). 21:17 UTC = قبيل منتصف الليل في المنطقة العربية، فحتى تأخير 7 ساعات يبقى
+// قبل الصباح، ودقيقة 17 تتجنب ازدحام رأس الساعة الذي يسبب التأخير.
 export const BROADCAST_CRON = '0 6 * * *';
-export const SLOTS_CRON = '30 0 * * *';
+export const SLOTS_CRON = '17 21 * * *';
+
+/**
+ * «يوم الإرسال» الذي ينتمي له التشغيل: تاريخ UTC بعد إضافة 12 ساعة.
+ * تشغيل 21:17 يوم 12 وتشغيل متأخر حتى ظهر يوم 13 وتشغيل يدوي ليلة 12 كلها = يوم 13، فتأخذ نفس مفتاح منع التكرار.
+ */
+export function pushDay(date) {
+  return new Date(date.getTime() + 12 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/** UUID ثابت (بصيغة RFC 9562 v5) من نص؛ OneSignal يشترط UUID في idempotency_key ويحفظه 30 يوماً */
+export function stableUuid(text) {
+  const h = crypto.createHash('sha1').update(`nemaa-daily-push:${text}`).digest();
+  h[6] = (h[6] & 0x0f) | 0x50;
+  h[8] = (h[8] & 0x3f) | 0x80;
+  const x = h.subarray(0, 16).toString('hex');
+  return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20, 32)}`;
+}
 
 // أوقات الخيارات الثابتة في الإعدادات (نفس نصوص الواجهة)
 export const FIXED_SLOTS = { morning: '08:00', midday: '13:00', evening: '18:00', night: '22:30' };
@@ -100,6 +124,15 @@ const tagMissing = (key) => ({ field: 'tag', key, relation: 'not_exists' });
 
 /** يُرجع قائمة الطلبات (كل عنصر: وصف + جسم الطلب) حسب الوضع */
 export function buildRequests(blessing, date, mode) {
+  // نفس اليوم + نفس الشريحة = نفس المفتاح، فلا يُرسل OneSignal نسخة ثانية مهما تكرر التشغيل
+  const day = pushDay(date);
+  return buildRequestsRaw(blessing, date, mode).map((r) => ({
+    ...r,
+    body: { ...r.body, idempotency_key: stableUuid(`${day}:${mode}:${r.label}`) }
+  }));
+}
+
+function buildRequestsRaw(blessing, date, mode) {
   const message = buildMessage(blessing);
   if (mode !== 'slots') {
     // الشريحة 'Total Subscriptions' هي التي نجح بها الإرسال الفعلي من لوحة الأدمن على هذا التطبيق (10 نوفمبر 2026)،
@@ -151,7 +184,7 @@ let lastSkip = null;
 // آخر رفض (HTTP 4xx) من OneSignal، لنكتشف الخطأ المنهجي (نفس الرفض لكل الطلبات) ونتوقف مبكراً
 let lastFail = null;
 
-/** يُرجع 'sent' | 'skipped' (لا مستلمين لهذه الشريحة، وهذا طبيعي) | 'failed' */
+/** يُرجع 'sent' | 'duplicate' (أُرسل سابقاً لنفس اليوم) | 'skipped' (لا مستلمين لهذه الشريحة، وهذا طبيعي) | 'failed' */
 export async function sendOne(req, fetchImpl = fetch) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     let response, data;
@@ -169,6 +202,10 @@ export async function sendOne(req, fetchImpl = fetch) {
     }
     const errText = JSON.stringify(data?.errors || '');
     if (response.ok && data?.id) {
+      if (response.headers?.get?.('idempotent-replayed') === 'true') {
+        console.log(`↩️  [${req.label}] already sent earlier for this day (idempotency key), not sent again`);
+        return 'duplicate';
+      }
       if (data.errors) console.warn(`⚠️  [${req.label}] sent with warnings:`, errText);
       return 'sent';
     }
@@ -203,10 +240,12 @@ async function main() {
     }
   }
 
-  const blessing = pickBlessing(loadPool(), now);
+  // النعمة ووقت «عشوائي» يُحسبان من يوم الإرسال لا من لحظة التشغيل، فيتطابق أي تشغيل متكرر لنفس اليوم
+  const target = new Date(`${pushDay(now)}T00:00:00Z`);
+  const blessing = pickBlessing(loadPool(), target);
   console.log(`Selected Blessing: "${blessing.title}" — ${blessing.author || 'حكمة مأثورة'}`);
 
-  const requests = buildRequests(blessing, now, MODE);
+  const requests = buildRequests(blessing, target, MODE);
 
   if (DRY_RUN) {
     for (const r of requests.slice(0, 8)) console.log(`\n[${r.label}]\n${JSON.stringify(r.body, null, 2)}`);
@@ -221,7 +260,7 @@ async function main() {
     process.exit(1);
   }
 
-  const tally = { sent: 0, skipped: 0, failed: 0 };
+  const tally = { sent: 0, duplicate: 0, skipped: 0, failed: 0 };
   let sameFailStreak = 0;
   let prevFailText = null;
   let attempted = 0;
@@ -238,16 +277,16 @@ async function main() {
       prevFailText = null;
     }
     // نفس الرفض لأول 3 طلبات ولم ينجح أي شيء: العطل منهجي (إعداد/خطة/مفتاح)، فلا نغرق السجل بمئة سطر متطابقة
-    if (sameFailStreak >= 3 && tally.sent === 0 && tally.skipped === 0) {
+    if (sameFailStreak >= 3 && tally.sent === 0 && tally.duplicate === 0 && tally.skipped === 0) {
       console.error(`⛔ Stopping early: the first ${sameFailStreak} requests were all rejected with the same error, so the rest would fail too (${requests.length - attempted} request(s) not attempted).`);
       console.error(`   OneSignal said: ${lastFail.text}`);
       break;
     }
     if (requests.length > 1) await sleep(250);
   }
-  console.log(`\nSummary: sent=${tally.sent} skipped(no recipients)=${tally.skipped} failed=${tally.failed}`);
+  console.log(`\nSummary (push day ${pushDay(now)}): sent=${tally.sent} already-sent=${tally.duplicate} skipped(no recipients)=${tally.skipped} failed=${tally.failed}`);
   if (tally.failed > 0) process.exit(1);
-  if (tally.sent === 0) {
+  if (tally.sent === 0 && tally.duplicate === 0) {
     console.log('ℹ️  Nothing was sent: no subscribed recipients matched. This is normal when nobody is subscribed yet.');
     if (lastSkip) console.log(`   OneSignal's last reply [${lastSkip.label}]: ${lastSkip.text}`);
     if (MODE === 'broadcast') console.log('   If your OneSignal dashboard shows devices with status Subscribed, the segment name in this script does not match your app.');
